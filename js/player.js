@@ -380,7 +380,13 @@
       const headTile = Math.floor((ny + 2) / TS), footTile = Math.floor((ny + this.h - 2) / TS);
       if (!W().isLadder(tx, headTile) && !W().isLadder(tx, footTile)) { this.state = 'normal'; return; }
       if (v > 0 && W().solid(tx, Math.floor((ny + this.h) / TS)) === 1) { this.state = 'normal'; this.y = Math.floor((ny + this.h) / TS) * TS - this.h; this.vy = 0; this.onGround = true; this.ladderCool = 0.3; return; }
-      if (v < 0 && !W().isLadder(tx, footTile) && !W().isLadder(tx, Math.floor((ny + this.h - 10) / TS))) { this.state = 'normal'; this.vy = -120; return; }
+      if (v < 0 && !W().isLadder(tx, headTile) && !W().isLadder(tx, footTile) && !W().isLadder(tx, Math.floor((ny + this.h - 10) / TS))) {
+        // Step off the top rung onto it.
+        this.state = 'normal';
+        const top = Math.floor((ny + this.h + 2) / TS);
+        if (W().solid(tx, top) >= 1) { this.y = top * TS - this.h; this.vy = 0; this.onGround = true; } else this.vy = -120;
+        return;
+      }
       this.y = ny;
       if (Math.abs(this.vy) > 1) { this.stepT -= dt * 3; if (this.stepT <= 0) { this.stepT = 1; H.Audio.step(true, 0.05); } }
       if (In.hit('jump')) { this.state = 'normal'; this.vy = -250; const d = (In.held('right') ? 1 : 0) - (In.held('left') ? 1 : 0); this.vx = d * 140; }

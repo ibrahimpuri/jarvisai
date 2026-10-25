@@ -30,11 +30,11 @@ const TG = targets();
 const PHASES = [['low', 10], ['high', 10], ['ebbing', 60], ['rising', 60]];
 
 const GW = 8 * 40, GH = 6 * 23;
-function analyse(abil, flags, extraSolid = []) {
+function analyse(abil, flags, extraSolid = [], opts = {}) {
   W.flags = Object.assign({}, flags);
   const can = (a) => abil.includes(a);
   // Precompute per-phase grids: 0 empty,1 solid,2 one-way; water bits.
-  const grids = PHASES.map(([ph, into]) => {
+  const grids = (opts.phases || PHASES).map(([ph, into]) => {
     T.setPhase(ph, into);
     const sol = new Uint8Array(GW * GH), wat = new Uint8Array(GW * GH), lad = new Uint8Array(GW * GH), room = new Uint8Array(GW * GH);
     for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) {
@@ -53,6 +53,9 @@ function analyse(abil, flags, extraSolid = []) {
   const rings = [];
   for (const r of H.ROOMS) for (let y = 0; y < r.th; y++) for (let x = 0; x < r.tw; x++) if (W.charAt(r.ox + x, r.oy + y) === 'o') rings.push([r.ox + x, r.oy + y]);
   const seen = new Uint8Array(GW * GH);
+  const from = new Int32Array(GW * GH).fill(-1);
+  const how = new Array(GW * GH);
+  let cur = -1, curHow = '';
   let count = 0;
   let g = grids[0];
   const inb = (x, y) => x >= 0 && y >= 0 && x < GW && y < GH;
@@ -64,10 +67,31 @@ function analyse(abil, flags, extraSolid = []) {
   const brine = (x, y) => wbits(x, y) & 2;
   const deep = (x, y) => wbits(x, y) & 4;
   const ladder = (x, y) => inb(x, y) && g.lad[y * GW + x];
-  const stand = (x, y) => bodyFree(x, y) && solid(x, y + 1) >= 1;
+  const spikes = (x, y) => W.charAt(x, y) === 'x';
+  const stand = (x, y) => bodyFree(x, y) && solid(x, y + 1) >= 1 && !spikes(x, y);
   const swimOK = (x, y) => water(x, y) && !(brine(x, y) && can('boots')) && !(deep(x, y) && !can('seal'));
   const queue = [];
-  const push = (x, y) => { if (!inb(x, y)) return; const i = y * GW + x; if (!seen[i] && bodyFree(x, y) && g.room[i]) { seen[i] = 1; count++; queue.push(i); } };
+  const dist = opts.dijkstra ? new Float64Array(GW * GH).fill(Infinity) : null;
+  const heap = [];
+  const hpush = (d, i) => { heap.push([d, i]); let k = heap.length - 1; while (k > 0) { const pk = (k - 1) >> 1; if (heap[pk][0] <= heap[k][0]) break; [heap[pk], heap[k]] = [heap[k], heap[pk]]; k = pk; } };
+  const hpop = () => { const top = heap[0]; const last = heap.pop(); if (heap.length) { heap[0] = last; let k = 0; for (;;) { const l = 2 * k + 1, r = l + 1; let m = k; if (l < heap.length && heap[l][0] < heap[m][0]) m = l; if (r < heap.length && heap[r][0] < heap[m][0]) m = r; if (m === k) break; [heap[m], heap[k]] = [heap[k], heap[m]]; k = m; } } return top; };
+  const edges = opts.edges ? new Set() : null;
+  const COST = { w: 1, l: 1, s: 1.3, b: 1.3, d: 2, j: 6, r: 20, start: 0 };
+  const push = (x, y, mv) => {
+    if (!inb(x, y)) return; const i = y * GW + x;
+    if (!bodyFree(x, y) || !g.room[i]) return;
+    mv = mv || curHow;
+    if (dist) {
+      const cx0 = cur >= 0 ? cur % GW : x, cy0 = cur >= 0 ? Math.floor(cur / GW) : y;
+      const jetJump = mv === 'j' && (cy0 - y > 3 || Math.abs(x - cx0) > (cy0 - y >= 2 ? 4 : 5));
+      const c = (COST[mv] || 1) + (mv === 'j' ? Math.abs(x - cx0) + Math.abs(y - cy0) + (jetJump ? 30 : 0) : mv === 'w' ? Math.abs(x - cx0) + Math.max(0, y - cy0) * 0.3 : 0);
+      const nd = (cur >= 0 ? dist[cur] : 0) + c;
+      if (nd < dist[i]) { dist[i] = nd; if (!seen[i]) count++; seen[i] = 1; from[i] = cur; how[i] = mv; hpush(nd, i); }
+      return;
+    }
+    if (edges && cur >= 0 && cur !== i) edges.add(cur * GW * GH + i);
+    if (!seen[i]) { seen[i] = 1; count++; queue.push(i); from[i] = cur; how[i] = mv; }
+  };
   const fall = (x, y) => {
     for (let k = 0; k < 80; k++) {
       if (!bodyFree(x, y)) return;
@@ -89,17 +113,20 @@ function analyse(abil, flags, extraSolid = []) {
   };
   const losT = (x1, y1, x2, y2) => { const n = Math.max(Math.abs(x2 - x1), Math.abs(y2 - y1)) * 2; for (let i = 1; i < n; i++) { const t = i / n; if (!free(Math.round(x1 + (x2 - x1) * t), Math.round(y1 + (y2 - y1) * t))) return false; } return true; };
   const step = (x, y) => {
+    cur = y * GW + x; curHow = 'w';
     const inW = water(x, y);
     const grounded = stand(x, y) || ladder(x, y) || ladder(x, y - 1);
     const surface = inW && !water(x, y - 1);
     const crushed = inW && deep(x, y) && !can('seal');
     if (inW && (brine(x, y) || crushed)) {
+      curHow = 'b';
       // boots off: float up and sideways (boots can be toggled at any time)
       for (const [dx, dy] of [[1, 0], [-1, 0], [0, -1]]) { const nx = x + dx, ny = y + dy; if (bodyFree(nx, ny)) { if (water(nx, ny)) push(nx, ny); else fall(nx, ny); } }
       if (!water(x, y - 1) || !water(x, y - 2)) for (let dy = 0; dy <= 2; dy++) for (let dx = -3; dx <= 3; dx++) if (stand(x + dx, y - dy) && arc(x, y, x + dx, y - dy)) push(x + dx, y - dy);
       if (!can('boots') || crushed) return;
     }
     if (swimOK(x, y)) {
+      curHow = 's';
       for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
         const nx = x + dx, ny = y + dy;
         if (!bodyFree(nx, ny)) continue;
@@ -107,12 +134,16 @@ function analyse(abil, flags, extraSolid = []) {
       }
     }
     if (ladder(x, y) || ladder(x, y - 1)) {
+      curHow = 'l';
       for (const dy of [-1, 1]) if (bodyFree(x, y + dy) && (ladder(x, y + dy) || ladder(x, y + dy - 1) || stand(x, y + dy))) push(x, y + dy);
       if (!ladder(x, y - 1) && ladder(x, y)) fall(x, y - 1);
     }
     if (!(grounded || surface)) return;
-    for (const dx of [-1, 1]) { if (bodyFree(x + dx, y)) fall(x + dx, y); else if (bodyFree(x + dx, y - 1) && stand(x + dx, y - 1)) push(x + dx, y - 1); }
+    curHow = 'w';
+    for (const dx of [-1, 1]) { if (bodyFree(x + dx, y)) fall(x + dx, y); else if (bodyFree(x + dx, y - 1) && stand(x + dx, y - 1)) push(x + dx, y - 1, 'j'); }
+    curHow = 'd';
     if (solid(x, y + 1) === 2) fall(x, y + 2);
+    curHow = 'j';
     for (let dy = -10; dy <= maxUp; dy++) {
       const lim = dy < 0 ? jumpDX(0) + Math.floor(-dy * 0.5) : jumpDX(dy);
       for (let dx = -lim; dx <= lim; dx++) {
@@ -122,15 +153,25 @@ function analyse(abil, flags, extraSolid = []) {
         if (arc(x, y, nx, ny)) push(nx, ny);
       }
     }
-    if (can('swing')) for (const [rx, ry] of rings) {
+    curHow = 'r';
+    if (can('swing') && !opts.noSwing) for (const [rx, ry] of rings) {
       if (ry >= y - 1 || Math.abs(rx - x) > 7 || Math.abs(ry - y) > 8 || Math.hypot(rx - x, ry - (y - 1)) > 6.5 || !losT(x, y - 1, rx, ry)) continue;
       for (let ty = ry + 2; ty <= ry + 8; ty++) for (let tx = rx - 7; tx <= rx + 7; tx++) {
         if ((stand(tx, ty) || ladder(tx, ty)) && Math.hypot(tx - rx, ty - 1 - ry) <= 7.5 && losT(rx, ry, tx, ty - 1)) push(tx, ty);
       }
     }
   };
-  push(TG['start@reef'].x, TG['start@reef'].y);
-  let changed = true, rounds = 0;
+  const st0 = opts.start || [TG['start@reef'].x, TG['start@reef'].y];
+  if (dist) {
+    g = grids[0];
+    push(st0[0], st0[1], 'start');
+    while (heap.length) {
+      const [d, i] = hpop();
+      if (d > dist[i]) continue;
+      step(i % GW, Math.floor(i / GW));
+    }
+  } else push(st0[0], st0[1], 'start');
+  let changed = !dist, rounds = 0;
   while (changed && rounds < 20) {
     changed = false; rounds++;
     for (let pi = 0; pi < grids.length; pi++) {
@@ -143,6 +184,13 @@ function analyse(abil, flags, extraSolid = []) {
   }
   const set = new Set();
   for (let i = 0; i < seen.length; i++) if (seen[i]) set.add((i % GW) + ',' + Math.floor(i / GW));
+  set.edges = edges;
+  set.pathTo = (x, y) => {
+    let i = y * GW + x; const out = [];
+    if (!seen[i]) return null;
+    while (i >= 0) { out.push([i % GW, Math.floor(i / GW), how[i]]); i = from[i]; }
+    return out.reverse();
+  };
   return set;
 }
 
@@ -168,6 +216,7 @@ const stages = [
   { name: 'Skull open', abil: ['swing', 'boots', 'jet', 'tidekey', 'seal'], flags: { seawallOpen: true, basinFilling: true, basinCrossed: true, priorWedged: true, liftDropped: true, skullOpen: true }, pool: true, choir: 3, breakC: true, breakS: true, lift: true, need: ['shoal@skullstair', 'agathe@lamp', 'lampwork@lamp', 'beacon@lamp', 'hymnbell@lamp'] },
 ];
 
+if (require.main !== module) { module.exports = { analyse, H, W, T, TG }; return; }
 let fails = 0;
 const dumpArg = process.argv.indexOf('--dump');
 const dump = dumpArg > 0 ? { stage: +process.argv[dumpArg + 1], room: process.argv[dumpArg + 2] } : null;
@@ -199,5 +248,45 @@ for (const [si, s] of stages.entries()) {
       console.log(String(y).padStart(2) + ' ' + line);
     }
   }
+}
+// Trap check: every reachable cell must be able to get back to the start or a Bell Room.
+function trapCheck(name, abil, flags, prep) {
+  W.reset();
+  prep && prep();
+  const seen = analyse(abil, flags, [], { edges: true });
+  const N = GW * GH;
+  const rev = new Map();
+  for (const e of seen.edges) { const a = Math.floor(e / N), b = e % N; if (!rev.has(b)) rev.set(b, []); rev.get(b).push(a); }
+  const safe = [];
+  const st = TG['start@reef']; safe.push(st.y * GW + st.x);
+  for (const [k, t] of Object.entries(TG)) if (k.startsWith('bell_')) for (let dx = -2; dx <= 2; dx++) safe.push(t.y * GW + t.x + dx);
+  const back = new Uint8Array(N);
+  const q = safe.filter((i) => seen.has((i % GW) + ',' + Math.floor(i / GW)));
+  q.forEach((i) => (back[i] = 1));
+  while (q.length) { const i = q.pop(); for (const a of rev.get(i) || []) if (!back[a]) { back[a] = 1; q.push(a); } }
+  const traps = {};
+  for (const k of seen) { const [x, y] = k.split(',').map(Number); if (!back[y * GW + x]) { const r = W.roomAtTile(x, y).id; (traps[r] = traps[r] || []).push([x - H.ROOM[r].ox, y - H.ROOM[r].oy]); } }
+  const n = Object.values(traps).reduce((a, b) => a + b.length, 0);
+  console.log(`${n ? 'TRAP' : 'ok  '} ${name}: ${n} cells cannot get back` + (n ? '\n' + Object.entries(traps).map(([r, c]) => '     ' + r + ': ' + c.slice(0, 8).map((p) => p.join(',')).join(' ') + (c.length > 8 ? ' (+' + (c.length - 8) + ')' : '')).join('\n') : ''));
+  return n;
+}
+if (!dump) {
+  fails += trapCheck('traps, early game', ['swing'], { seawallOpen: true }) ? 1 : 0;
+  fails += trapCheck('traps, barge solved (Act I)', ['swing'], { seawallOpen: true, basinFilling: true, basinCrossed: true }, () => { W.state('saltgate').pool = { basin: 7 }; }) ? 1 : 0;
+  fails += trapCheck('traps, boots (Act II start)', ['swing', 'boots'], { seawallOpen: true, basinFilling: true, basinCrossed: true, abbotDead: true }, () => { W.state('saltgate').pool = { basin: 7 }; }) ? 1 : 0;
+  fails += trapCheck('traps, mid game', ['swing', 'boots', 'jet'], { seawallOpen: true, basinFilling: true, basinCrossed: true, priorWedged: true }, () => { W.state('saltgate').pool = { basin: 7 }; }) ? 1 : 0;
+  fails += trapCheck('traps, Tide Key, shrine water normal', ['swing', 'boots', 'jet', 'tidekey'], { seawallOpen: true, basinFilling: true, basinCrossed: true, priorWedged: true }, () => {
+    W.state('saltgate').pool = { basin: 7 };
+    const c = H.ROOM.choir; for (let y = 0; y < 23; y++) if (W.charAt(c.ox + 4, c.oy + y) === 'C') W.setChar(c.ox + 4, c.oy + y, ' ');
+  }) ? 1 : 0;
+  fails += trapCheck('traps, Choir drained', ['swing', 'boots', 'jet', 'tidekey'], { seawallOpen: true, basinFilling: true, basinCrossed: true, priorWedged: true, choirDrained: true }, () => {
+    W.state('saltgate').pool = { basin: 7 }; W.state('choir').choirLevel = 21;
+    const c = H.ROOM.choir; for (let y = 0; y < 23; y++) if (W.charAt(c.ox + 4, c.oy + y) === 'C') W.setChar(c.ox + 4, c.oy + y, ' ');
+  }) ? 1 : 0;
+  fails += trapCheck('traps, all tools', ['swing', 'boots', 'jet', 'tidekey', 'seal', 'lens'], { seawallOpen: true, basinFilling: true, basinCrossed: true, priorWedged: true, liftDropped: true, skullOpen: true }, () => {
+    W.state('saltgate').pool = { basin: 7 }; W.state('choir').choirLevel = 3;
+    const r = H.ROOM.priors; for (let y = 17; y < 23; y++) W.setChar(r.ox + 21, r.oy + y, 'H');
+    const c = H.ROOM.choir; for (let y = 0; y < 23; y++) for (const x of [4, 32]) if (W.charAt(c.ox + x, c.oy + y) === 'C') W.setChar(c.ox + x, c.oy + y, ' ');
+  }) ? 1 : 0;
 }
 process.exit(fails ? 1 : 0);

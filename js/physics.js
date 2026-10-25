@@ -47,7 +47,7 @@ H.Phys = (() => {
           for (let tx = x0; tx <= x1; tx++) {
             const s = W().solid(tx, ty);
             if (s === 1 && ty * TS >= e.y + e.h - 0.5) { landY = ty * TS; break; }
-            if (s === 2 && !e.dropping && prevBottom <= ty * TS + 0.5) { landY = ty * TS; break; }
+            if (s === 2 && !e.dropping && prevBottom <= ty * TS + 2) { landY = ty * TS; break; }
           }
         }
         for (const p of platforms) {
