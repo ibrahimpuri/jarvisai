@@ -4,6 +4,8 @@ H.UI = (() => {
   let root = null;
   let stack = [];       // close callbacks
   let dlg = null;       // active dialogue {lines, i, done}
+  // Present when running inside the desktop app (see desktop/preload.js).
+  const desktop = window.hollowmereDesktop || null;
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const G = () => H.Game;
   const P = () => H.Game.player;
@@ -70,6 +72,8 @@ H.UI = (() => {
     actions.newgame = () => { close(); H.Game.newGame(opts); };
     actions.cont = () => { close(); H.Game.loadGame(); };
     actions.controls = () => controls(title);
+    actions.fullscreen = () => desktop && desktop.toggleFullscreen();
+    actions.exit = () => desktop && desktop.quit();
     show(`<div class="panel narrow">
       <h1>HOLLOWMERE</h1>
       <div class="sub">The tide redraws the map every ten minutes, and brings the dead back with it.</div>
@@ -89,8 +93,9 @@ H.UI = (() => {
         <button data-act="newgame" class="primary">Row out to the lighthouse</button>
         ${hasSave ? '<button data-act="cont">Continue from the last Bell Room</button>' : ''}
         <button data-act="controls">Controls</button>
+        ${desktop ? '<button data-act="fullscreen">Toggle fullscreen (F11)</button><button data-act="exit">Quit to desktop</button>' : ''}
       </div>
-      <p class="small muted" style="text-align:center;margin-top:14px">Mouse + keyboard. Best with headphones.</p>
+      <p class="small muted" style="text-align:center;margin-top:14px">Mouse + keyboard. Best with headphones.${desktop ? ' F11 or Alt+Enter toggles fullscreen.' : ''}</p>
     </div>`, 'title');
   }
 
@@ -117,12 +122,14 @@ H.UI = (() => {
     actions.resume = () => close();
     actions.controls = () => controls(pause);
     actions.quit = () => { close(); H.Game.toTitle(); };
+    actions.fullscreen = () => desktop && desktop.toggleFullscreen();
+    actions.exit = () => desktop && desktop.quit();
     actions.vol = (ds) => { H.Audio.setVolume(parseFloat(ds.v)); G().volume = parseFloat(ds.v); pause(); };
     const v = G().volume;
     show(`<div class="panel narrow"><h2>Paused</h2>
       <p class="muted small">${esc(G().room.name)} · ${esc(H.REGIONS[G().room.region].name)} · Act ${'I'.repeat(G().act)}</p>
       <h3>Volume</h3><div class="opt">${[0, 0.35, 0.7, 1].map((x) => `<button data-act="vol" data-v="${x}" class="${v === x ? 'sel' : ''}">${x === 0 ? 'Off' : Math.round(x * 100) + '%'}</button>`).join('')}</div>
-      <div class="btns col"><button data-act="resume" class="primary">Resume</button><button data-act="controls">Controls</button><button data-act="quit">Quit to title (progress since the last save is lost)</button></div></div>`, 'pause');
+      <div class="btns col"><button data-act="resume" class="primary">Resume</button><button data-act="controls">Controls</button>${desktop ? '<button data-act="fullscreen">Toggle fullscreen (F11)</button>' : ''}<button data-act="quit">Quit to title (progress since the last save is lost)</button>${desktop ? '<button data-act="exit">Quit to desktop (progress since the last save is lost)</button>' : ''}</div></div>`, 'pause');
   }
 
   // ---- Bell Room ------------------------------------------------------------------------------

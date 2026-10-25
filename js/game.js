@@ -46,6 +46,8 @@ H.Game = (() => {
       requestAnimationFrame(frame);
     }
     requestAnimationFrame(frame);
+    // Alt-tabbing away pauses the game.
+    window.addEventListener('blur', () => { if (G.mode === 'play' && !H.UI.isOpen() && !G.player.dead) H.UI.pause(); });
   }
 
   function findWrackPools() {
@@ -699,7 +701,7 @@ H.Game = (() => {
     // Wind gusts are telegraphed by streaks of salt dust.
     if (G.room.windZones) {
       const w = p.windAt();
-      if (w && Math.random() < 0.8) H.FX.spawn(G.cam.x + (w > 0 ? 0 : H.VIEW_W), G.cam.y + Math.random() * H.VIEW_H, 1, { ang: w > 0 ? 0 : Math.PI, spread: 0.05, smin: Math.abs(w) * 2, smax: Math.abs(w) * 3, color: 'rgba(230,225,210,0.6)', grav: 0, lmin: 1.5, lmax: 2.5, size: 1.2 });
+      if (w && Math.random() < 48 * dt) H.FX.spawn(G.cam.x + (w > 0 ? 0 : H.VIEW_W), G.cam.y + Math.random() * H.VIEW_H, 1, { ang: w > 0 ? 0 : Math.PI, spread: 0.05, smin: Math.abs(w) * 2, smax: Math.abs(w) * 3, color: 'rgba(230,225,210,0.6)', grav: 0, lmin: 1.5, lmax: 2.5, size: 1.2 });
       if (w && !G.gusting) { G.gusting = true; H.Audio.burst(); }
       if (!w) G.gusting = false;
     }

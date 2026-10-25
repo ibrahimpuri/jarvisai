@@ -1,0 +1,78 @@
+# Builds the Windows installer and portable exe on a real Windows machine, launches the
+# packaged game and plays it briefly, then uploads the .exe files (and publishes a release
+# when a tag is given).
+name: Windows build
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Tag to publish as a GitHub release (leave empty to only upload artifacts)
+        required: false
+        default: ''
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Check the level design
+        run: npm run test:rooms
+
+      - name: Build installer and portable exe
+        run: npm run dist:win
+
+      - name: Launch and play the packaged exe
+        run: |
+          npm install --no-save playwright-core@1.63.0
+          node tools/desktop-test.js release/win-unpacked/Hollowmere.exe .
+
+      - name: Upload the .exe files
+        uses: actions/upload-artifact@v4
+        with:
+          name: Hollowmere-Windows-x64
+          path: |
+            release/Hollowmere-Setup-*.exe
+            release/Hollowmere-Portable-*.exe
+          if-no-files-found: error
+
+      - name: Upload test screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-test-screenshots
+          path: desktop_*.png
+          if-no-files-found: ignore
+
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/') || inputs.release_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.release_tag || github.ref_name }}
+          target_commitish: ${{ github.sha }}
+          name: Hollowmere ${{ inputs.release_tag || github.ref_name }}
+          body: |
+            Windows x64 build of Hollowmere.
+
+            - **Hollowmere-Setup-*.exe** installs the game with Start menu and desktop shortcuts.
+            - **Hollowmere-Portable-*.exe** runs without installing.
+
+            The files are not code-signed, so Windows SmartScreen may warn the first time: choose **More info → Run anyway**.
+            Saves live in `%APPDATA%\Hollowmere`.
+          files: |
+            release/Hollowmere-Setup-*.exe
+            release/Hollowmere-Portable-*.exe

@@ -1,0 +1,62 @@
+{
+  "name": "hollowmere",
+  "productName": "Hollowmere",
+  "version": "1.0.0",
+  "description": "A 2D survival-horror metroidvania where the tide redraws the map every ten minutes.",
+  "author": "Ibrahim Puri",
+  "license": "UNLICENSED",
+  "private": true,
+  "main": "desktop/main.js",
+  "scripts": {
+    "build:web": "node tools/build-web.js",
+    "icon": "node tools/make-icon.js",
+    "start": "npm run build:web && electron .",
+    "dist:win": "npm run build:web && electron-builder --win --x64",
+    "dist:linux": "npm run build:web && electron-builder --linux dir",
+    "test:rooms": "node tools/validate.js && node tools/reach.js"
+  },
+  "devDependencies": {
+    "electron": "44.7.0",
+    "electron-builder": "26.17.0",
+    "esbuild": "0.28.2"
+  },
+  "build": {
+    "appId": "com.hollowmere.game",
+    "productName": "Hollowmere",
+    "copyright": "Copyright © 2026 Ibrahim Puri",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "desktop/**",
+      "dist/app/**",
+      "package.json"
+    ],
+    "asar": true,
+    "win": {
+      "target": [
+        { "target": "nsis", "arch": ["x64"] },
+        { "target": "portable", "arch": ["x64"] }
+      ],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Hollowmere",
+      "artifactName": "Hollowmere-Setup-${version}.exe"
+    },
+    "portable": {
+      "artifactName": "Hollowmere-Portable-${version}.exe"
+    },
+    "linux": {
+      "target": ["dir"],
+      "category": "Game",
+      "icon": "build/icon.png"
+    }
+  }
+}

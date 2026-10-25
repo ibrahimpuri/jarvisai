@@ -188,10 +188,10 @@
         this.oil = 0;
         if (this.bag.count('oil') > 0 && !this.shut) { this.bag.remove('oil', 1); this.oil = 90; H.toast('You refill the lantern from an oil flask.', 2); }
       }
-      this.beamPath = this.focusing ? this.traceBeam() : null;
+      this.beamPath = this.focusing ? this.traceBeam(dt) : null;
     }
     // Focused beam path, bent by prisms.
-    traceBeam() {
+    traceBeam(dt = 1 / 60) {
       const lp = this.lanternPos();
       let x = lp.x, y = lp.y, ang = this.aim;
       const path = [{ x, y }];
@@ -216,7 +216,7 @@
         path.push({ x: ex, y: ey });
         budget -= d;
         if (!hit) break;
-        if (hit.type === 'crystal') { hit.hitByBeam(1 / 60); break; }
+        if (hit.type === 'crystal') { hit.hitByBeam(dt); break; }
         used.add(hit); hit.lit = 1;
         const c = hit.center();
         const [ddx, ddy] = H.PRISM_DIRS[hit.dir];

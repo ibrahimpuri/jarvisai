@@ -14,6 +14,25 @@ python3 -m http.server 8000   # then visit http://localhost:8000
 
 You need a mouse and keyboard. Headphones help, because the Undertow's bell is panned.
 
+### Windows desktop app
+
+There is also a native Windows build (x64), packaged with Electron so it ships its own Chromium and renders on your GPU:
+
+- `Hollowmere-Setup-1.0.0.exe` installs the game with Start menu and desktop shortcuts.
+- `Hollowmere-Portable-1.0.0.exe` runs without installing.
+
+Download them from the repository's **Releases** page, or from the latest **Windows build** run under **Actions**. The files are not code-signed, so SmartScreen may warn the first time: choose **More info → Run anyway**. The game starts fullscreen; F11 or Alt+Enter toggles it, and alt-tabbing pauses. Saves and settings live in `%APPDATA%\Hollowmere`.
+
+To build it yourself on Windows with Node.js 22:
+
+```sh
+npm ci
+npm run dist:win      # writes release/Hollowmere-Setup-1.0.0.exe and release/Hollowmere-Portable-1.0.0.exe
+npm start             # or run the desktop app straight from the source
+```
+
+`npm run build:web` is the "compile" step: it concatenates all scripts in load order and minifies them into `dist/app/game.min.js`, which is what the desktop app loads.
+
 | Key | Action |
 | --- | --- |
 | A / D | Move |
@@ -76,6 +95,7 @@ node tools/play.js          # 22 scripted gameplay scenarios with real keyboard 
 node tools/route.js         # the movement model plans routes; an in-page autopilot plays them with real physics
 node tools/soak.js 5        # random bot in every room and tide phase, reports runtime errors
 node tools/tour.js out/     # screenshots of every room
+node tools/desktop-test.js <exe> [out/]   # launches the packaged desktop app, plays, checks fullscreen and saves
 ```
 
 `F9` toggles invulnerability for testing. `Shift+F9` grants every tool.
@@ -98,3 +118,5 @@ node tools/tour.js out/     # screenshots of every room
 | `js/story.js` | NPC dialogue, quests, Agathe's log and the endings |
 | `js/ui.js` | Menus |
 | `js/game.js` | Loop, rooms, tide consequences, acts, death, saving |
+| `desktop/` | Electron shell: window, GPU flags, fullscreen, menu bridge |
+| `.github/workflows/windows-build.yml` | Builds, tests and publishes the Windows .exe files |

@@ -144,6 +144,8 @@ H.HUD = (() => {
 
   function draw(c) {
     const p = H.Game.player;
+    // Earlier passes leave stroke state behind (the background arches use a 10 px line).
+    c.lineWidth = 1; c.lineCap = 'butt'; c.globalAlpha = 1; c.textAlign = 'left';
     pips(c, p); breath(c, p); lantern(c, p);
     dial(c); weapon(c, p); prompt(c); toasts(c); roomTitle(c); bossBar(c); grabbed(c, p);
     if (H.Game.god) { c.fillStyle = '#f66'; c.font = '7px monospace'; c.fillText('DEBUG', 6, H.VIEW_H - 4); }

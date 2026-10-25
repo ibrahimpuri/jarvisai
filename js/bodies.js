@@ -291,7 +291,7 @@
       for (const k of this.knots) if (k.flare > 0) k.flare -= dt;
       if (this.burnT > 0) {
         this.burnT -= dt;
-        if (Math.random() < 0.6) H.FX.embers(this.cx() + H.rand(-8, 8), this.cy(), 2);
+        if (Math.random() < 36 * dt) H.FX.embers(this.cx() + H.rand(-8, 8), this.cy(), 2);
         if (this.burnT <= 0) { this.gone = true; this.mode = 'gone'; G().onBodyBurned(this); H.FX.spawn(this.cx(), this.cy(), 20, { color: '#333', grav: -30 }); }
         return;
       }
