@@ -298,7 +298,7 @@
       this.dy = H.approach(this.y, target, 40 * dt) - this.y;
       this.y += this.dy;
     }
-    platform() { return { x: this.x, y: this.y, w: this.w, h: this.h, oneWay: true, dy: this.dy || 0 }; }
+    platformRect() { return { x: this.x, y: this.y, w: this.w, h: this.h, oneWay: true, dy: this.dy || 0 }; }
     draw(c) {
       c.fillStyle = '#5a4a38'; c.fillRect(this.x, this.y, this.w, this.h);
       c.fillStyle = '#e8e8f0'; c.fillRect(this.x + 4, this.y - 4, this.w - 8, 4);
@@ -314,7 +314,7 @@
       this.dy = H.approach(this.y, target, 60 * dt) - this.y;
       this.y += this.dy;
     }
-    platform() { return { x: this.x, y: this.y, w: this.w, h: this.h, oneWay: true, dy: this.dy || 0 }; }
+    platformRect() { return { x: this.x, y: this.y, w: this.w, h: this.h, oneWay: true, dy: this.dy || 0 }; }
     draw(c) {
       c.fillStyle = '#3a2e22'; c.fillRect(this.x, this.y, this.w, 3);
       c.fillRect(this.x, this.y - 7, 3, 10); c.fillRect(this.x + this.w - 4, this.y, 2, 5);
@@ -350,7 +350,7 @@
       for (let ty = ty0; ty < ty0 + 6; ty++) W().setChar(tx, ty, 'H');
       W().flags.liftDropped = true;
     }
-    platform() { return this.done ? null : { x: this.x, y: this.y, w: this.w, h: this.h, oneWay: false, dy: this.falling ? 220 / 60 : 0 }; }
+    platformRect() { return this.done ? null : { x: this.x, y: this.y, w: this.w, h: this.h, oneWay: false, dy: this.falling ? 220 / 60 : 0 }; }
     prompt() { return this.done ? null : 'Lift pan: ' + (this.load || 0) + ' / 2 bodies. Drag knotless dead onto it (E near a body).'; }
     draw(c) {
       if (this.done) return;

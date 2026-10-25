@@ -30,7 +30,7 @@ H.UI = (() => {
     root.querySelectorAll('[data-act]').forEach((b) => b.addEventListener('click', () => { H.Audio.ui(); actions[b.dataset.act] && actions[b.dataset.act](b.dataset); }));
   }
   function close() {
-    root.classList.add('hidden'); root.innerHTML = ''; dlg = null;
+    root.classList.add('hidden'); root.innerHTML = ''; root.dataset.kind = ''; dlg = null;
     H.Input.clear();
     const cb = stack.pop(); stack = []; if (cb) cb();
   }

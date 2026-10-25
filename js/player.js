@@ -103,7 +103,7 @@
       if (this.hp <= 0) { this.hp = 0; G().onPlayerDeath(); }
     }
     tryGrab(enemy) {
-      if (this.grabbedBy || this.invuln() || this.dead || this.state === 'swing') return false;
+      if (this.grabbedBy || this.invuln() || this.dead || this.state === 'swing' || G().god) return false;
       this.grabbedBy = enemy; this.state = 'grabbed';
       const cracked = enemy.knots && enemy.knots.some((k) => (k.type === 'elbow' || k.type === 'arm') && k.hp < k.max);
       this.mash = cracked ? 3 : 6;
@@ -194,7 +194,7 @@
       const lp = this.lanternPos();
       let x = lp.x, y = lp.y, ang = this.aim;
       const path = [{ x, y }];
-      let budget = 520;
+      let budget = 1100;
       const used = new Set();
       for (let seg = 0; seg < 6 && budget > 0; seg++) {
         const dx = Math.cos(ang), dy = Math.sin(ang);
@@ -687,7 +687,7 @@
     startDrag(e) { this.dragging = e; e.dragged = true; H.Audio.hook(); }
     stopDrag() {
       if (!this.dragging) return;
-      const e = this.dragging; e.dragged = false; e.vy = 0;
+      const e = this.dragging; e.dragged = false; e.vy = 0; e.vx = 0;
       this.dragging = null;
       if (H.World.aboveTideLine(G().room, e.cx(), e.feet() - 2) && e.mode === 'downed') H.toast('Hauled above the tide line. It will stay down.', 2.5);
     }

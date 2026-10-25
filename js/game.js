@@ -637,7 +637,7 @@ H.Game = (() => {
 
     // Dynamic platforms
     const plats = [];
-    for (const e of G.ents) if (e.platform) { const pl = e.platform(); if (pl) plats.push(pl); }
+    for (const e of G.ents) if (e.platformRect) { const pl = e.platformRect(); if (pl) plats.push(pl); }
     H.Phys.setPlatforms(plats);
 
     p.update(dt);

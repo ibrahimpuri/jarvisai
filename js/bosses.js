@@ -264,7 +264,7 @@
     think(dt) {
       const p = P();
       if (!this.started) {
-        if (p && H.dist(p.cx(), p.cy(), this.cx(), this.cy()) < 9 * TS) this.start();
+        if (p && H.dist(p.cx(), p.cy(), this.cx(), this.cy()) < 17 * TS && H.Phys.los(p.cx(), p.cy(), this.cx(), this.y + 10)) this.start();
         return;
       }
       this.cool -= dt;

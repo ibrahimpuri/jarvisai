@@ -329,6 +329,8 @@
         this.vy += 1100 * dt; if (this.vy > 500) this.vy = 500;
       }
       if (pinned) this.vx = 0;
+      // Limp bodies do not slide.
+      if (this.mode === 'downed' || this.mode === 'dormant' || this.mode === 'captured') this.vx *= this.onGround ? 0.7 : 0.98;
       H.Phys.move(this, dt);
       // Bodies stay in their own room.
       const r = this.room;
