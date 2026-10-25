@@ -478,6 +478,52 @@ const scenarios = {
     s = await until(['KeyA', 'ShiftLeft'], (s) => s.tx <= 5, 15000);
     check('sneak to the altar', s.tx <= 6, s);
   },
+  async chandelier(page) {
+    // Feedback-driven bot: pump each swing and let go when the predicted arc passes under the next
+    // ring (or onto the gallery), holding Q so the next ring is caught automatically.
+    await ev(page, () => { H.Game.god = true; H.Game.ents.forEach((e) => { if (e.isBody) e.gone = true; }); });
+    await place(page, 'tithe', 4, 16);
+    const targets = [[11, 9], [20, 9], [27, 7], [34, 7]];
+    await page.keyboard.down('KeyQ'); await sleep(100);
+    const rings = [];
+    for (let hop = 0; hop < 6; hop++) {
+      const sw = await ev(page, () => H.Game.player.swing && Math.round((H.Game.player.swing.ax - H.Game.room.px - 8) / 16));
+      if (sw === null || sw === undefined || sw === false) break;
+      rings.push(sw);
+      const tgt = targets.find((t) => t[0] > sw);
+      const last = tgt[0] === 34;
+      await page.keyboard.down('KeyD');
+      let released = false;
+      for (let i = 0; i < 200 && !released; i++) {
+        const ok = await ev(page, ([tx, ty, last]) => {
+          const p = H.Game.player, w = p.swing, r = H.Game.room;
+          if (!w) return 'gone';
+          const boost = 1.2;
+          let vx = Math.cos(w.ang) * w.av * w.len * boost, vy = -Math.sin(w.ang) * w.av * w.len * boost - 160;
+          let x = p.cx(), y = p.y + 4;
+          const gx = r.px + tx * 16 + 8, gy = r.py + ty * 16 + 8;
+          for (let t = 0; t < 1.2; t += 1 / 60) {
+            vy += 1300 / 60; x += vx / 60; y += vy / 60;
+            if (last) { if (x > r.px + 32 * 16 && x < r.px + 38 * 16 && Math.abs(y + 18 - (r.py + 8 * 16)) < 6 && vy > 0) return true; }
+            else if (Math.abs(x - gx) < 40 && y > gy && y < gy + 100) return true;
+          }
+          return false;
+        }, [tgt[0], tgt[1], last]);
+        if (ok === 'gone') break;
+        if (ok === true) { await page.keyboard.press('Space'); released = true; }
+        else await sleep(16);
+      }
+      await sleep(400);
+      if (last || !released) break;
+      const st = await state(page);
+      if (st.st !== 'swing') { await sleep(400); if ((await state(page)).st !== 'swing') break; }
+    }
+    await page.keyboard.up('KeyD');
+    await page.keyboard.up('KeyQ');
+    await sleep(700);
+    const s = await state(page);
+    check('chain the chandelier rings to the gallery', s.ty <= 8 && s.tx >= 31, { rings, end: s });
+  },
 };
 
 (async () => {

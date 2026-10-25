@@ -119,6 +119,7 @@
       if (this.dead) return;
       this.invulnT -= dt; this.dashCool -= dt; this.gaffCool -= dt; this.fireCool -= dt;
       this.staggerT -= dt; this.gaffLooseT -= dt;
+      if (this.lastRing) this.lastRing.t -= dt;
       const r = G().room;
       this.inBellRoom = r.bellRoom && !(r.id === 'chapel' && G().quest('tables') === 'sold') && !G().bellRoomBreached(r.id);
 
@@ -294,7 +295,7 @@
       if (In.hit('dash') && this.dashCool <= 0 && !this.locked() && !this.dragging) this.dash();
 
       // Gaff swing
-      if (In.hit('swing') && this.has('swing') && !this.locked()) this.startSwing();
+      if ((In.hit('swing') || (In.held('swing') && !this.onGround && (!this.lastRing || this.lastRing.t <= 0.3))) && this.has('swing') && !this.locked()) this.startSwing(!In.hit('swing'));
 
       // gravity
       const g = this.boots && this.inWater() ? 900 : GRAV;
@@ -467,7 +468,7 @@
     }
 
     // ---- gaff ------------------------------------------------------------------
-    startSwing() {
+    startSwing(ringOnly) {
       if (this.dragging) return;
       // Prefer a ring within reach and in sight.
       let best = null, bd = 1e9;
@@ -477,16 +478,22 @@
       for (let ty = ty0; ty <= ty1; ty++) for (let tx = tx0; tx <= tx1; tx++) {
         if (W().charAt(tx, ty) !== 'o') continue;
         const rx = tx * TS + 8, ry = ty * TS + 8;
-        const d = H.dist(this.cx(), this.y + 4, rx, ry);
-        if (d < 110 && d < bd && ry < this.y + 8 && H.Phys.los(this.cx(), this.y + 4, rx, ry)) { bd = d; best = { x: rx, y: ry }; }
+        let d = H.dist(this.cx(), this.y + 4, rx, ry);
+        // Chaining: skip the ring just released and favour rings ahead of the swing.
+        if (this.lastRing && this.lastRing.t > 0 && this.lastRing.x === rx && this.lastRing.y === ry) continue;
+        if (!this.onGround && Math.abs(this.vx) > 40 && Math.sign(rx - this.cx()) === Math.sign(this.vx)) d *= 0.6;
+        if (d < 110 * (this.onGround ? 1 : 1.25) && d < bd && ry < this.y + 8 && H.Phys.los(this.cx(), this.y + 4, rx, ry)) { bd = d; best = { x: rx, y: ry }; }
       }
       if (best) {
-        const len = Math.max(28, Math.min(bd, 100));
+        // Keep the rope short enough that the bottom of the arc clears the floor.
+        const floorD = H.Phys.ray(best.x, best.y, Math.PI / 2, 200);
+        const len = Math.max(24, Math.min(H.dist(this.cx(), this.y + 4, best.x, best.y), 78, floorD - 22));
         const ang = Math.atan2(this.cx() - best.x, (this.y + 4) - best.y);
         this.swing = { ax: best.x, ay: best.y, len, ang, av: (this.vx * Math.cos(ang) - this.vy * Math.sin(ang)) / len };
         this.state = 'swing'; H.Audio.hook(); this.vy = 0;
         return;
       }
+      if (ringOnly) return;
       // Otherwise a hook pull on a light enemy in front of you.
       for (const e of G().ents) {
         if (!e.isBody || !e.alive || !e.alive() || e.boss || e.type === 'undertow') continue;
@@ -511,11 +518,13 @@
       const In = I(), s = this.swing;
       const dir = (In.held('right') ? 1 : 0) - (In.held('left') ? 1 : 0);
       const g = 1100;
-      s.av += (-g / s.len * Math.sin(s.ang) + dir * 4.2) * dt;
+      // Pumping adds energy in the direction of motion, like a real swing.
+      const pump = dir !== 0 && (Math.sign(s.av) === dir || Math.abs(s.av) < 0.5) ? dir * 7 : 0;
+      s.av += (-g / s.len * Math.sin(s.ang) + pump) * dt;
       s.av *= 1 - 0.15 * dt;
       s.av = H.clamp(s.av, -6, 6);
       if (In.held('up')) s.len = Math.max(24, s.len - 60 * dt);
-      if (In.held('down')) s.len = Math.min(110, s.len + 60 * dt);
+      if (In.held('down')) s.len = Math.min(110, H.Phys.ray(s.ax, s.ay, Math.PI / 2, 200) - 22, s.len + 60 * dt);
       s.ang += s.av * dt;
       const nx = s.ax + Math.sin(s.ang) * s.len - this.w / 2;
       const ny = s.ay + Math.cos(s.ang) * s.len - 4;
@@ -524,8 +533,11 @@
       this.facing = s.av >= 0 ? 1 : -1;
       if (!In.held('swing') || In.hit('jump')) {
         // Keep momentum on release.
-        this.vx = Math.cos(s.ang) * s.av * s.len;
-        this.vy = -Math.sin(s.ang) * s.av * s.len - (In.hit('jump') ? 120 : 0);
+        // A jump-release flings a little harder than simply letting go.
+        const boost = In.hit('jump') ? 1.2 : 1;
+        this.vx = Math.cos(s.ang) * s.av * s.len * boost;
+        this.vy = -Math.sin(s.ang) * s.av * s.len * boost - (In.hit('jump') ? 160 : 0);
+        this.lastRing = { x: s.ax, y: s.ay, t: 0.45 };
         this.state = 'normal'; this.swing = null;
       }
     }

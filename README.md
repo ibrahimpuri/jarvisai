@@ -72,7 +72,7 @@ The document plans 8-10 people over 30 months for about 180 rooms and a 10-12 ho
 ```sh
 node tools/validate.js      # room sizes, legend, and that every open edge meets an open neighbour
 node tools/reach.js         # movement-model reachability of the critical path, plus gate integrity
-node tools/play.js          # 21 scripted gameplay scenarios with real keyboard and mouse input (Playwright)
+node tools/play.js          # 22 scripted gameplay scenarios with real keyboard and mouse input (Playwright)
 node tools/soak.js 5        # random bot in every room and tide phase, reports runtime errors
 node tools/tour.js out/     # screenshots of every room
 ```

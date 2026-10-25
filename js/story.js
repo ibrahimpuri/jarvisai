@@ -126,7 +126,7 @@ H.Story = (() => {
         ]);
         return;
       }
-      if (p.has('tidekey') && !q.hesperSatchel) {
+      if (p.has('tidekey') && !q.hesperSatchel && !q.cacheSatchel) {
         say(['You hold the Tide Key, and still the shrine is full. You could have drained us, and you did not.', 'Take this. A Choir satchel, woven of kelp and salt. It will hold more than you think.'], () => {
           q.hesperSatchel = true; p.bag.size = Math.max(p.bag.size + 4, 12);
           H.toast('Satchel expanded to ' + p.bag.size + ' slots.');

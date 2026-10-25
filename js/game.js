@@ -390,7 +390,12 @@ H.Game = (() => {
     tip('escape', 'The way out is up: gaff to the chandelier rings (hold Q), swing to the gallery, climb to the window.', 6);
   }
   function onTagsTaken() {}
-  function onCacheOpened() { H.toast("Odile's salvage cache: she will be glad someone used it."); }
+  function onCacheOpened() {
+    const p = G.player;
+    // On the drained path the cache replaces Hesper's satchel as the second expansion.
+    if (!G.quests.hesperSatchel && !G.quests.cacheSatchel) { G.quests.cacheSatchel = true; p.bag.size = Math.max(p.bag.size + 4, 12); }
+    H.toast("Odile's salvage cache, with a big salvage satchel. Satchel: " + p.bag.size + ' slots.', 4);
+  }
   function onAbbotKilled(a) {
     W().flags.abbotDead = true;
     G.bossBar = null;
