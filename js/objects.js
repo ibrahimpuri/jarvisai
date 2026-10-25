@@ -36,7 +36,7 @@
       // Lifeline rule: scarcity bites without soft-locking anyone.
       const rivets = p.bag.count('rivets') + (p.weapons.driver ? p.weapons.driver.mag : 0);
       const mats = H.Satchel.MATERIALS.some((m) => p.bag.count(m) > 0);
-      if (rivets < 3 && !mats && !this.lifeline) { this.contents.scrap = (this.contents.scrap || 0) + 2; this.lifeline = true; }
+      if (rivets < 3 && !mats && !this.lifeline && (G().difficulty !== 'drowned' || Math.random() < 0.5)) { this.contents.scrap = (this.contents.scrap || 0) + 2; this.lifeline = true; }
       const got = [];
       for (const [item, n] of Object.entries(this.contents)) {
         const n2 = G().difficulty === 'pilgrim' && item === 'scrap' ? n + 1 : n;

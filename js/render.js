@@ -169,7 +169,7 @@ H.Render = (() => {
       c.fillStyle = '#121a20'; c.fillRect(lx + 2, ly + 10, 6, 30);
       return;
     }
-    const cols = { wrackline: ['#0a0d10', '#141a1e'], saltworks: ['#14120f', '#221e1a'], cloister: ['#080c0c', '#121a1a'], choir: ['#080a10', '#121624'], ribvault: ['#100e0a', '#1e1a14'], gullet: ['#03080a', '#08141a'], skull: ['#120e08', '#22180e'] }[reg];
+    const cols = { wrackline: ['#0e1216', '#1a2228'], saltworks: ['#1a1713', '#2a251f'], cloister: ['#0c1212', '#182222'], choir: ['#0c0e16', '#181c2e'], ribvault: ['#16130e', '#262118'], gullet: ['#050c0f', '#0c1a20'], skull: ['#18130c', '#2a1f12'] }[reg];
     const g = c.createLinearGradient(0, 0, 0, H.VIEW_H);
     g.addColorStop(0, cols[0]); g.addColorStop(1, cols[1]);
     c.fillStyle = g; c.fillRect(0, 0, H.VIEW_W, H.VIEW_H);
@@ -336,7 +336,7 @@ H.Render = (() => {
 
   function drawLighting(room, cam, p, sx, sy) {
     const G = H.Game;
-    const ambient = room.outdoor ? 0.3 : room.bellRoom ? 0.32 : room.region === 'gullet' ? 0.72 : 0.56;
+    const ambient = room.outdoor ? 0.28 : room.bellRoom ? 0.3 : room.region === 'gullet' ? 0.66 : 0.5;
     dctx.globalCompositeOperation = 'source-over';
     dctx.fillStyle = `rgba(2,4,6,${ambient})`;
     dctx.fillRect(0, 0, H.VIEW_W, H.VIEW_H);

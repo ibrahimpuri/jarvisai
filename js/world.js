@@ -62,7 +62,12 @@ H.World = (() => {
       default: return 0;
     }
   }
-  function solid(tx, ty) { return solidity(charAt(tx, ty)); }
+  function solid(tx, ty) {
+    const s = solidity(charAt(tx, ty));
+    // The top rung of a ladder is a platform you can stand on (S climbs down).
+    if (s === 0 && isLadder(tx, ty) && !isLadder(tx, ty - 1)) return 2;
+    return s;
+  }
   function solidPx(x, y) { return solid(Math.floor(x / TS), Math.floor(y / TS)) === 1; }
   function isLadder(tx, ty) {
     const ch = charAt(tx, ty);

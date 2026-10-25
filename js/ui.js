@@ -315,9 +315,10 @@ H.UI = (() => {
   function fontMenu() {
     const p = P(), g = G();
     actions.take = (ds) => {
+      if (!g.freeGraft && p.bag.count('ivory') < 1) { H.toast('The font asks an offering of Mere-ivory for each graft.'); H.Audio.deny(); return; }
       confirm(`Take the ${H.GRAFTS[ds.g].name}? ${H.GRAFTS[ds.g].power}. It grows a knot at your ${H.GRAFTS[ds.g].knot.toLowerCase()}: ${H.GRAFTS[ds.g].cost}.`, () => {
         p.grafts.add(ds.g);
-        if (g.freeGraft) g.freeGraft = false;
+        if (g.freeGraft) g.freeGraft = false; else p.bag.remove('ivory', 1);
         H.Audio.crack(); H.Audio.bell(220, 0.4); G().flash = 0.2;
         if (ds.g === 'lung') p.breath = 30;
         H.toast(`The ${H.GRAFTS[ds.g].name} takes root. Salt crawls under your skin.`);
@@ -325,7 +326,7 @@ H.UI = (() => {
     };
     actions.close = () => close();
     const rows = Object.entries(H.GRAFTS).map(([k, d]) => `<div class="row"><span>${d.name} <span class="muted">(${d.knot})</span><div class="desc">${d.power}. Cost: ${d.cost}.</div></span>
-      ${p.grafts.has(k) ? '<span class="muted">Taken</span>' : `<button data-act="take" data-g="${k}">Take</button>`}</div>`).join('');
+      ${p.grafts.has(k) ? '<span class="muted">Taken</span>' : `<button data-act="take" data-g="${k}">${g.freeGraft ? 'Take (free)' : 'Take (1 Mere-ivory)'}</button>`}</div>`).join('');
     show(`<div class="panel narrow"><h2>The Brine font</h2><p class="small">Each graft gives a strong power but grows a knot on Maren herself, which enemies can strike. Grafts change how others treat you, and which endings are open. A graft can be cut out once, at a Keeper's surgery.</p>${rows}
       <div class="btns"><button data-act="close">Step back</button></div></div>`, 'font');
   }

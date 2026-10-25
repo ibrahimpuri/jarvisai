@@ -260,12 +260,14 @@
       }
       // Currents at Ebb drag at Maren unless she wears the boots.
       this.applyCurrent(dt);
+      this.applyWind(dt);
 
       if (this.onGround) { this.coyote = COYOTE; this.airDashed = false; } else this.coyote -= dt;
       if (In.hit('jump')) this.jumpBuf = BUFFER; else this.jumpBuf -= dt;
 
       // Ladders
-      if ((In.held('up') || (In.held('down') && !this.onGround)) && this.onLadderTile() && !this.dragging) { this.state = 'ladder'; this.vx = 0; this.vy = 0; this.x = Math.floor(this.cx() / TS) * TS + 8 - this.w / 2; return; }
+      this.ladderCool = (this.ladderCool || 0) - dt;
+      if ((In.held('up') || (In.held('down') && !this.onGround && this.ladderCool <= 0)) && this.onLadderTile() && !this.dragging) { this.state = 'ladder'; this.vx = 0; this.vy = 0; this.x = Math.floor(this.cx() / TS) * TS + 8 - this.w / 2; return; }
       if (In.held('down') && this.onGround && this.ladderBelow() && !this.dragging) { this.state = 'ladder'; this.y += 4; this.x = Math.floor(this.cx() / TS) * TS + 8 - this.w / 2; return; }
 
       // Wall-hang on timber (never wet stone).
@@ -340,6 +342,25 @@
       const tx = Math.floor((dir > 0 ? this.x + this.w + 2 : this.x - 2) / TS);
       return W().isWallHang(tx, Math.floor((this.y + 6) / TS)) && W().isWallHang(tx, Math.floor((this.y + this.h - 6) / TS));
     }
+    // Ribvault gusts: telegraphed by streaks of salt dust, they push Maren sideways.
+    windAt() {
+      const r = G().room;
+      if (!r.windZones) return 0;
+      const tx = Math.floor(this.cx() / TS) - r.ox, ty = Math.floor(this.cy() / TS) - r.oy;
+      for (const z of r.windZones) {
+        if (tx < z.x0 || tx > z.x1 || ty < z.y0 || ty > z.y1) continue;
+        const ph = (G().stats.time % z.period) / z.period;
+        // calm for half the cycle, then a gust that alternates direction each cycle
+        const dir = Math.floor(G().stats.time / z.period) % 2 ? -1 : 1;
+        return ph < 0.5 ? 0 : dir * z.force * Math.sin((ph - 0.5) * 2 * Math.PI);
+      }
+      return 0;
+    }
+    applyWind(dt) {
+      const w = this.windAt();
+      if (!w || this.boots) return;
+      this.vx += w * dt * (this.onGround ? 0.5 : 1.6);
+    }
     applyCurrent(dt) {
       if (H.Tide.phase() !== 'ebbing' || this.boots) return;
       const r = G().room;
@@ -357,7 +378,7 @@
       // stop at the top or bottom of the ladder
       const headTile = Math.floor((ny + 2) / TS), footTile = Math.floor((ny + this.h - 2) / TS);
       if (!W().isLadder(tx, headTile) && !W().isLadder(tx, footTile)) { this.state = 'normal'; return; }
-      if (v > 0 && W().solid(tx, Math.floor((ny + this.h) / TS)) === 1) { this.state = 'normal'; return; }
+      if (v > 0 && W().solid(tx, Math.floor((ny + this.h) / TS)) === 1) { this.state = 'normal'; this.y = Math.floor((ny + this.h) / TS) * TS - this.h; this.vy = 0; this.onGround = true; this.ladderCool = 0.3; return; }
       if (v < 0 && !W().isLadder(tx, footTile) && !W().isLadder(tx, Math.floor((ny + this.h - 10) / TS))) { this.state = 'normal'; this.vy = -120; return; }
       this.y = ny;
       if (Math.abs(this.vy) > 1) { this.stepT -= dt * 3; if (this.stepT <= 0) { this.stepT = 1; H.Audio.step(true, 0.05); } }
@@ -468,12 +489,18 @@
       }
       // Otherwise a hook pull on a light enemy in front of you.
       for (const e of G().ents) {
-        if (!e.isBody || !e.alive || !e.alive() || e.boss || e.type === 'saltwright' || e.type === 'undertow') continue;
+        if (!e.isBody || !e.alive || !e.alive() || e.boss || e.type === 'undertow') continue;
+        if (e.type === 'saltwright' && !(e.pinT > 0 && e.tetherable)) continue;
+        if (e.pinT > 0 && e.tetherable && H.dist(this.cx(), this.cy(), e.cx(), e.cy()) < 160) {
+          e.pinT = 0; e.vx = Math.sign(this.cx() - e.cx()) * 260; e.vy = -120; e.stun = 1.2;
+          H.Audio.hook(); H.toast('Tether: yanked off the wall!', 1);
+          return;
+        }
         const d = H.dist(this.cx(), this.cy(), e.cx(), e.cy());
         const a = Math.atan2(e.cy() - this.cy(), e.cx() - this.cx());
         if (d < 90 && Math.abs(H.angleDiff(this.aim, a)) < 0.5 && H.Phys.los(this.cx(), this.cy(), e.cx(), e.cy())) {
           if (e.type === 'gullet' && e.mode === 'hang') { e.drop(true); }
-          else { e.vx = -Math.cos(a) * 220; e.vy = -140; e.stun = 1.0; if (e.pose === 'stand' && e.setPose) { /* knocked down briefly */ } }
+          else { e.vx = -Math.cos(a) * 220; e.vy = -140; e.stun = 1.0; }
           // Tether: yank a pinned enemy toward you.
           H.Audio.hook(); H.toast('Gaff pull!', 0.8);
           return;
@@ -525,7 +552,7 @@
       }
       if (best) {
         best.e.damageKnot(best.k, 1 * knotMul, 'gaff');
-        if (this.grafts.has('arm')) best.e.crust[best.k.id] = 3;
+        if (this.grafts.has('arm') && !best.e.boss) { best.e.crust[best.k.id] = 3; best.e.stun = Math.max(best.e.stun, best.e.type === 'saltwright' ? 1.5 : 3); H.FX.salt(best.e.cx(), best.e.cy(), 10); }
         hitSomething = true;
       } else {
         for (const e of G().ents) {

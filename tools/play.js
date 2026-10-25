@@ -279,7 +279,7 @@ const scenarios = {
     await page.screenshot({ path: require('path').join(OUT, 'play_prisms.png') });
   },
   async choir(page) {
-    await ev(page, () => { H.Game.god = true; const p = H.Game.player; ['boots', 'jet'].forEach((a) => p.abilities.add(a)); });
+    await ev(page, () => { H.Game.god = true; const p = H.Game.player; ['boots', 'jet'].forEach((a) => p.abilities.add(a)); p.bag.add('ivory', 1); });
     await place(page, 'choir', 4, 16);
     await page.keyboard.press('KeyE'); await sleep(60); await page.keyboard.press('KeyE'); await sleep(60);
     check('valve sets basin level 2', await ev(page, () => H.World.flags.basin === 2));
@@ -451,6 +451,32 @@ const scenarios = {
     const end = await ev(page, () => ({ kind: document.querySelector('#ui').dataset.kind, ended: H.Game.ended, text: document.querySelector('#ui').innerText.slice(0, 60) }));
     check('Keeper\'s Dark ending plays', end.kind === 'ending' && end.ended === 'dark', end);
     await page.screenshot({ path: require('path').join(OUT, 'play_ending.png') });
+  },
+  async opening(page) {
+    // Real inputs only: reef -> pier -> seawall ladder -> chapel -> back down -> Tithe Hall.
+    const until = async (keys, cond, ms = 8000) => {
+      for (const k of keys) await page.keyboard.down(k);
+      const t0 = Date.now(); let s;
+      while (Date.now() - t0 < ms) { s = await state(page); if (cond(s)) break; await sleep(50); }
+      for (const k of keys) await page.keyboard.up(k);
+      return s;
+    };
+    await ev(page, () => { H.Game.god = true; });
+    let s = await until(['KeyA'], (s) => s.room === 'pier', 9000);
+    check('walk from the deck to the pier', s.room === 'pier', s);
+    s = await until(['KeyA'], (s) => s.tx <= 4, 9000);
+    check('reach the seawall ladder', s.tx <= 5, s);
+    s = await until(['KeyW'], (s) => s.room === 'seawall' && s.st !== 'ladder', 9000);
+    check('climb into the seawall', s.room === 'seawall', s);
+    s = await until(['KeyD'], (s) => s.room === 'chapel', 9000);
+    check('walk into the chapel', s.room === 'chapel', s);
+    s = await until(['KeyA'], (s) => s.room === 'seawall' && s.tx <= 4, 9000);
+    s = await until(['KeyS'], (s) => s.room === 'pier' && s.ground, 9000);
+    check('climb back down to the pier', s.room === 'pier' && s.ground, s);
+    s = await until(['KeyA'], (s) => s.room === 'tithe', 9000);
+    check('enter the Tithe Hall by the side door', s.room === 'tithe', s);
+    s = await until(['KeyA', 'ShiftLeft'], (s) => s.tx <= 5, 15000);
+    check('sneak to the altar', s.tx <= 6, s);
   },
 };
 
