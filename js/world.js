@@ -2,7 +2,9 @@
 'use strict';
 H.World = (() => {
   const TS = H.TILE;
-  const grid = {};          // "col,row" -> room def
+  // Room lookup is a flat array over the screen grid; each room keeps a flat live tile array
+  // (its map with persistent changes applied) so tile queries never build string keys.
+  let grid = [], GRID_W = 1, GRID_H = 1;
   let flags = {};           // global world flags (gates opened, puzzles solved, quest state)
   let states = {};          // per-room persistent state
 
@@ -12,17 +14,32 @@ H.World = (() => {
       r.tw = r.w * H.SCREEN_W; r.th = r.h * H.SCREEN_H;
       r.ox = r.col * H.SCREEN_W; r.oy = r.row * H.SCREEN_H;
       r.px = r.ox * TS; r.py = r.oy * TS; r.pw = r.tw * TS; r.ph = r.th * TS;
-      for (let c = 0; c < r.w; c++) for (let k = 0; k < r.h; k++) grid[(r.col + c) + ',' + (r.row + k)] = r;
+      GRID_W = Math.max(GRID_W, r.col + r.w); GRID_H = Math.max(GRID_H, r.row + r.h);
       // Strip entity characters out of the tile layer.
       r.tiles = r.map.map((row) => row.split('').map((ch) => (r.ents && r.ents[ch] ? ' ' : ch)));
+      r.base = [].concat(...r.tiles);
+      r.live = r.base.slice();
       r.bellRoom = !!r.bellRoom;
     }
+    grid = new Array(GRID_W * GRID_H).fill(null);
+    for (const r of H.ROOMS) for (let c = 0; c < r.w; c++) for (let k = 0; k < r.h; k++) grid[(r.row + k) * GRID_W + r.col + c] = r;
+  }
+  // Rebuild every room's live tiles from its map plus the saved changes.
+  function refreshLive() {
+    for (const r of H.ROOMS) {
+      r.live = r.base.slice();
+      const st = states[r.id];
+      if (st && st.tiles) for (const k in st.tiles) { const i = k.indexOf(','); r.live[(+k.slice(i + 1)) * r.tw + (+k.slice(0, i))] = st.tiles[k]; }
+    }
+    if (H.Render) H.Render.markDirty();
   }
 
-  function reset() { flags = {}; states = {}; }
+  function reset() { flags = {}; states = {}; refreshLive(); }
 
   function roomAtTile(tx, ty) {
-    return grid[Math.floor(tx / H.SCREEN_W) + ',' + Math.floor(ty / H.SCREEN_H)] || null;
+    const c = Math.floor(tx / H.SCREEN_W), r = Math.floor(ty / H.SCREEN_H);
+    if (c < 0 || r < 0 || c >= GRID_W || r >= GRID_H) return null;
+    return grid[r * GRID_W + c];
   }
   function roomAtPx(x, y) { return roomAtTile(Math.floor(x / TS), Math.floor(y / TS)); }
 
@@ -34,15 +51,13 @@ H.World = (() => {
   function charAt(tx, ty) {
     const r = roomAtTile(tx, ty);
     if (!r) return '#';
-    const lx = tx - r.ox, ly = ty - r.oy;
-    const st = states[r.id];
-    if (st) { const o = st.tiles[lx + ',' + ly]; if (o !== undefined) return o; }
-    return r.tiles[ly][lx];
+    return r.live[(ty - r.oy) * r.tw + (tx - r.ox)];
   }
   function setChar(tx, ty, ch) {
     const r = roomAtTile(tx, ty);
     if (!r) return;
     state(r.id).tiles[(tx - r.ox) + ',' + (ty - r.oy)] = ch;
+    r.live[(ty - r.oy) * r.tw + (tx - r.ox)] = ch;
     if (H.Render) H.Render.markDirty();
   }
 
@@ -122,6 +137,6 @@ H.World = (() => {
     get flags() { return flags; },
     set flags(v) { flags = v; },
     get states() { return states; },
-    set states(v) { states = v; },
+    set states(v) { states = v; refreshLive(); },
   };
 })();

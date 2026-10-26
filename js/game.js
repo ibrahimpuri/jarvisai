@@ -776,7 +776,7 @@ H.Game = (() => {
   G.onAbbotKilled = onAbbotKilled; G.onUndertowKilled = onUndertowKilled; G.onShoalKilled = onShoalKilled; G.collect = collect;
   G.setRespawn = setRespawn; G.setChoirLevel = setChoirLevel; G.interact = interact; G.onPlayerDeath = onPlayerDeath;
   G.recoverSatchel = recoverSatchel; G.rest = rest; G.statsSummary = statsSummary; G.bellRoomBreached = bellRoomBreached;
-  G.enterRoom = enterRoom; G.snapCamera = snapCamera;
+  G.enterRoom = enterRoom; G.snapCamera = snapCamera; G._step = step;
   return G;
 })();
 
