@@ -34,8 +34,9 @@ function check(name, cond, info) { console.log((cond ? 'PASS ' : 'FAIL ') + name
 
 const scenarios = {
   async movement(page) {
+    await place(page, 'reef', 25, 12); await sleep(300);
     let s = await state(page);
-    check('starts on reef deck', s.room === 'reef' && s.ground, s);
+    check('stands on the reef deck', s.room === 'reef' && s.ground, s);
     await hold(page, 'KeyD', 400);
     const s2 = await state(page);
     check('walks right', s2.x > s.x + 30, s2);
@@ -466,6 +467,7 @@ const scenarios = {
       return s;
     };
     await ev(page, () => { H.Game.god = true; });
+    await place(page, 'reef', 25, 12); await sleep(300);
     let s = await until(['KeyA'], (s) => s.room === 'pier', 9000);
     check('walk from the deck to the pier', s.room === 'pier', s);
     s = await until(['KeyA'], (s) => s.tx <= 4, 9000);
@@ -530,7 +532,7 @@ const scenarios = {
   },
   async narrative(page) {
     const n = await ev(page, () => Object.keys(H.LORE.carvings).length);
-    check('every room has a carving', n === 25, n);
+    check('every room has a carving', n === (await ev(page, () => H.ROOMS.length)), n);
     // every carving lands on a floor cell in its room
     const bad = await ev(page, () => {
       const out = [];
@@ -560,6 +562,186 @@ const scenarios = {
     // death text varies and saves keep narrative state
     await ev(page, () => { H.Game.save(); });
     check('narrative state saved', await ev(page, () => !!JSON.parse(localStorage.getItem('hollowmere_save')).narr.read));
+  },
+
+  // The opening on the outer rocks, played with nothing but the keyboard and mouse.
+  async prologue(page) {
+    const pos = () => ev(page, () => { const p = H.Game.player, r = H.Game.room; return { room: r.id, tx: (p.cx() - r.px) / 16, ty: (p.y + p.h - 1 - r.py) / 16, vy: p.vy, hang: p.hanging, hp: p.hp, water: p.inWater() }; });
+    let s = await pos();
+    check('a new game starts on the outer rocks', s.room === 'breakers', s);
+    check('the tide holds at Low out here', await ev(page, () => H.Tide.paused && H.Tide.phase() === 'low'));
+    check('the tide dial is not shown yet', await ev(page, () => H.Game.dialT === 0));
+    check('no instructions on arrival', await ev(page, () => H.toasts.length === 0));
+    await sleep(1600);
+    check('Maren thinks about the boat', await ev(page, () => !!H.Game.narr.thoughts.boat));
+    check('no hint before hesitating', (await ev(page, () => H.Hints.shown)) === null);
+    await sleep(5000);
+    check('standing still raises the walk hint', (await ev(page, () => H.Hints.shown)) === 'move');
+    await page.keyboard.down('KeyA'); await sleep(1600);
+    check('walking retires the walk hint', await ev(page, () => H.Hints.hasDone('move')));
+    await sleep(3200);
+    check('leaning on the rock raises the jump hint', (await ev(page, () => H.Hints.shown)) === 'jump', await pos());
+    for (let i = 0; i < 3 && (await pos()).tx > 56; i++) { await hold(page, 'Space', 300); await sleep(400); }
+    s = await pos();
+    check('jumps up the rocks', s.tx < 58 && s.ty < 14.5, s);
+    for (let i = 0; i < 300 && (await pos()).tx > 52.6; i++) await sleep(8);
+    await hold(page, 'Space', 300); await sleep(500);
+    s = await pos();
+    check('clears the tide pool', s.tx < 47.9 && s.ty < 14.5 && !s.water, s);
+    await sleep(1200); await page.keyboard.up('KeyA'); await sleep(200);
+    s = await pos();
+    check('stands at the foot of the chimney', s.tx > 36.5 && s.tx < 41 && s.ty > 13, s);
+    check('Maren notices the timber', await ev(page, () => !!H.Game.narr.thoughts.timber));
+    // cling and leap: hold toward a wall, jump when hanging, then steer for the other wall
+    let dir = -1, jumped = false;
+    await page.keyboard.down('KeyA'); await hold(page, 'Space', 300);
+    for (let f = 0; f < 400; f++) {
+      s = await pos();
+      if (s.ty < 4.6) break;
+      if (s.hang === dir && s.vy > 0) {
+        await page.keyboard.down('Space'); await sleep(20);
+        await page.keyboard.up(dir < 0 ? 'KeyA' : 'KeyD'); dir = -dir; await page.keyboard.down(dir < 0 ? 'KeyA' : 'KeyD');
+        await sleep(220); await page.keyboard.up('Space'); jumped = true; continue;
+      }
+      await sleep(8);
+    }
+    await page.keyboard.up('KeyD'); await page.keyboard.down('KeyA'); await sleep(600);
+    s = await pos();
+    check('climbs the chimney by wall-jumping', jumped && s.ty < 5 && s.tx < 37, s);
+    await sleep(1600); await page.keyboard.up('KeyA'); await sleep(3500);
+    check('stalling on the planks raises the drop hint', (await ev(page, () => H.Hints.shown)) === 'drop', await pos());
+    await page.keyboard.down('KeyS'); await page.keyboard.press('Space'); await page.keyboard.up('KeyS'); await sleep(1200);
+    s = await pos();
+    check('drops through the planks into the hollow', s.ty > 12 && s.tx < 32, s);
+    check('Maren sees the salt', await ev(page, () => !!H.Game.narr.thoughts.salt));
+    await page.keyboard.down('KeyD');
+    for (let i = 0; i < 300 && (await pos()).tx < 29.5; i++) await sleep(8);
+    await page.keyboard.up('KeyD'); await sleep(200);
+    const hp0 = (await pos()).hp;
+    const b = await ev(page, () => { const e = H.Game.ents.find((x) => x.type === 'barrel'); return { x: e.cx(), y: e.cy() }; });
+    await aimAt(page, b.x, b.y);
+    await page.mouse.down(); await sleep(50); await page.mouse.up(); await sleep(2500);
+    check('the shot barrel burns', await ev(page, () => H.Game.ents.find((x) => x.type === 'barrel').done));
+    check('the fire cracks the salt plug', await ev(page, () => { const r = H.Game.room; return H.World.charAt(r.ox + 21, r.oy + 11) !== 'S' && H.World.charAt(r.ox + 21, r.oy + 12) !== 'S'; }));
+    check('shooting from range keeps Maren clear of the fire', (await pos()).hp === hp0);
+    await sleep(8000);
+    // creep to the edge of the crystals, then dash from a standstill
+    await page.keyboard.down('KeyA');
+    for (let i = 0; i < 400 && (await pos()).tx > 18.2; i++) await sleep(8);
+    await page.keyboard.up('KeyA'); await sleep(300);
+    await place(page, 'breakers', 16, 12); await sleep(200);
+    await page.keyboard.down('KeyA'); await page.keyboard.press('KeyC'); await sleep(500);
+    s = await pos();
+    check('dashes through the salt crystals unhurt', s.tx < 13.5 && s.hp === hp0, s);
+    for (let i = 0; i < 300 && (await pos()).room === 'breakers'; i++) await sleep(10);
+    await page.keyboard.up('KeyA');
+    s = await pos();
+    check('walks onto the reef', s.room === 'reef', s);
+    await sleep(1500);
+    check('the tide starts to move', await ev(page, () => !H.Tide.paused && H.World.flags.landed));
+    check('and the dial fades in', await ev(page, () => H.Game.dialT > 0.5));
+    check('the Constance thought follows', await ev(page, () => !!H.Game.narr.thoughts.start));
+  },
+
+  // A pretend controller fed through the same path as a real one.
+  async controller(page) {
+    check('DualSense reads as PlayStation', await ev(page, () => H.Input.classify('DualSense Wireless Controller (STANDARD GAMEPAD Vendor: 054c Product: 0ce6)') === 'playstation'));
+    check('Switch Pro reads as Switch', await ev(page, () => H.Input.classify('Pro Controller (STANDARD GAMEPAD Vendor: 057e Product: 2009)') === 'switch'));
+    check('Xbox reads as Xbox', await ev(page, () => H.Input.classify('Xbox 360 Controller (XInput STANDARD GAMEPAD)') === 'xbox'));
+    const mk = (id) => ev(page, (id) => { window.__pad = { id, index: 0, buttons: Array.from({ length: 18 }, () => ({ pressed: false, value: 0 })), axes: [0, 0, 0, 0] }; H.Input.fakePad = window.__pad; }, id);
+    const btn = (i, v) => ev(page, ([i, v]) => { window.__pad.buttons[i].pressed = v; window.__pad.buttons[i].value = v ? 1 : 0; }, [i, v]);
+    const axis = (i, v) => ev(page, ([i, v]) => { window.__pad.axes[i] = v; }, [i, v]);
+    const tap = async (i) => { await btn(i, true); await sleep(60); await btn(i, false); await sleep(80); };
+    const holdBtn = async (i, ms) => { await btn(i, true); await sleep(ms); await btn(i, false); await sleep(60); };
+    await mk('Xbox Wireless Controller (STANDARD GAMEPAD Vendor: 045e Product: 0b13)');
+    await place(page, 'reef', 25, 12); await sleep(300);
+    let x0 = (await state(page)).x;
+    await axis(0, -1); await sleep(400); await axis(0, 0); await sleep(100);
+    check('left stick walks', (await state(page)).x < x0 - 40);
+    await axis(0, 0.45); await sleep(80);
+    check('a light tilt sneaks', await ev(page, () => H.Input.held('sneak') && H.Input.held('right')));
+    await axis(0, 0); await sleep(300);
+    const y0 = (await state(page)).y;
+    await btn(0, true); await sleep(150); await btn(0, false);
+    check('A jumps', (await state(page)).y < y0 - 15);
+    await sleep(800);
+    await axis(3, -1); await sleep(80);
+    check('right stick aims', await ev(page, () => Math.abs(H.angleDiff(H.Game.player.aim, -Math.PI / 2)) < 0.25));
+    await axis(3, 0);
+    const mag = await ev(page, () => H.Game.player.weapons.driver.mag);
+    await ev(page, () => { H.Input.pad.lastRumble = null; });
+    await btn(7, true); await sleep(80); await btn(7, false); await sleep(80);
+    check('RT fires', (await ev(page, () => H.Game.player.weapons.driver.mag)) < mag);
+    check('firing asks for rumble', await ev(page, () => !!H.Input.pad.lastRumble));
+    await place(page, 'reef', 13, 12);
+    await ev(page, () => { const c = H.Game.ents.find((e) => e.type === 'chest'); const p = H.Game.player; p.x = c.cx() - p.w / 2; });
+    await sleep(100); await tap(3); await sleep(200);
+    check('tapping Y opens the locker', await ev(page, () => H.Game.ents.find((e) => e.type === 'chest').done));
+    await ev(page, () => { const p = H.Game.player; p.hp = 3; p.bag.add('stitchkit', 1); });
+    await tap(12); await sleep(100);
+    check('d-pad up uses a poultice', await ev(page, () => H.Game.player.healKind === 'poultice'));
+    await sleep(3300); await ev(page, () => { H.Game.player.hp = 2; });
+    await holdBtn(12, 550);
+    check('holding d-pad up kneels for the stitch kit', await ev(page, () => H.Game.player.healKind === 'stitch' && H.Game.player.healT > 0));
+    await sleep(4300);
+    await ev(page, () => H.Game.player.bag.add('scrap', 2));
+    await holdBtn(5, 550);
+    check('holding RB quick-crafts rivets', await ev(page, () => H.Game.player.craftT > 0));
+    await sleep(2600);
+    await ev(page, () => { H.Game.player.weapons.driver.mag = 2; });
+    await tap(5);
+    check('tapping RB reloads', await ev(page, () => H.Game.player.reloadT > 0));
+    await sleep(2000);
+    await ev(page, () => { const p = H.Game.player; p.weapons.harpoon = { tier: 0, mag: 1 }; p.weaponOrder.push('harpoon'); });
+    await tap(15);
+    check('d-pad right changes weapon', (await ev(page, () => H.Game.player.cur)) === 'harpoon');
+    await tap(14);
+    check('d-pad left changes back', (await ev(page, () => H.Game.player.cur)) === 'driver');
+    await tap(10);
+    check('L3 toggles sneaking', await ev(page, () => H.Input.pad.sneakLatch && H.Input.held('sneak')));
+    await tap(10);
+    // aim assist pulls a near miss onto a knot
+    await place(page, 'pier', 20, 16);
+    const off = await ev(page, () => { const e = H.Game.ents.find((x) => x.key === 'first_shucker'); const k = e.knots.find((k) => !k.broken && !e.isSealed(k)); const kp = e.knotPos(k), lp = H.Game.player.lanternPos(); return Math.atan2(kp.y - lp.y, kp.x - lp.x) + 0.12; });
+    await axis(2, Math.cos(off)); await axis(3, Math.sin(off)); await sleep(100);
+    const err = await ev(page, () => { const e = H.Game.ents.find((x) => x.key === 'first_shucker'), p = H.Game.player, lp = p.lanternPos(); return Math.min(...e.knots.filter((k) => !k.broken && !e.isSealed(k)).map((k) => { const q = e.knotPos(k); return Math.abs(H.angleDiff(p.aim, Math.atan2(q.y - lp.y, q.x - lp.x))); })); });
+    check('aim assist pulls a near miss onto a knot', err < 0.045, err);
+    await axis(2, 0); await axis(3, 0);
+    // View opens the journal; the bumpers turn its pages; B closes it
+    await tap(8); await sleep(100);
+    check('View opens the journal', await ev(page, () => document.querySelector('#ui').dataset.kind === 'satchel'));
+    const before = await ev(page, () => document.querySelector('.tabs button.sel').textContent);
+    await tap(5);
+    check('RB turns the page', (await ev(page, () => document.querySelector('.tabs button.sel').textContent)) !== before);
+    check('menus show controller prompts', await ev(page, () => document.querySelectorAll('.foot img.glyph').length > 0));
+    await tap(1); await sleep(100);
+    check('B closes it', await ev(page, () => !H.UI.isOpen()));
+    await tap(9); await sleep(100);
+    check('Start pauses', await ev(page, () => document.querySelector('#ui').dataset.kind === 'pause'));
+    await tap(9); await sleep(200);
+    check('Start resumes and stays resumed', await ev(page, () => !H.UI.isOpen()));
+    // d-pad moves menu focus and A presses the focused button
+    await tap(9); await sleep(100);
+    await tap(13); await sleep(50);
+    check('d-pad moves the menu focus', await ev(page, () => document.querySelector('button.padfocus') && document.querySelector('button.padfocus').textContent !== 'Resume'));
+    await tap(1); await sleep(100);
+    // Switch: A (the right button) confirms in menus, B (the bottom one) backs out
+    await mk('Pro Controller (STANDARD GAMEPAD Vendor: 057e Product: 2009)');
+    await tap(0); await sleep(50);
+    await ev(page, () => H.UI.dialogue('Test', ['one', 'two']));
+    await sleep(100);
+    await tap(1);
+    check('Switch A (right) advances dialogue', await ev(page, () => H.UI.isOpen() && document.querySelector('.dialogue .line').textContent === 'two'));
+    await tap(1); await sleep(100);
+    check('and closes it', await ev(page, () => !H.UI.isOpen()));
+    await ev(page, () => H.UI.pause()); await sleep(100);
+    await tap(0); await sleep(100);
+    check('Switch B (bottom) backs out', await ev(page, () => !H.UI.isOpen()));
+    check('Switch prompt for jump is B', await ev(page, () => H.Glyphs.plain('{jump}') === 'B'));
+    check('keyboard prompt for interact is E', await ev(page, () => H.Glyphs.plain('{interact} Open', 'keyboard') === 'E Open'));
+    check('PlayStation names its buttons', await ev(page, () => H.Glyphs.plain('{jump} / {fire}', 'playstation') === 'Cross / R2'));
+    await ev(page, () => H.Input.disconnected(0)); await sleep(100);
+    check('disconnecting the pad pauses the game', await ev(page, () => document.querySelector('#ui').dataset.kind === 'pause' && document.querySelector('#ui').textContent.includes('disconnected')));
   },
 };
 

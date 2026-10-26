@@ -40,9 +40,10 @@ async function launch() {
   // play a little, then save at the chapel bell
   await win.click('button[data-act="newgame"]'); await sleep(200);
   await win.keyboard.press('Escape'); await sleep(200);
+  const x0 = await win.evaluate(() => H.Game.player.x);
   await win.keyboard.down('KeyA'); await sleep(1500); await win.keyboard.up('KeyA');
   const st = await win.evaluate(() => ({ room: H.Game.room.id, x: Math.round(H.Game.player.x) }));
-  check('game runs and takes input', st.room === 'reef' || st.room === 'pier', st);
+  check('game runs and takes input', st.room === 'breakers' && st.x < x0 - 60, st);
   await win.evaluate(() => {
     const G = H.Game, r = H.ROOM.chapel; G.enterRoom(r); G.player.x = r.px + 20 * 16 + 3; G.player.y = r.py + 17 * 16 - G.player.h; G.snapCamera();
     G.player.bag.add('oil', 1); G.player.bag.add('scrap', 5);

@@ -19,8 +19,9 @@ public static class Scenarios
     {
         ["movement"] = async t =>
         {
+            t.Place("reef", 25, 12); await t.Run(0.3f);
             var s = t.State();
-            t.Ok("starts on reef deck", s.room == "reef" && s.ground, s);
+            t.Ok("stands on the reef deck", s.room == "reef" && s.ground, s);
             await t.Hold("right", 0.4f);
             var s2 = t.State();
             t.Ok("walks right", s2.x > s.x + 30, s2);
@@ -472,6 +473,7 @@ public static class Scenarios
                 return s;
             }
             G.god = true;
+            t.Place("reef", 25, 12); await t.Run(0.3f);
             var s = await Until(new[] { "left" }, s => s.room == "pier");
             t.Ok("walk from the deck to the pier", s.room == "pier", s);
             s = await Until(new[] { "left" }, s => s.tx <= 4);
@@ -563,10 +565,277 @@ public static class Scenarios
             t.Ok("death screen", UI.Kind == "death", UI.Kind);
         },
 
+        ["controller"] = async t =>
+        {
+            // which family a controller belongs to
+            t.Ok("DualSense reads as PlayStation", Pad.Classify("dualsense wireless controller", 0x054C) == PadKind.PlayStation);
+            t.Ok("PS4 controller by name", Pad.Classify("ps4 controller", 0) == PadKind.PlayStation);
+            t.Ok("Switch Pro reads as Switch", Pad.Classify("nintendo switch pro controller", 0x057E) == PadKind.Switch);
+            t.Ok("Joy-Cons read as Switch", Pad.Classify("joy-con (l/r)", 0) == PadKind.Switch);
+            t.Ok("Xbox Series reads as Xbox", Pad.Classify("xbox series x controller", 0x045E) == PadKind.Xbox);
+            t.Ok("unknown pads fall back to Xbox prompts", Pad.Classify("8bitdo pro 2", 0x2DC8) == PadKind.Xbox);
+
+            Pad.Simulate(PadKind.Xbox);
+            t.Place("reef", 25, 12);
+            var p = G.player;
+            // left stick walks; a light tilt creeps
+            float x0 = p.x;
+            t.PadAxis(JoyAxis.LeftX, -1); await t.Run(0.4f); t.PadAxis(JoyAxis.LeftX, 0); await t.Run(0.1f);
+            t.Ok("left stick walks", p.x < x0 - 40, $"{x0} -> {p.x}");
+            t.PadAxis(JoyAxis.LeftX, 0.45f); await t.Run(0.1f);
+            t.Ok("a light tilt sneaks", Inp.Held("sneak") && Inp.Held("right"));
+            t.PadAxis(JoyAxis.LeftX, 0); await t.Run(0.1f);
+            // A jumps
+            await t.Run(0.3f);
+            float y0 = p.y; t.PadButton(JoyButton.A, true); await t.Run(0.15f); t.PadButton(JoyButton.A, false);
+            t.Ok("A jumps", p.y < y0 - 15, $"{y0} -> {p.y}");
+            await t.Run(0.8f);
+            // the right stick aims; with no target the aim follows it exactly
+            t.PadAxis(JoyAxis.RightX, 0); t.PadAxis(JoyAxis.RightY, -1); await t.Run(0.1f);
+            t.Ok("right stick aims", MathF.Abs(H.AngleDiff(p.aim, -H.PI / 2)) < 0.25f, p.aim);
+            t.PadAxis(JoyAxis.RightY, 0); await t.Run(0.1f);
+            // RT fires and rumbles
+            int mag = p.weapons["driver"].mag;
+            Pad.LastRumble = (0, 0, 0);
+            t.PadAxis(JoyAxis.TriggerRight, 1); await t.Run(0.1f); t.PadAxis(JoyAxis.TriggerRight, 0); await t.Run(0.1f);
+            t.Ok("RT fires", p.weapons["driver"].mag < mag, $"{mag} -> {p.weapons["driver"].mag}");
+            t.Ok("firing rumbles", Pad.LastRumble.weak > 0, Pad.LastRumble);
+            // tap Y interacts (on release); hold Y burns
+            t.Place("reef", 13, 12);
+            var chest = First<Chest>();
+            p.x = chest.Cx() - p.w / 2; await t.Run(0.1f);
+            await t.PadTap(JoyButton.Y); await t.Run(0.2f);
+            t.Ok("tapping Y opens the locker", chest.done, chest.done);
+            // tap / hold on the d-pad: poultice, stitch kit
+            p.hp = 3; p.bag.Add("stitchkit", 1);
+            await t.PadTap(JoyButton.DpadUp); await t.Run(0.1f);
+            t.Ok("d-pad up uses a poultice", p.healKind == "poultice", p.healKind);
+            await t.Run(3.2f); p.hp = 2;
+            await t.PadHold(JoyButton.DpadUp, 0.5f);
+            t.Ok("holding d-pad up kneels for the stitch kit", p.healKind == "stitch" && p.healT > 0, $"{p.healKind} {p.healT}");
+            await t.Run(4.2f);
+            // hold RB quick-crafts; tap RB reloads
+            p.bag.Add("scrap", 2);
+            await t.PadHold(JoyButton.RightShoulder, 0.5f);
+            t.Ok("holding RB quick-crafts rivets", p.craftT > 0, p.craftT);
+            await t.Run(2.5f);
+            p.weapons["driver"].mag = 2;
+            await t.PadTap(JoyButton.RightShoulder); await t.Run(0.05f);
+            t.Ok("tapping RB reloads", p.reloadT > 0, p.reloadT);
+            await t.Run(2f);
+            // d-pad left / right change weapon
+            p.weapons["harpoon"] = new WeaponState { tier = 0, mag = 1 }; p.weaponOrder.Add("harpoon");
+            await t.PadTap(JoyButton.DpadRight);
+            t.Ok("d-pad right changes weapon", p.cur == "harpoon", p.cur);
+            await t.PadTap(JoyButton.DpadLeft);
+            t.Ok("d-pad left changes back", p.cur == "driver", p.cur);
+            // L3 latches sneaking
+            await t.PadTap(JoyButton.LeftStick);
+            t.Ok("L3 toggles sneaking", Inp.sneakLatch && Inp.Held("sneak"));
+            await t.PadTap(JoyButton.LeftStick);
+            // aim assist pulls a near miss onto a knot
+            t.Place("pier", 20, 16);
+            var sh = Find("first_shucker");
+            var knot = sh.knots.First(k => !k.broken && !sh.IsSealed(k));
+            var kp = sh.KnotPos(knot).Value; var lp = p.LanternPos();
+            float exact = MathF.Atan2(kp.Y - lp.Y, kp.X - lp.X), off = exact + 0.12f;
+            t.PadAxis(JoyAxis.RightX, MathF.Cos(off)); t.PadAxis(JoyAxis.RightY, MathF.Sin(off)); await t.Run(0.1f);
+            lp = p.LanternPos();
+            float err = sh.knots.Where(k => !k.broken && !sh.IsSealed(k)).Select(k => sh.KnotPos(k).Value)
+                .Min(q => MathF.Abs(H.AngleDiff(p.aim, MathF.Atan2(q.Y - lp.Y, q.X - lp.X))));
+            t.Ok("aim assist pulls a near miss onto a knot", err < 0.045f, $"err={err:0.000} (stick off by 0.12)");
+            Settings.AimAssist = false; await t.Run(0.05f);
+            t.Ok("aim assist can be switched off", MathF.Abs(H.AngleDiff(p.aim, off)) < 0.05f);
+            Settings.AimAssist = true;
+            t.PadAxis(JoyAxis.RightX, 0); t.PadAxis(JoyAxis.RightY, 0);
+            // View opens the journal; the bumpers turn its pages; B closes it
+            await t.PadTap(JoyButton.Back); await t.Run(0.1f);
+            t.Ok("View opens the journal", UI.Kind == "satchel", UI.Kind);
+            string before = UI.Inst.AllText();
+            await t.PadTap(JoyButton.RightShoulder);
+            t.Ok("RB turns the page", UI.Inst.AllText() != before);
+            await t.PadTap(JoyButton.B); await t.Run(0.1f);
+            t.Ok("B closes it", !UI.IsOpen(), UI.Kind);
+            // Start pauses, Start resumes, and the same press does not reopen it
+            await t.PadTap(JoyButton.Start); await t.Run(0.1f);
+            t.Ok("Start pauses", UI.Kind == "pause", UI.Kind);
+            await t.PadTap(JoyButton.Start); await t.Run(0.2f);
+            t.Ok("Start resumes and stays resumed", !UI.IsOpen(), UI.Kind);
+            // Switch: A (the right button) confirms in menus, B (bottom) backs out
+            Pad.Simulate(PadKind.Switch);
+            UI.Dialogue("Test", new List<string> { "one", "two" }); await t.Run(0.1f);
+            await t.PadTap(JoyButton.B);
+            t.Ok("Switch A (right) advances dialogue", UI.IsOpen() && UI.Inst.AllText().Contains("two"), UI.Inst.AllText());
+            await t.PadTap(JoyButton.B); await t.Run(0.1f);
+            t.Ok("and closes it", !UI.IsOpen());
+            UI.Pause(); await t.Run(0.1f);
+            await t.PadTap(JoyButton.A); await t.Run(0.1f);
+            t.Ok("Switch B (bottom) backs out", !UI.IsOpen(), UI.Kind);
+            // glyphs follow the controller
+            Glyphs.Force = null;
+            t.Ok("Switch prompt for jump is B", Glyphs.Plain("{jump}", Glyphs.Current) == "B" && Glyphs.Current == Glyphs.Style.Switch);
+            t.Ok("keyboard prompt for interact is E", Glyphs.Plain("{interact} Open", Glyphs.Style.Keyboard) == "E Open");
+            t.Ok("PlayStation names its buttons", Glyphs.Plain("{jump} / {fire}", Glyphs.Style.PlayStation) == "Cross / R2", Glyphs.Plain("{jump} / {fire}", Glyphs.Style.PlayStation));
+            // losing the controller mid-game pauses
+            Pad.OnConnection(0, false); await t.Run(0.1f);
+            t.Ok("disconnecting the pad pauses the game", UI.Kind == "pause" && UI.Inst.AllText().Contains("disconnected"), UI.Inst.AllText().Split('\n').FirstOrDefault());
+            UI.Close();
+        },
+
+        ["glyphs"] = async t =>
+        {
+            t.Place("reef", 13, 12);
+            var chest = First<Chest>(); var p = G.player; p.x = chest.Cx() - p.w / 2;
+            foreach (var st in new[] { Glyphs.Style.Keyboard, Glyphs.Style.Xbox, Glyphs.Style.PlayStation, Glyphs.Style.Switch })
+            {
+                Glyphs.Force = st;
+                H.Toasts.Clear(); H.ToastMsg("Grabbed! Mash {mash} to break free.", 30);
+                await t.Run(0.2f); t.Snap("glyph_prompt_" + st);
+                UI.Inst.Controls(null, "pad"); await t.Run(0.2f); t.Snap("glyph_controls_" + st);
+                UI.Satchel("map"); await t.Run(0.2f); t.Snap("glyph_journal_" + st);
+                UI.Close();
+            }
+            Glyphs.Force = null; H.Toasts.Clear();
+            UI.Inst.ControllerSettings(null); await t.Run(0.2f); t.Snap("ui_controller");
+            t.Ok("controller settings open", UI.Kind == "controller", UI.Kind);
+            UI.Close();
+        },
+
+        // The opening on the outer rocks, played with nothing but inputs.
+        ["prologue"] = async t =>
+        {
+            var p = G.player; var r = G.room;
+            float Tx() => (p.Cx() - r.Px) / H.TILE;
+            float Ty() => (p.y + p.h - 1 - r.Py) / H.TILE;
+            t.Ok("a new game starts on the outer rocks", r.Id == "breakers" && p.onGround, t.State());
+            await t.Run(0.3f);
+            t.Ok("the tide holds at Low out here", Tide.paused && Tide.PhaseId() == "low");
+            t.Ok("the tide dial is not shown yet", G.dialT == 0, G.dialT);
+            t.Ok("no instructions on arrival", H.Toasts.Count == 0, string.Join(" | ", H.Toasts.Select(x => x.Text)));
+            await t.Run(1.5f);
+            t.Ok("Maren thinks about the boat", G.narr.thoughts.Contains("boat"));
+            // stand still: only then does the walk hint surface
+            t.Ok("no hint before hesitating", Hints.Shown == null, Hints.Shown);
+            await t.Run(5f);
+            t.Ok("standing still raises the walk hint", Hints.Shown == "move", Hints.Shown);
+            // walk to the first rock and lean on it
+            t.Down("left"); await t.Run(1.6f);
+            t.Ok("walking retires the walk hint", Hints.HasDone("move"));
+            await t.Run(3.2f);
+            t.Ok("leaning on the rock raises the jump hint", Hints.Shown == "jump", $"{Hints.Shown} at {Tx():0.0},{Ty():0.0}");
+            // up the two steps
+            for (int i = 0; i < 3 && Tx() > 56; i++) { await t.Hold("jump", 0.3f); await t.Run(0.4f); }
+            t.Ok("jumps up the rocks", Tx() < 58 && Ty() < 14.5f, $"{Tx():0.0},{Ty():0.0}");
+            // across the pool: jump at the lip
+            for (int f = 0; f < 240 && Tx() > 52.6f; f++) await t.Run(1 / 60f);
+            await t.Hold("jump", 0.3f); await t.Run(0.5f);
+            t.Ok("clears the tide pool", Tx() < 47.9f && Ty() < 14.5f && !p.InWater(), $"{Tx():0.0},{Ty():0.0}");
+            // into the chimney, against its west wall
+            await t.Run(1.2f);
+            t.Release("left"); await t.Run(0.2f);
+            t.Ok("stands at the foot of the chimney", Tx() > 36.5f && Tx() < 41 && Ty() > 13, $"{Tx():0.0},{Ty():0.0}");
+            t.Ok("Maren notices the timber", G.narr.thoughts.Contains("timber"));
+            // cling and leap, left wall, right wall, out over the top
+            int dir = -1; bool jumped = false;
+            t.Down("left"); await t.Hold("jump", 0.3f);
+            for (int f = 0; f < 60 * 4 && Ty() > 4.6f; f++)
+            {
+                if (p.hanging == dir && p.vy > 0)
+                {
+                    t.Down("jump"); await t.Run(1 / 60f);
+                    t.Release(dir < 0 ? "left" : "right"); dir = -dir; t.Down(dir < 0 ? "left" : "right");
+                    await t.Run(0.22f); t.Release("jump"); jumped = true; continue;
+                }
+                if (Ty() < 6 && dir > 0) { t.Release("right"); t.Down("left"); dir = -1; }
+                await t.Run(1 / 60f);
+            }
+            await t.Run(0.6f);
+            t.Ok("climbs the chimney by wall-jumping", jumped && Ty() < 5 && Tx() < 37, $"{Tx():0.0},{Ty():0.0}");
+            t.Ok("wall-jumping is remembered", Hints.HasDone("walljump"));
+            // along the planks to the cliff, then stall
+            await t.Run(1.6f); t.Release("left"); await t.Run(3.5f);
+            t.Ok("stalling on the planks raises the drop hint", Hints.Shown == "drop", $"{Hints.Shown} at {Tx():0.0},{Ty():0.0}");
+            t.Down("down"); await t.Tap("jump"); t.Release("down"); await t.Run(1.2f);
+            t.Ok("drops through the planks into the hollow", Ty() > 12 && Tx() < 32, $"{Tx():0.0},{Ty():0.0}");
+            t.Ok("Maren sees the salt", G.narr.thoughts.Contains("salt"));
+            // the salt plug: shoot the barrel from a safe distance
+            t.Down("right"); for (int f = 0; f < 240 && Tx() < 29.5f; f++) await t.Run(1 / 60f); t.Release("right"); await t.Run(0.2f);
+            var barrel = G.ents.OfType<Barrel>().First();
+            int hp0 = p.hp;
+            t.AimAt(barrel.Cx(), barrel.Cy());
+            await t.Click(); await t.Run(2.5f);
+            t.Ok("the shot barrel burns", barrel.done);
+            t.Ok("the fire cracks the salt plug", World.CharAt(r.Ox + 21, r.Oy + 11) != 'S' && World.CharAt(r.Ox + 21, r.Oy + 12) != 'S');
+            t.Ok("shooting from range keeps Maren clear of the fire", p.hp == hp0, $"{hp0} -> {p.hp}");
+            await t.Run(8f);
+            // the crystal tunnel: a dash carries her through untouched
+            t.Down("left"); for (int f = 0; f < 300 && Tx() > 17.4f; f++) await t.Run(1 / 60f);
+            await t.Tap("dash"); await t.Run(0.5f);
+            t.Ok("dashes through the salt crystals unhurt", Tx() < 13.5f && p.hp == hp0, $"{Tx():0.0} hp {p.hp}");
+            t.Ok("Maren eyes the crystals", G.narr.thoughts.Contains("crystals"));
+            for (int f = 0; f < 60 * 3 && G.room.Id == "breakers"; f++) await t.Run(1 / 60f);
+            t.Release("left");
+            t.Ok("walks onto the reef", G.room.Id == "reef", G.room.Id);
+            await t.Run(1.5f);
+            t.Ok("the tide starts to move", !Tide.paused && World.flags.B("landed"));
+            t.Ok("and the dial fades in", G.dialT > 0.5f, G.dialT);
+            t.Ok("the Constance thought follows", G.narr.thoughts.Contains("start"));
+            t.Ok("the reef's chest is still on the deck", G.ents.OfType<Chest>().Any());
+        },
+
+        // Falling into the pool is not a dead end, and a cut from the crystals brings the dash hint.
+        ["prologue2"] = async t =>
+        {
+            var p = G.player; var r = G.room;
+            float Tx() => (p.Cx() - r.Px) / H.TILE;
+            float Ty() => (p.y + p.h - 1 - r.Py) / H.TILE;
+            t.Place("breakers", 50, 18); await t.Run(0.8f);
+            t.Ok("in the tide pool", p.InWater(), $"{Tx():0.0},{Ty():0.0}");
+            await t.Run(3.5f);
+            t.Ok("treading water raises the swim hint", Hints.Shown == "swim", Hints.Shown);
+            t.Down("left", "up"); await t.Run(0.5f); await t.Hold("jump", 0.3f); await t.Run(0.4f); t.Release("up");
+            await t.Hold("jump", 0.3f); await t.Run(0.6f); t.Release("left");
+            t.Ok("climbs out of the pool", !p.InWater() && Ty() < 14.5f && Tx() < 48, $"{Tx():0.0},{Ty():0.0}");
+            // walk into the crystals: a cut, and the dash hint comes at once
+            World.SetChar(r.Ox + 21, r.Oy + 11, ' '); World.SetChar(r.Ox + 21, r.Oy + 12, ' ');
+            t.Place("breakers", 19, 12); await t.Run(0.2f);
+            int hp0 = p.hp;
+            t.Down("left"); await t.Run(1.2f); t.Release("left");
+            t.Ok("walking over crystals cuts", p.hp < hp0, $"{hp0} -> {p.hp}");
+            t.Place("breakers", 18, 12); await t.Run(0.6f);
+            t.Ok("and the dash hint shows straight away", Hints.Shown == "dash", Hints.Shown);
+            // hurt with a poultice in hand and nothing hostile near: the poultice hint
+            await t.Run(4.5f);
+            t.Place("breakers", 5, 12); await t.Run(5f);
+            t.Ok("hurt and safe: the poultice hint", Hints.Shown == "heal", Hints.Shown);
+            await t.Tap("poultice"); await t.Run(1f);
+            t.Ok("using it retires the hint", Hints.HasDone("poultice") && Hints.Shown != "heal", Hints.Shown);
+            // hints can be turned off
+            Settings.Hints = false; t.Place("breakers", 50, 18); await t.Run(5f);
+            t.Ok("no hints when switched off", Hints.Shown == null, Hints.Shown);
+            Settings.Hints = true;
+        },
+
+        // Screenshots of hints as players see them (rendered runs only).
+        ["hintshots"] = async t =>
+        {
+            await t.Run(6f); t.Snap("hint_move_keyboard");
+            Hints.Did("move");
+            foreach (var (st, room, x, y, name, wait) in new[] {
+                (Glyphs.Style.Keyboard, "breakers", 38, 13, "walljump", 6f), (Glyphs.Style.Xbox, "breakers", 38, 13, "walljump", 1f),
+                (Glyphs.Style.PlayStation, "breakers", 25, 4, "drop", 4f), (Glyphs.Style.Switch, "breakers", 28, 12, "shoot", 8f) })
+            {
+                Glyphs.Force = st; t.Place(room, x, y); await t.Run(wait);
+                t.Snap($"hint_{name}_{st}");
+                t.Ok($"{name} hint shows", Hints.Shown == name, Hints.Shown);
+            }
+            Glyphs.Force = null;
+        },
+
         ["narrative"] = async t =>
         {
             int n = Data.Lore.P("carvings").Keys.Count();
-            t.Ok("every room has a carving", n == 25, n);
+            t.Ok("every room has a carving", n == Data.Rooms.Count, $"{n} of {Data.Rooms.Count}");
             var bad = Data.Rooms.Where(r => Narr.CarvingSpecs(r, new HashSet<(int, int)>()).Count == 0).Select(r => r.Id).ToList();
             t.Ok("carvings find a floor spot", bad.Count == 0, string.Join(",", bad));
             t.Place("seawall", 15, 16);

@@ -8,7 +8,7 @@ namespace Hollowmere;
 
 public class NarrState
 {
-    public HashSet<string> thoughts = new(), regions = new(), read = new(), heard = new();
+    public HashSet<string> thoughts = new(), regions = new(), read = new(), heard = new(), hints = new(), did = new();
     public int dreamIndex;
     public Dictionary<string, int> lore = new();
     public JsonObject ToJson()
@@ -17,6 +17,7 @@ public class NarrState
         return new JsonObject
         {
             ["thoughts"] = A(thoughts), ["regions"] = A(regions), ["read"] = A(read), ["heard"] = A(heard), ["dreamIndex"] = dreamIndex,
+            ["hints"] = A(hints), ["did"] = A(did),
             ["lore"] = new JsonObject(lore.Select(kv => new KeyValuePair<string, JsonNode>(kv.Key, kv.Value))),
         };
     }
@@ -27,6 +28,7 @@ public class NarrState
         s.thoughts = new HashSet<string>(p.Strings("thoughts")); s.regions = new HashSet<string>(p.Strings("regions"));
         s.read = new HashSet<string>(p.Strings("read")); s.heard = new HashSet<string>(p.Strings("heard"));
         s.dreamIndex = p.I("dreamIndex"); s.lore = p.Counts("lore");
+        s.hints = new HashSet<string>(p.Strings("hints")); s.did = new HashSet<string>(p.Strings("did"));
         return s;
     }
 }
@@ -101,7 +103,6 @@ public static class Narr
             St.heard.Add(target.key ?? "");
             whispers.Add(new Timed { x = target.Cx(), y = target.y - 6, text = WhisperFor(target), t = 5.5f, max = 5.5f });
             focusBody = null;
-            G.Tip("whisper", "Hold the focused beam on the still and the drowned, and you can hear what they are thinking.", 5);
         }
     }
 

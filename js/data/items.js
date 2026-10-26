@@ -63,10 +63,10 @@ H.GRAFTS = {
 };
 
 H.ABILITIES = {
-  swing:   { name: 'Gaff Swing', desc: 'Hold Q near an iron ring to swing. Release to let go.' },
-  boots:   { name: 'Ballast Boots', desc: 'Press B to sink and walk the seabed. Ignore currents. Stomp a downed knot.' },
-  jet:     { name: 'Jet Valve', desc: 'Press C in the air or underwater to burst. Costs 3 s of suit air.' },
-  tidekey: { name: 'Tide Key', desc: 'Work sluice gates (E) to raise or drop a room\'s water.' },
+  swing:   { name: 'Gaff Swing', desc: 'Hold {swing} near an iron ring to swing from it. Let go to fly.' },
+  boots:   { name: 'Ballast Boots', desc: 'Press {boots} to sink and walk the seabed. Ignore currents. Stomp a downed knot.' },
+  jet:     { name: 'Jet Valve', desc: 'Press {dash} in the air or underwater to burst. Costs 3 s of suit air.' },
+  tidekey: { name: 'Tide Key', desc: 'Work sluice gates ({interact}) to raise or drop a room\'s water.' },
   seal:    { name: 'Pressure Seal', desc: 'Dive the deep water of the Gullet. Breath rises to 60 s.' },
   lens:    { name: 'Saltsight Lens', desc: 'See knots in darkness without burning oil.' },
 };

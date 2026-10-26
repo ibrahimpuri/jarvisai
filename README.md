@@ -12,7 +12,7 @@ Open `index.html` in a desktop browser (Chrome, Edge, Firefox, Safari). It works
 python3 -m http.server 8000   # then visit http://localhost:8000
 ```
 
-You need a mouse and keyboard. Headphones help, because the Undertow's bell is panned.
+Play with keyboard and mouse, or with an Xbox, PlayStation or Switch controller (see [Controllers](#controllers)). Headphones help, because the Undertow's bell is panned.
 
 ### Windows desktop app
 
@@ -68,7 +68,7 @@ The game saves when you rest or save at a Bell Room. Continue from the title scr
 - A water shader with depth tint and drifting caustics, rain, lightning and a moonlit sky outdoors, and dust, drips, salt and bubbles indoors.
 - A finishing pass with underwater refraction, colour grade, vignette and film grain.
 - Synthesised sound rendered into cached samples, with streamed surf and drone ambience.
-- Native menus with keyboard and gamepad navigation (left stick to move, right stick to aim, triggers to fire and focus).
+- Native controller support through SDL3: Xbox, PlayStation (DualShock 4, DualSense) and Switch (Pro Controller, Joy-Con pairs), with the extras below.
 
 **Play on Windows:** unzip `Hollowmere-Godot-Windows.zip` and run `Hollowmere.exe`. Keep the `data_Hollowmere_windows_x86_64` folder next to it; it holds the .NET runtime. Saves live in `%APPDATA%\Godot\app_userdata\Hollowmere`.
 
@@ -84,17 +84,50 @@ godot --headless --path . --export-release "Windows Desktop" ../windows-build/go
 The game has its own test harness. These run inside the real game:
 
 ```sh
-godot --headless --path godot -- --test              # 24 scripted scenarios ported from tools/play.js
+godot --headless --path godot -- --test              # every scripted scenario: the play.js ports, controllers, the opening, hints
 godot --path godot -- --shots out/ [room...]         # screenshots of every room
 ```
 
 | Folder | Contents |
 | --- | --- |
-| `godot/src/Core` | Constants and helpers, game data loading, input, synthesised audio, settings |
+| `godot/src/Core` | Constants and helpers, game data loading, input and controllers (`Pad.cs`: detection, rumble, light bar, gyro), synthesised audio, settings |
 | `godot/src/World` | The tide clock, tile queries and water, AABB physics |
-| `godot/src/Game` | Player, bodies and knots, bosses, objects, combat, story, narrative, the game loop and saving |
-| `godot/src/View` | The world view (lights, shadows, water, sky, post), tile art, HUD, menus, a Canvas-style drawing layer |
+| `godot/src/Game` | Player, bodies and knots, bosses, objects, combat, story, narrative, hints, the opening's zones, the game loop and saving |
+| `godot/src/View` | The world view (lights, shadows, water, sky, post), tile art, HUD, button glyphs, menus, a Canvas-style drawing layer |
 | `godot/shaders` | Water and post-processing shaders |
+
+## Controllers
+
+Both editions play fully on a controller, from the title screen to the endings. Prompts always show the buttons of the controller in your hands: Xbox letters, PlayStation shapes, or Switch letters in Nintendo's positions. They switch to keycaps the moment you touch the keyboard or mouse.
+
+| Control | Action |
+| --- | --- |
+| Left stick | Move, climb, swim. A light tilt creeps quietly; click it (L3) to keep sneaking |
+| Right stick | Aim. Leave it alone and Maren aims where she walks; a gentle aim assist settles on knots and barrels |
+| A / Cross / Switch B | Jump (down + jump drops through planks) |
+| B / Circle / Switch A | Dash |
+| X / Square / Switch Y | Gaff strike |
+| Y / Triangle / Switch X | Interact, talk, drag a body. Hold it to burn a downed body |
+| LB / L1 / L | Gaff Swing (hold) |
+| RB / R1 / R | Reload. Hold it to quick-craft rivets from scrap |
+| LT / L2 / ZL | Focused beam (hold) |
+| RT / R2 / ZR | Fire |
+| D-pad up | Poultice. Hold it for the Stitch Kit |
+| D-pad down | Ballast Boots |
+| D-pad left / right | Change weapon |
+| R3 | Shutter the lantern |
+| View / Create / − | Journal: map, satchel, crafting, gear, logbook. The bumpers turn its pages |
+| Menu / Options / + | Pause |
+
+Menus are navigated with the d-pad or left stick. On a Switch controller, A (the right button) confirms and B backs out, as on the console; this can be swapped in the controller settings. Unplugging the controller mid-game pauses it. Rumble follows every jolt, shot and hit, with Off / Gentle / Full settings.
+
+The Godot edition adds the platform features SDL3 exposes: the DualSense and DualShock 4 light bar glows like Maren's lantern (dimmer as the oil runs low, red when she is nearly dead, sea-green underwater), and gyro aim is available on PlayStation and Switch controllers.
+
+## The opening and hints
+
+The game teaches itself without a tutorial screen. A new run starts on the Breakers, the outer rocks where Maren's rowboat breaks up, and the climb to the reef asks for each of her moves in turn: jump a rock, clear a tide pool (falling in teaches swimming), wall-jump up an old hull stood on end, drop through planks, shoot an oil barrel so its fire cracks a salt plug, and dash through a tunnel of salt crystals. The tide holds at Low out there, and the tide dial only appears once she reaches the reef.
+
+Nothing tells the player what to do unless they stall. A faint glyph and a word or two rise over Maren only when something is relevant and the player has hesitated for a few seconds (walk, jump, swim, wall-jump, drop, shoot, dash, heal, focus the beam, swing, fight the joints, gaff the Crown, reload, craft, change weapon, map, the Ballast Boots and the Jet Valve). Each hint retires for good the first time its action is done, whether or not it was ever shown, so a player who works things out never sees one. Maren's own thoughts carry the rest: wet stone will not take a grip but timber will; the salt cracks in the heat; sparks mean the flesh is only weight. Hints can be switched off in the pause menu.
 
 ## What is in the build
 
@@ -109,17 +142,17 @@ Every core system in the design document is implemented and wired together:
 - **Survival.** A slot-limited satchel (8 → 12 → 16; key items take 2 slots), anywhere and bench crafting, poultices and Stitch Kits that lock you in place, breath as helmet bubbles, Bell Rooms (rekindle, save, rest to the next Low, shared Reliquary, bench), and the hidden lifeline rule. On death your satchel stays where you fell, and the Ebb carries it to the Wrack Pool if you died in tidal water.
 - **Build choices.** Seven fittings under a Pressure Rating raised by six Brass Seals. Three Brine Grafts, each with its own vulnerability; Ansel can cut one out once at the cost of a health pip. Four weapons with three behaviour-changing tiers paid in scrap and Mere-ivory.
 - **Traversal.** Gaff Swing, Ballast Boots (sink through buoyant brine, stomp), Jet Valve, Tide Key, Pressure Seal (the Gullet's pressure won't let an unsealed suit dive) and Saltsight Lens.
-- **World.** Seven regions, 25 hand-built rooms, six Bell Rooms. Puzzles: Sluice Ladder barge, Hymn of Hours, Tuned Bells (the Tide Key becomes a tuning fork), Lamp Prisms (bend the focused beam) and Dead Weight (drag knotless bodies onto the lift).
+- **World.** Seven regions, 26 hand-built rooms, six Bell Rooms. Puzzles: Sluice Ladder barge, Hymn of Hours, Tuned Bells (the Tide Key becomes a tuning fork), Lamp Prisms (bend the focused beam) and Dead Weight (drag knotless bodies onto the lift).
 - **RPG layer.** Four NPCs (Ansel, Odile, Hesper, Agathe). Four quests with physical consequences: Lines Gone Slack, The Choir's Water, The Prior's Tables and A Keeper's Log. The Brine breaches a Bell Room in Act III. Three endings: Relight the Lamp, The Saint's Hymn and Keeper's Dark, each gated as the design describes.
 - **Fairness and tension.** A pacing valve after fights, readable dormancy (true corpses have no knots), adaptive encrustation (new bodies grow plates over the knot type you break most, always leaving two open, and Ansel remarks on it), tells before damage, and the logbook map that only records water lines for tide phases you have seen.
-- **The opening.** The Wrackline and the Tithe Hall set piece play as written: the first Shucker stands when the water reaches it, lifting the crank tolls the bell and floods the hall, you escape by chandelier rings to the gallery, and the Undertow passes behind the glass.
+- **The opening.** The Breakers teach movement without words (see above). Then the Wrackline and the Tithe Hall set piece play as written: the first Shucker stands when the water reaches it, lifting the crank tolls the bell and floods the hall, you escape by chandelier rings to the gallery, and the Undertow passes behind the glass.
 - **Difficulty.** Pilgrim, Keeper and Drowned, plus a separate 100% / 150% / 200% tide-length setting.
 
 ## Scope compared with the document
 
-The document plans 8-10 people over 30 months for about 180 rooms and a 10-12 hour game. This build is a complete but compact version of it: all seven regions and the whole critical path, from the reef to all three endings, across 25 rooms, so a first run is far shorter than the document's 10-12 hours. Things that are smaller than the document describes:
+The document plans 8-10 people over 30 months for about 180 rooms and a 10-12 hour game. This build is a complete but compact version of it: all seven regions and the whole critical path, from the outer rocks to all three endings, across 26 rooms, so a first run is far shorter than the document's 10-12 hours. Things that are smaller than the document describes:
 
-- 25 rooms and 6 Bell Rooms instead of about 180 and 14. Bell-cable lifts, which the document lists as cuttable, are omitted.
+- 26 rooms and 6 Bell Rooms instead of about 180 and 14. Bell-cable lifts, which the document lists as cuttable, are omitted.
 - Hesper and Teodor are conditional fights rather than six fixed bosses.
 - Art and audio are procedural placeholders: stick-skeleton puppets, tile shading and synthesised sound.
 
@@ -128,7 +161,7 @@ The document plans 8-10 people over 30 months for about 180 rooms and a 10-12 ho
 ```sh
 node tools/validate.js      # room sizes, legend, and that every open edge meets an open neighbour
 node tools/reach.js         # movement-model reachability of the critical path, gate integrity, and soft-lock (trap) detection
-node tools/play.js          # 23 scripted gameplay scenarios with real keyboard and mouse input (Playwright)
+node tools/play.js          # 26 scripted scenarios with real keyboard, mouse and (simulated) controller input (Playwright)
 node tools/route.js         # the movement model plans routes; an in-page autopilot plays them with real physics
 node tools/soak.js 5        # random bot in every room and tide phase, reports runtime errors
 node tools/tour.js out/     # screenshots of every room
@@ -141,8 +174,11 @@ node tools/desktop-test.js <exe> [out/]   # launches the packaged desktop app, p
 
 | File | Contents |
 | --- | --- |
-| `js/data/rooms.js` | The island: 25 ASCII rooms on a world grid, with their entities |
+| `js/data/rooms.js` | The island: 26 ASCII rooms on a world grid, with their entities |
 | `js/data/items.js` | Items, recipes, weapons, fittings, grafts and abilities |
+| `js/settings.js` / `js/input.js` | Saved settings; keyboard, mouse and controller input, rumble |
+| `js/glyphs.js` | Button prompts for keyboard, mouse, Xbox, PlayStation and Switch, on the canvas and in menus |
+| `js/hints.js` | Hints that surface only when the player stalls |
 | `js/tide.js` | The tide clock |
 | `js/world.js` | Tile queries, phase-dependent gates, water (sea, fixed, pools, floods) and room persistence |
 | `js/physics.js` | AABB movement, one-way and moving platforms, line of sight |

@@ -13,6 +13,8 @@ public partial class Main : Node2D
     public override void _Ready()
     {
         Settings.Load();
+        Pad.Init();
+        Pad.Notice = OnPadNotice;
         AddChild(new Snd());
         Snd.SetVolume(Snd.Volume);
         G.Init();
@@ -50,6 +52,7 @@ public partial class Main : Node2D
     public override void _Input(InputEvent ev)
     {
         Inp.OnEvent(ev);
+        if (ev is InputEventJoypadButton jb && jb.Pressed && UI.IsOpen()) UI.Inst.PadButton(jb.ButtonIndex);
         if (ev is InputEventKey k && k.Pressed && !k.Echo && (k.PhysicalKeycode == Key.F11 || (k.PhysicalKeycode == Key.Enter && k.AltPressed)))
         {
             Settings.ToggleFullscreen();
@@ -67,11 +70,27 @@ public partial class Main : Node2D
     {
         float dt = MathF.Min(0.033f, (float)delta);
         if (tester != null && tester.FixedStep) dt = 1 / 60f;
-        Inp.Poll(GetViewport());
+        Inp.Poll(GetViewport(), dt);
+        Pad.UpdateGyro(dt);
         tester?.BeforeStep();
         try { G.Step(dt); }
         catch (Exception e) { GD.PushError(e.ToString()); if (tester != null) tester.Errors.Add(e.ToString()); }
         Inp.EndFrame();
-        if (G.mode == "play" && !UI.IsOpen()) Input.MouseMode = Input.MouseModeEnum.Hidden;
+        Pad.UpdateLight((float)(Time.GetTicksMsec() / 1000.0));
+        // the cursor shows only in menus, and only while the mouse is the thing in use
+        var want = !UI.IsOpen() ? (G.mode == "play" ? Input.MouseModeEnum.Hidden : Input.MouseMode) : Pad.Using ? Input.MouseModeEnum.Hidden : Input.MouseModeEnum.Visible;
+        if (Input.MouseMode != want) Input.MouseMode = want;
+    }
+
+    // A controller connected or dropped. Losing the pad mid-game pauses, as on a console.
+    void OnPadNotice(string msg)
+    {
+        if (tester != null && !Pad.TestMode) return;
+        if (msg == "disconnected")
+        {
+            if (G.mode == "play" && !UI.IsOpen() && G.player != null && !G.player.dead) UI.Pause("Controller disconnected. Reconnect it, or carry on with keyboard and mouse.");
+            return;
+        }
+        if (G.mode == "play") H.ToastMsg(msg, 2.5f);
     }
 }

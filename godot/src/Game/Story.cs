@@ -240,7 +240,7 @@ public static class Story
                     if (ammo.Item1 != null) p.bag.Add(ammo.Item1, ammo.Item2);
                     UI.Say(def.S("name"), wid switch
                     {
-                        "harpoon" => "Pins a limb to a wall for 4 s. Bolts can be recovered if they do not sink at Ebb. Select with 2 or the mouse wheel.",
+                        "harpoon" => "Pins a limb to a wall for 4 s. Bolts can be recovered if they do not sink at Ebb. Change weapon with {weapon}.",
                         "sling" => "Throws flares that burn for 10 s and draw Driftlings. A lit flare stuck to a body lets the swarm strip its knots for you.",
                         _ => "Strings a wire at knee height that cuts the knots of anything crossing it.",
                     });

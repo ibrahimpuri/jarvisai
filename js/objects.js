@@ -29,7 +29,7 @@
   class Chest extends Obj {
     constructor(spec, room) { super(spec, room); this.w = 16; this.h = 11; this.x = spec.x - 8; this.y = spec.y - 11; this.contents = Object.assign({}, spec.loot || {}); this.fitting = spec.fitting; }
     hidden() { return this.spec.needsDrained && !W().flags.choirDrained; }
-    prompt() { return this.hidden() ? null : this.done ? null : 'E  Open ' + (this.spec.label || 'container'); }
+    prompt() { return this.hidden() ? null : this.done ? null : '{interact} Open ' + (this.spec.label || 'container'); }
     interact() {
       if (this.hidden() || this.done) return;
       const p = P();
@@ -99,7 +99,7 @@
   // Words cut into the island: read with E, shown as an inscription.
   class Carving extends Obj {
     constructor(spec, room) { super(spec, room); this.w = 14; this.h = 18; this.x = spec.x - 7; this.y = spec.y - 22; }
-    prompt() { return 'E  Read the carving'; }
+    prompt() { return '{interact} Read the carving'; }
     interact() { H.Narr.markRead(this.spec.id); H.UI.inscription(this.spec.title, this.spec.text); }
     light() { return H.Narr.isRead(this.spec.id) ? null : { x: this.cx(), y: this.cy(), r: 26, i: 0.35, color: '200,220,230' }; }
     draw(c) {
@@ -114,7 +114,7 @@
   }
 
   class Sign extends Obj {
-    prompt() { return 'E  Read'; }
+    prompt() { return '{interact} Read'; }
     interact() { H.UI.say(null, this.spec.text); }
     draw(c) {
       c.fillStyle = 'rgba(230,230,210,0.5)';
@@ -127,7 +127,7 @@
     constructor(spec, room) { super(spec, room); this.w = 18; this.h = 30; this.x = spec.x - 9; this.y = spec.y - 30; }
     lit() { return !!G().bellsLit[this.spec.id]; }
     silenced() { return this.spec.id === 'bell_chapel' && G().quest('tables') === 'sold'; }
-    prompt() { return this.silenced() ? 'E  The bell is silent' : G().bellRoomBreached(this.room.id) ? 'E  The bell is drowned out' : this.lit() ? 'E  Bell Room' : 'E  Rekindle the bell lamp (1 oil flask)'; }
+    prompt() { return this.silenced() ? '{interact} The bell is silent' : G().bellRoomBreached(this.room.id) ? '{interact} The bell is drowned out' : this.lit() ? '{interact} Bell Room' : '{interact} Rekindle the bell lamp (1 oil flask)'; }
     interact() {
       if (this.silenced()) { H.UI.say(null, 'The bell hangs cracked and silent. Without its resonance, this room is no longer safe.'); return; }
       if (G().bellRoomBreached(this.room.id)) { H.UI.say(null, 'Brine water has breached the room and the bell\'s note is drowned out. Clear the room before you can rest here.'); return; }
@@ -159,7 +159,7 @@
   }
   class Reliquary extends Obj {
     constructor(spec, room) { super(spec, room); this.w = 18; this.h = 12; this.x = spec.x - 9; this.y = spec.y - 12; }
-    prompt() { return 'E  Reliquary chest'; }
+    prompt() { return '{interact} Reliquary chest'; }
     interact() { H.UI.reliquary(); }
     draw(c) {
       c.fillStyle = '#5a4030'; c.fillRect(this.x, this.y + 2, this.w, this.h - 2);
@@ -168,7 +168,7 @@
   }
   class Bench extends Obj {
     constructor(spec, room) { super(spec, room); this.w = 22; this.h = 12; this.x = spec.x - 11; this.y = spec.y - 12; }
-    prompt() { return 'E  Bench: craft, upgrade, fittings'; }
+    prompt() { return '{interact} Bench: craft, upgrade, fittings'; }
     interact() { H.UI.bench(this.room.id === 'chapel'); }
     draw(c) {
       c.fillStyle = '#4a3a2a'; c.fillRect(this.x, this.y + 3, this.w, 3);
@@ -181,7 +181,7 @@
   class NPC extends Obj {
     constructor(spec, room) { super(spec, room); this.w = 12; this.h = 26; this.x = spec.x - 6; this.y = spec.y - 26; this.id = spec.id; }
     present() { return H.Story.npcPresent(this.id, this.room.id); }
-    prompt() { return this.present() ? 'E  Speak with ' + H.Story.npcName(this.id) : null; }
+    prompt() { return this.present() ? '{interact} Speak with ' + H.Story.npcName(this.id) : null; }
     interact() { if (this.present()) H.Story.talk(this.id); }
     draw(c) {
       if (!this.present()) return;
@@ -200,7 +200,7 @@
   // ---------------------------------------------------------------- Wrackline objects
   class Socket extends Obj {
     constructor(spec, room) { super(spec, room); this.w = 12; this.h = 14; }
-    prompt() { return W().flags.seawallOpen ? null : P().bag.count('crank') ? 'E  Fit the Sluice Crank' : 'E  Examine gate socket'; }
+    prompt() { return W().flags.seawallOpen ? null : P().bag.count('crank') ? '{interact} Fit the Sluice Crank' : '{interact} Examine gate socket'; }
     interact() {
       if (W().flags.seawallOpen) return;
       const p = P();
@@ -219,7 +219,7 @@
   }
   class Crank extends Obj {
     constructor(spec, room) { super(spec, room); this.w = 14; this.h = 14; }
-    prompt() { return this.done ? null : 'E  Lift the Sluice Crank from the altar'; }
+    prompt() { return this.done ? null : '{interact} Lift the Sluice Crank from the altar'; }
     interact() {
       if (this.done) return;
       const p = P();
@@ -237,13 +237,14 @@
   }
   class Barrel extends Obj {
     constructor(spec, room) { super(spec, room); this.w = 12; this.h = 14; this.shootable = true; }
-    prompt() { return this.done ? null : 'F  Kick over (or shoot) the oil barrel'; }
+    prompt() { return this.done ? null : '{gaff} Kick over, or {fire} shoot, the oil barrel'; }
     hitBox() { return { x: this.x, y: this.y, w: this.w, h: this.h }; }
     onShot() { this.burst(); }
     onGaff() { this.burst(); }
     burst() {
       if (this.done) return;
       this.done = true;
+      H.Hints.did('barrel');
       H.FX.spawn(this.cx(), this.cy(), 30, { color: '#ffb040', glow: true, smin: 40, smax: 200 });
       H.Fire.spill(this.cx(), this.y + this.h - 4, 4);
       G().shake(4);
@@ -272,7 +273,7 @@
   const SEQ = ['sea', 'saint', 'kiln'];
   class Lever extends Obj {
     constructor(spec, room) { super(spec, room); this.w = 10; this.h = 16; }
-    prompt() { const f = W().flags; return f.basinCrossed ? null : f.basinJam ? 'E  The gates are jammed until the Ebb' : 'E  Throw the ' + { wave: 'wave', skull: 'skull', flame: 'flame' }[this.spec.icon] + ' lever'; }
+    prompt() { const f = W().flags; return f.basinCrossed ? null : f.basinJam ? '{interact} The gates are jammed until the Ebb' : '{interact} Throw the ' + { wave: 'wave', skull: 'skull', flame: 'flame' }[this.spec.icon] + ' lever'; }
     pulled() { return (W().flags.basinSeq || []).includes(this.spec.id); }
     interact() {
       const f = W().flags;
@@ -368,7 +369,7 @@
       W().flags.liftDropped = true;
     }
     platformRect() { return this.done ? null : { x: this.x, y: this.y, w: this.w, h: this.h, oneWay: false, dy: this.falling ? 220 / 60 : 0 }; }
-    prompt() { return this.done ? null : 'Lift pan: ' + (this.load || 0) + ' / 2 bodies. Drag knotless dead onto it (E near a body).'; }
+    prompt() { return this.done ? null : 'Lift pan: ' + (this.load || 0) + ' / 2 bodies. Drag knotless dead onto it ({interact} near a body).'; }
     draw(c) {
       if (this.done) return;
       c.fillStyle = '#5a5a5a'; c.fillRect(this.x, this.y, this.w, this.h);
@@ -382,7 +383,7 @@
   const DIRS = [[1, 0], [0, 1], [-1, 0], [0, -1]];
   class Prism extends Obj {
     constructor(spec, room) { super(spec, room); this.w = 10; this.h = 12; this.x = spec.x - 5; this.y = spec.y - 12 + 2; this.dir = spec.dir || 0; this.lit = 0; }
-    prompt() { return 'E  Turn the prism'; }
+    prompt() { return '{interact} Turn the prism'; }
     interact() { this.dir = (this.dir + 1) % 4; H.Audio.ui(); H.Audio.tink(); }
     center() { return { x: this.room.px + this.spec.tx * TS + 8, y: this.room.py + this.spec.ty * TS + 8 }; }
     draw(c) {
@@ -426,7 +427,7 @@
   // ---------------------------------------------------------------- Sunken Choir objects
   class TunedBell extends Obj {
     constructor(spec, room) { super(spec, room); this.w = 14; this.h = 18; }
-    prompt() { return 'E / F  Strike the tuned bell'; }
+    prompt() { return '{interact} Strike the tuned bell'; }
     basinLevel() { return W().flags.choirLevelName === 'raised' ? 3 : (W().flags.basin || 0); }
     interact() { this.ring(); }
     onGaff() { this.ring(); }
@@ -458,7 +459,7 @@
   }
   class Valve extends Obj {
     constructor(spec, room) { super(spec, room); this.w = 10; this.h = 10; }
-    prompt() { return 'E  Turn the basin valve (level ' + (W().flags.basin || 0) + ')'; }
+    prompt() { return '{interact} Turn the basin valve (level ' + (W().flags.basin || 0) + ')'; }
     interact() { W().flags.basin = ((W().flags.basin || 0) + 1) % 3; H.Audio.ui(); H.Audio.splash(0.1); }
     draw(c) {
       c.strokeStyle = '#8a6a3a'; c.lineWidth = 1.5; c.beginPath(); c.arc(this.cx(), this.cy(), 4, 0, Math.PI * 2); c.stroke();
@@ -467,7 +468,7 @@
   }
   class Sluice extends Obj {
     constructor(spec, room) { super(spec, room); this.w = 12; this.h = 18; }
-    prompt() { return P().has('tidekey') ? 'E  Work the sluice with the Tide Key' : 'E  Examine the sluice'; }
+    prompt() { return P().has('tidekey') ? '{interact} Work the sluice with the Tide Key' : '{interact} Examine the sluice'; }
     interact() {
       if (!P().has('tidekey')) { H.UI.say(null, 'A sluice wheel with a keyhole shaped like a wave. The Choir\'s water is held here.'); return; }
       H.UI.sluiceMenu();
@@ -479,7 +480,7 @@
   }
   class Font extends Obj {
     constructor(spec, room) { super(spec, room); this.w = 16; this.h = 12; }
-    prompt() { return H.Story.choirFriendly() ? 'E  The Brine font' : null; }
+    prompt() { return H.Story.choirFriendly() ? '{interact} The Brine font' : null; }
     interact() { H.UI.fontMenu(); }
     draw(c) {
       c.fillStyle = '#6a6a72'; c.fillRect(this.x + 3, this.y + 4, this.w - 6, this.h - 4);
@@ -490,7 +491,7 @@
   }
   class Bowl extends Obj {
     constructor(spec, room) { super(spec, room); this.w = 12; this.h = 10; }
-    prompt() { return H.Story.choirFriendly() && G().quest('tables') !== 'given' && G().quest('tables') !== 'sold' ? 'E  The offering bowl' : null; }
+    prompt() { return H.Story.choirFriendly() && G().quest('tables') !== 'given' && G().quest('tables') !== 'sold' ? '{interact} The offering bowl' : null; }
     interact() { H.Story.offerTables(); }
     draw(c) { c.fillStyle = '#7a6a4a'; c.beginPath(); c.ellipse(this.cx(), this.y + 4, 6, 3, 0, 0, Math.PI); c.fill(); c.fillRect(this.cx() - 1, this.y + 5, 2, 5); }
   }
@@ -564,7 +565,7 @@
   // ---------------------------------------------------------------- ending objects
   class Lampwork extends Obj {
     constructor(spec, room) { super(spec, room); this.w = 30; this.h = 40; }
-    prompt() { return 'E  The great lamp'; }
+    prompt() { return '{interact} The great lamp'; }
     interact() { H.Story.ending('relight'); }
     light() { return { x: this.cx(), y: this.y + 8, r: 60, i: 0.4, color: '255,230,180' }; }
     draw(c) {
@@ -577,13 +578,13 @@
   }
   class Beacon extends Obj {
     constructor(spec, room) { super(spec, room); this.w = 12; this.h = 22; }
-    prompt() { return 'E  The warning beacon'; }
+    prompt() { return '{interact} The warning beacon'; }
     interact() { H.Story.ending('dark'); }
     draw(c) { c.fillStyle = '#5a2a1a'; c.fillRect(this.x + 2, this.y + 6, 8, 16); c.fillStyle = '#c03020'; c.fillRect(this.x, this.y, 12, 6); }
   }
   class HymnBell extends Obj {
     constructor(spec, room) { super(spec, room); this.w = 14; this.h = 20; }
-    prompt() { return 'E  The Saint\'s bell'; }
+    prompt() { return '{interact} The Saint\'s bell'; }
     interact() { H.Story.ending('hymn'); }
     draw(c) {
       const x = this.cx();
@@ -592,7 +593,43 @@
     }
   }
 
+  // The first room's furniture: invisible zones that give Maren a thought or let a hint surface,
+  // and the rowboat she came in on, holed on the outer rocks.
+  class Zone extends Obj {
+    constructor(spec, room) {
+      super(spec, room);
+      this.x = room.px + spec.tx * TS; this.y = room.py + spec.ty * TS; this.w = spec.w * TS; this.h = spec.h * TS;
+    }
+    update(dt) {
+      const p = P();
+      if (!p || p.dead || !H.rectsOverlap(p.box(), this)) return;
+      if (this.spec.hint) H.Hints.inZone(this.spec.hint);
+      if (this.spec.think) H.Narr.think(this.spec.think);
+    }
+  }
+  class Boat extends Obj {
+    constructor(spec, room) { super(spec, room); this.w = 44; this.h = 14; this.x = spec.x - 22; this.y = spec.y - 10; }
+    update(dt) { this.t += dt; }
+    draw(c) {
+      // Settled by the stern, rocking a little in the swell.
+      const cx = this.cx(), sy = this.spec.y + Math.sin(this.t * 1.3) * 0.8;
+      c.save(); c.translate(cx, sy); c.rotate(-0.12 + Math.sin(this.t * 0.9) * 0.02);
+      c.fillStyle = '#2c2118';
+      c.beginPath(); c.moveTo(-23, -8); c.quadraticCurveTo(-4, 9, 21, -7); c.lineTo(19, -10); c.quadraticCurveTo(-4, 2, -21, -11); c.closePath(); c.fill();
+      c.fillStyle = '#5e4a30'; c.fillRect(-22, -11, 42, 2);
+      c.fillStyle = '#3d2f20'; for (let i = -14; i <= 12; i += 9) c.fillRect(i, -9, 2, 8);
+      // the hole the rocks punched through
+      c.fillStyle = '#0c0a08'; c.beginPath(); c.moveTo(2, -3); c.lineTo(9, -6); c.lineTo(7, 1); c.lineTo(3, 2); c.closePath(); c.fill();
+      c.restore();
+      // an oar adrift beside it
+      const ox = cx - 34, oy = sy - 1 + Math.sin(this.t * 1.7 + 1) * 0.8;
+      c.strokeStyle = '#5e4a30'; c.lineWidth = 1.5; c.beginPath(); c.moveTo(ox - 10, oy); c.lineTo(ox + 9, oy - 2); c.stroke();
+      c.fillStyle = '#5e4a30'; c.fillRect(ox + 8, oy - 4, 6, 3);
+    }
+  }
+
   H.ObjTypes = {
+    zone: Zone, boat: Boat,
     chest: Chest, pickup: Pickup, sign: Sign, carving: Carving, bell: Bell, reliquary: Reliquary, bench: Bench, npc: NPC,
     socket: Socket, crank: Crank, barrel: Barrel, pews: Pews, lever: Lever, barge: Barge, floater: Floater, lift: Lift,
     prism: Prism, crystal: Crystal, tunedbell: TunedBell, valve: Valve, sluice: Sluice, font: Font, bowl: Bowl,

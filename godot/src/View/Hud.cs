@@ -100,11 +100,11 @@ public static class Hud
         string text = G.promptText;
         if (text == null) return;
         c.Font = "8px monospace";
-        float w = c.MeasureText(text) + 14;
-        float x = (H.VIEW_W - w) / 2, y = H.VIEW_H - 46;
-        c.Fill = H.Rgba(10, 12, 14, 0.7f); c.FillRect(x, y, w, 15);
+        float w = Glyphs.Measure(c, text) + 14;
+        float x = (H.VIEW_W - w) / 2, y = H.VIEW_H - 48;
+        c.Fill = H.Rgba(10, 12, 14, 0.7f); c.FillRect(x, y, w, 17);
         c.Fill = H.Rgba(200, 170, 100, 0.4f); c.FillRect(x, y, w, 1);
-        c.FillStyle = "#e8dcb8"; c.FillText(text, x + 7, y + 10);
+        c.FillStyle = "#e8dcb8"; Glyphs.DrawText(c, text, x + 7, y + 11.5f);
     }
 
     // Notifications: a wrapped column under the HUD, leaving the centre for titles and story text.
@@ -116,12 +116,13 @@ public static class Hud
         foreach (var t in H.Toasts)
         {
             float a = MathF.Min(1, MathF.Min(t.T, (t.Max - t.T) * 4 + 0.2f));
-            var lines = Narr.Wrap(c, t.Text, maxW);
-            float h = lines.Count * 9 + 5;
+            var lines = Glyphs.Wrap(c, t.Text, maxW);
+            bool rich = t.Text.Contains('{');
+            float lh = rich ? 12 : 9, h = lines.Count * lh + 5;
             c.Fill = H.Rgba(8, 10, 12, 0.6f * a); c.FillRect(8, y - 8, maxW + 10, h);
             c.Fill = H.Rgba(200, 170, 100, 0.7f * a); c.FillRect(8, y - 8, 1.5f, h);
             c.Fill = H.Rgba(232, 220, 184, a);
-            for (int i = 0; i < lines.Count; i++) c.FillText(lines[i], 13, y + i * 9);
+            for (int i = 0; i < lines.Count; i++) Glyphs.DrawText(c, lines[i], 13, y + i * lh + (rich ? 1.5f : 0));
             y += h + 3;
         }
     }
@@ -170,7 +171,7 @@ public static class Hud
     {
         if (p.grabbedBy == null) return;
         c.Font = "12px monospace"; c.TextAlign = 1; c.FillStyle = "#ff9a7a";
-        c.FillText("BREAK FREE  [F / E / SPACE]  x" + p.mash, H.VIEW_W / 2, H.VIEW_H / 2 + 50);
+        Glyphs.DrawText(c, "BREAK FREE  {mash}  x" + p.mash, H.VIEW_W / 2, H.VIEW_H / 2 + 50);
         c.TextAlign = 0;
     }
 
@@ -192,7 +193,10 @@ public static class Hud
         var p = G.player;
         c.LineWidth = 1; c.GlobalAlpha = 1; c.TextAlign = 0;
         Pips(c, p); Breath(c, p); Lantern(c, p);
-        Dial(c); Weapon(c, p); PromptBox(c); Toasts(c); RoomTitle(c); BossBar(c); Grabbed(c, p);
+        if (G.dialT > 0.01f) { c.GlobalAlpha = G.dialT; Dial(c); c.GlobalAlpha = 1; }
+        Weapon(c, p); PromptBox(c); Toasts(c); RoomTitle(c); BossBar(c); Grabbed(c, p);
+        Hints.Draw(c);
+        if (Inp.sneakLatch && Pad.Using) { c.Font = "6px monospace"; c.FillStyle = "#9a9080"; c.FillText("creeping", 10, 56); }
         if (G.god) { c.FillStyle = "#f66"; c.Font = "7px monospace"; c.FillText("DEBUG", 6, H.VIEW_H - 4); }
         Crosshair(c);
     }
@@ -202,7 +206,8 @@ public static class Hud
     {
         c.FillStyle = "#1a1712"; c.FillRect(0, 0, W, Hh);
         c.FillStyle = "#2a251c"; c.FillRect(8, 8, W - 16, Hh - 16);
-        const int cols = 8, rows = 6;
+        // the island's extent, from the rooms themselves
+        int cols = Data.Rooms.Max(r => r.Col + r.W), rows = Data.Rooms.Max(r => r.Row + r.H);
         float sw = MathF.Floor((W - 40) / cols), sh = MathF.Floor((Hh - 60) / rows);
         float ox = 20, oy = 36;
         c.Font = "11px Georgia, serif"; c.FillStyle = "#d8c8a0";

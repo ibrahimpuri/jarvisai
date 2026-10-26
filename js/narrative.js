@@ -5,7 +5,7 @@ H.Narr = (() => {
   const L = () => H.LORE;
   const G = () => H.Game;
 
-  function fresh() { return { thoughts: {}, regions: {}, dreamIndex: 0, read: {}, lore: {}, heard: {} }; }
+  function fresh() { return { thoughts: {}, regions: {}, dreamIndex: 0, read: {}, lore: {}, heard: {}, hints: {}, did: {} }; }
   function st() { return G().narr || (G().narr = fresh()); }
 
   // ---- thoughts: one quiet italic line, each shown once ----------------------------------
@@ -63,7 +63,6 @@ H.Narr = (() => {
       st().heard[target.key || ''] = true;
       whispers.push({ x: target.cx(), y: target.y - 6, text: whisperFor(target), t: 5.5, max: 5.5 });
       focusBody = null;
-      if (!G().tips.whisper) G().tip('whisper', 'Hold the focused beam on the still and the drowned, and you can hear what they are thinking.', 5);
     }
   }
 
@@ -182,5 +181,6 @@ H.Narr = (() => {
   function epigraphActive() { return !!epigraph; }
   function reset() { thought = null; epigraph = null; whispers.length = 0; heardThisVisit.clear(); }
 
-  return { fresh, think, enterRegion, onRoomEnter, updateWhispers, carvingSpecs, markRead, isRead, nextDream, deathText, npcLore, fates, drawWorld, drawHUD, drawEpigraph, epigraphActive, reset };
+  function had(id) { return !!st().thoughts[id]; }
+  return { fresh, think, had, enterRegion, onRoomEnter, updateWhispers, carvingSpecs, markRead, isRead, nextDream, deathText, npcLore, fates, drawWorld, drawHUD, drawEpigraph, epigraphActive, reset };
 })();

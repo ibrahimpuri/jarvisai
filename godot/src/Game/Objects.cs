@@ -38,7 +38,7 @@ public class Chest : Obj
         contents = spec.Counts("loot"); fitting = spec.S("fitting");
     }
     bool Hidden() => spec.B("needsDrained") && !World.flags.B("choirDrained");
-    public override string Prompt() => Hidden() ? null : done ? null : "E  Open " + (spec.S("label") ?? "container");
+    public override string Prompt() => Hidden() ? null : done ? null : "{interact} Open " + (spec.S("label") ?? "container");
     public override void Interact()
     {
         if (Hidden() || done) return;
@@ -129,7 +129,7 @@ public class Pickup : Obj
 public class Carving : Obj
 {
     public Carving(Props spec, RoomDef room) : base(spec, room) { w = 14; h = 18; x = spec.F("x") - 7; y = spec.F("y") - 22; }
-    public override string Prompt() => "E  Read the carving";
+    public override string Prompt() => "{interact} Read the carving";
     public override void Interact() { Narr.MarkRead(spec.S("id")); UI.Inscription(spec.S("title"), spec.S("text")); }
     public override LightSrc Light() => Narr.IsRead(spec.S("id")) ? null : new LightSrc { x = Cx(), y = Cy(), r = 26, i = 0.35f, color = "200,220,230" };
     public override void Draw(Canvas c)
@@ -148,7 +148,7 @@ public class Carving : Obj
 public class Sign : Obj
 {
     public Sign(Props spec, RoomDef room) : base(spec, room) { }
-    public override string Prompt() => "E  Read";
+    public override string Prompt() => "{interact} Read";
     public override void Interact() => UI.Say(null, spec.S("text"));
     public override void Draw(Canvas c)
     {
@@ -163,7 +163,7 @@ public class Bell : Obj
     public Bell(Props spec, RoomDef room) : base(spec, room) { w = 18; h = 30; x = spec.F("x") - 9; y = spec.F("y") - 30; }
     public bool Lit() => G.bellsLit.Contains(spec.S("id"));
     bool Silenced() => spec.S("id") == "bell_chapel" && G.Quest("tables") == "sold";
-    public override string Prompt() => Silenced() ? "E  The bell is silent" : G.BellRoomBreached(room.Id) ? "E  The bell is drowned out" : Lit() ? "E  Bell Room" : "E  Rekindle the bell lamp (1 oil flask)";
+    public override string Prompt() => Silenced() ? "{interact} The bell is silent" : G.BellRoomBreached(room.Id) ? "{interact} The bell is drowned out" : Lit() ? "{interact} Bell Room" : "{interact} Rekindle the bell lamp (1 oil flask)";
     public override void Interact()
     {
         if (Silenced()) { UI.Say(null, "The bell hangs cracked and silent. Without its resonance, this room is no longer safe."); return; }
@@ -202,7 +202,7 @@ public class Bell : Obj
 public class Reliquary : Obj
 {
     public Reliquary(Props spec, RoomDef room) : base(spec, room) { w = 18; h = 12; x = spec.F("x") - 9; y = spec.F("y") - 12; }
-    public override string Prompt() => "E  Reliquary chest";
+    public override string Prompt() => "{interact} Reliquary chest";
     public override void Interact() => UI.ReliquaryMenu();
     public override void Draw(Canvas c)
     {
@@ -215,7 +215,7 @@ public class Reliquary : Obj
 public class Bench : Obj
 {
     public Bench(Props spec, RoomDef room) : base(spec, room) { w = 22; h = 12; x = spec.F("x") - 11; y = spec.F("y") - 12; }
-    public override string Prompt() => "E  Bench: craft, upgrade, fittings";
+    public override string Prompt() => "{interact} Bench: craft, upgrade, fittings";
     public override void Interact() => UI.BenchMenu(room.Id == "chapel");
     public override void Draw(Canvas c)
     {
@@ -232,7 +232,7 @@ public class NPC : Obj
     public string id;
     public NPC(Props spec, RoomDef room) : base(spec, room) { w = 12; h = 26; x = spec.F("x") - 6; y = spec.F("y") - 26; id = spec.S("id"); }
     bool Present() => Story.NpcPresent(id, room.Id);
-    public override string Prompt() => Present() ? "E  Speak with " + Story.NpcName(id) : null;
+    public override string Prompt() => Present() ? "{interact} Speak with " + Story.NpcName(id) : null;
     public override void Interact() { if (Present()) Story.Talk(id); }
     public override void Draw(Canvas c)
     {

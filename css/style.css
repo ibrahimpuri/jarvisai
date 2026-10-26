@@ -92,3 +92,13 @@ canvas.map { width: 100%; height: auto; display: block; border: 1px solid var(--
 .death .lore { font-style: italic; font-size: 18px; }
 @keyframes fadein { from { opacity: 0; } to { opacity: 1; } }
 @media (max-width: 640px) { .cinematic .cline { font-size: 18px; } .inscription .itext { font-size: 17px; } }
+
+/* Controller prompts and focus */
+img.glyph { vertical-align: middle; margin: 0 1px; image-rendering: auto; }
+.foot { display: flex; justify-content: flex-end; gap: 16px; margin-top: 10px; color: var(--muted); font-size: 12px; }
+.foot span { display: inline-flex; align-items: center; gap: 4px; }
+.cinematic .cskip .foot { margin-top: 0; color: #5a5446; }
+.inscription .foot { justify-content: center; margin-top: 22px; }
+button.padfocus { outline: 1px solid #ffd27a; outline-offset: 2px; border-color: var(--gold); color: #fff3d0; }
+table.keys.pad td:first-child { white-space: nowrap; }
+p.bad { color: #d07a6a; }

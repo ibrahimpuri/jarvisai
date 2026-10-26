@@ -15,7 +15,7 @@ H.Game = (() => {
     reliquary: null, respawn: null, satchelDrop: null,
     difficulty: 'keeper', swell: 0, valveT: 0, sinceLoad: 0,
     undertow: null, bossBar: null, encrustedType: null, freeGraft: false,
-    shakeAmt: 0, flash: 0, pressureWarn: 0, titleT: 0, promptText: null,
+    shakeAmt: 0, flash: 0, pressureWarn: 0, titleT: 0, promptText: null, dialT: 1,
     volume: 0.7, god: false, ended: null, tips: {},
     wrackPools: {},
   };
@@ -23,6 +23,8 @@ H.Game = (() => {
   // ------------------------------------------------------------------ setup
   function init() {
     const canvas = document.getElementById('game');
+    G.volume = H.Settings.volume;
+    H.Audio.setVolume(G.volume);
     H.Input.init(canvas);
     H.Render.init(canvas);
     H.UI.init();
@@ -37,10 +39,17 @@ H.Game = (() => {
     enterRoom(H.ROOM.reef, true);
     placeAtStart();
     H.UI.title();
+    // A controller dropping out mid-game pauses, as on a console.
+    H.Input.notice = (msg) => {
+      if (msg === 'disconnected') { if (G.mode === 'play' && !H.UI.isOpen() && !G.player.dead) H.UI.pause('Controller disconnected. Reconnect it, or carry on with keyboard and mouse.'); }
+      else if (G.mode === 'play') H.toast(msg, 2.5);
+    };
     let last = performance.now();
     function frame(now) {
       const dt = Math.min(0.033, (now - last) / 1000);
       last = now;
+      H.Input.poll(dt);
+      if (H.UI.isOpen()) H.UI.padUpdate(dt);
       try { step(dt); } catch (e) { console.error(e); }
       H.Input.endFrame();
       requestAnimationFrame(frame);
@@ -62,7 +71,7 @@ H.Game = (() => {
     const s = G.ents.find((e) => e.type === 'start');
     const p = G.player;
     if (s) { p.x = s.cx() - p.w / 2; p.y = s.y + s.h - p.h; }
-    G.respawn = G.respawn || { room: 'reef', x: p.x, y: p.y };
+    G.respawn = G.respawn || { room: G.room.id, x: p.x, y: p.y };
     snapCamera();
   }
 
@@ -80,14 +89,14 @@ H.Game = (() => {
       encrustedType: null, freeGraft: false, ended: null, tips: {}, mode: 'play', narr: H.Narr.fresh(),
     });
     H.Narr.reset();
+    H.Hints.reset();
     H.FX.parts = [];
-    enterRoom(H.ROOM.reef, true);
+    G.dialT = 0;
+    // Maren comes ashore on the outer rocks; the tide holds at Low until she reaches the reef.
+    enterRoom(H.ROOM.breakers, true);
     placeAtStart();
     G.titleT = 6;
-    H.UI.cinematic(H.LORE.opening.concat(H.LORE.openingAfter), () => {
-      H.Narr.think('start');
-      tip('move', 'A / D to move, Space to jump. Hold toward timber to wall-hang. Hold Q near an iron ring to swing.', 6);
-    });
+    H.UI.cinematic(H.LORE.opening.concat(H.LORE.openingAfter), () => setTimeout(() => H.Narr.think('boat'), 1200));
   }
 
   function toTitle() {
@@ -205,7 +214,14 @@ H.Game = (() => {
     if (room.id === 'kilns' && f.basinFilling) f.basinCrossed = true;
     const enterThought = { pier: 'pier', chapel: 'chapel', choir: 'choir', skullstair: 'skull', lamp: 'agathe' }[room.id];
     if (enterThought) H.Narr.think(enterThought);
-    if (room.id === 'chapel' && firstVisit) tip('bell', 'A Bell Room. Rekindle its lamp with the oil flask from the Constance (E at the bell).', 5);
+    // Reaching the reef: the tide starts to move, and the dial shows it.
+    if (room.id !== 'breakers' && !f.landed) {
+      f.landed = true;
+      if (room.id === 'reef') H.Narr.think('start');
+      // From here on a fall wakes Maren on the Constance's deck, not back out on the rocks.
+      if (G.respawn && G.respawn.room === 'breakers') G.respawn = reefDeck();
+    }
+    H.Tide.paused = room.id === 'breakers' && !f.landed;
     // Act III: the Brine breaches one Bell Room.
     if (G.act >= 3 && room.id === breachRoom() && !f.breachDone) {
       if (room.id === 'saltbell' && q.teodor === 'captured') {
@@ -265,7 +281,8 @@ H.Game = (() => {
           if (inTideWater(r, s)) s.reknot = true;
         }
       }
-      if (!G.tips.rising && G.room.row === 4) tip('rising', 'Rising tide: the water climbs room by room. Bodies it reaches will re-knot and stand at High.', 5);
+      if (G.room.row === 4) H.Narr.think('rising');
+      H.Hints.tideTurned();
     }
     if (ph === 'high') {
       if (G.room.row === 4 && !G.room.fixedWater) H.Narr.think('firstHigh');
@@ -343,7 +360,25 @@ H.Game = (() => {
     if (G.swell > 9 && G.valveT <= 0) { G.valveT = H.rand(60, 90); G.swell = 0; }
   }
   function canWake() { return G.valveT <= 0; }
-  function shake(n) { G.shakeAmt = Math.max(G.shakeAmt, n); }
+  function shake(n) {
+    G.shakeAmt = Math.max(G.shakeAmt, n);
+    // the pad feels every jolt the camera does
+    H.Input.rumble(Math.min(1, 0.12 * n + 0.08), n >= 2 ? Math.min(1, 0.11 * n) : 0, 0.08 + 0.05 * n);
+  }
+  // Where the reef's start marker stands: the Constance's deck.
+  function reefDeck() {
+    const r = H.ROOM.reef, p = G.player;
+    for (let ty = 0; ty < r.map.length; ty++) for (let tx = 0; tx < r.map[ty].length; tx++) {
+      const e = r.ents && r.ents[r.map[ty][tx]];
+      if (e && e.type === 'start') return { room: r.id, x: r.px + tx * TS + 8 - p.w / 2, y: r.py + (ty + 1) * TS - p.h };
+    }
+    return { room: r.id, x: r.px + 25 * TS, y: r.py + 12 * TS };
+  }
+  function ringNear(p, rad) {
+    const tx = Math.floor(p.cx() / TS), ty = Math.floor(p.cy() / TS);
+    for (let dy = -rad; dy <= 2; dy++) for (let dx = -rad; dx <= rad; dx++) if (W().charAt(tx + dx, ty + dy) === 'o') return true;
+    return false;
+  }
   function tip(id, text, t = 4) { if (G.tips[id]) return; G.tips[id] = true; H.toast(text, t); }
   function quest(k) { return G.quests[k]; }
   function setQuest(k, v) { G.quests[k] = v; }
@@ -380,7 +415,6 @@ H.Game = (() => {
 
   function onBodyDowned(b, src) {
     if (!b.boss) H.Narr.think('firstDown');
-    if (!G.tips.downed && !b.boss) tip('downed', 'Dropped. If water reaches it during the next Rising it stands again at High. Drag it clear (E) or burn it (X).', 6);
     addSwell(0.5);
     if (b.breach) { G.breachT = 0; W().flags.breachDone = true; G.quests.teodor = 'dead'; G.bossBar = null; H.toast('Teodor falls for the last time. Odile is safe.', 4); }
     if (b.hesper) { G.quests.hesperDead = true; G.bossBar = null; H.toast('Hesper Vane falls. The Choir\'s hymn goes unfinished.', 4); }
@@ -404,7 +438,6 @@ H.Game = (() => {
     G.titheFlood = 0;
     H.toast('The crank\'s counterweight drops. The hall bell tolls overhead, and water pours up through the floor grates!', 5);
     H.Narr.think('titheTrap');
-    tip('escape', 'The way out is up: gaff to the chandelier rings (hold Q), swing to the gallery, climb to the window.', 6);
   }
   function onTagsTaken() {}
   function onCacheOpened() {
@@ -459,7 +492,7 @@ H.Game = (() => {
       if (e.isBody || !e.prompt || !e.near) continue;
       if (!e.near(p)) continue;
       const pr = e.prompt();
-      if (!pr || pr.startsWith('F ') || pr.startsWith('Lift pan')) continue;
+      if (!pr || pr.startsWith('{gaff}') || pr.startsWith('Lift pan')) continue;
       const d = Math.abs(e.cx() - p.cx());
       if (d < bd) { bd = d; best = e; }
     }
@@ -479,7 +512,7 @@ H.Game = (() => {
   }
   function computePrompt() {
     const p = G.player;
-    if (p.dragging) return 'E  Let go   (dragging is slow; haul it above the tide line)';
+    if (p.dragging) return '{interact} Let go   (dragging is slow; haul it above the tide line)';
     let best = null, bd = 1e9;
     for (const e of G.ents) {
       if (e.isBody || !e.prompt || !e.near || !e.near(p)) continue;
@@ -490,8 +523,8 @@ H.Game = (() => {
     if (best) return best;
     const b = p.nearestDownedBody(24);
     if (b) {
-      if (b.teodor && b.mode === 'captured') return 'E  Bind Teodor for Odile';
-      return 'E  Drag body   X  Burn it (oil)';
+      if (b.teodor && b.mode === 'captured') return '{interact} Bind Teodor for Odile';
+      return '{interact} Drag body   {burn} Burn it (oil)';
     }
     return null;
   }
@@ -500,6 +533,7 @@ H.Game = (() => {
   function onPlayerDeath() {
     const p = G.player;
     if (p.dead) return;
+    H.Input.rumble(0.6, 1, 0.7);
     p.dead = true; p.grabbedBy = null; if (p.dragging) p.stopDrag();
     G.stats.deaths++;
     // The satchel stays where she fell; weapons and fittings stay with her.
@@ -583,7 +617,9 @@ H.Game = (() => {
       undertow: new H.UndertowSystem(), mode: 'play', ended: null, swell: 0, valveT: 0,
     });
     G.undertow.dead = d.undertowDead;
+    G.dialT = 1;
     H.Narr.reset();
+    H.Hints.reset();
     G.player.hp = G.player.maxHp;
     enterRoom(H.ROOM[G.respawn.room], true);
     G.player.x = G.respawn.x; G.player.y = G.respawn.y;
@@ -621,7 +657,8 @@ H.Game = (() => {
     }
     if (In.hit('pause')) { H.UI.pause(); return; }
     if (In.hit('map')) { H.UI.map(); return; }
-    if (In.hit('satchel')) { H.UI.satchel(); return; }
+    if (In.hit('satchel')) { H.UI.satchel('satchel'); return; }
+    if (In.hit('journal')) { H.UI.satchel(null); return; }
     if (In.hit('debug')) {
       if (In.held('sneak')) { const p = G.player; ['swing', 'boots', 'jet', 'tidekey', 'seal', 'lens'].forEach((a) => p.abilities.add(a)); ['harpoon', 'sling', 'sawline'].forEach((w) => { if (!p.weapons[w]) { p.weapons[w] = { tier: 0, mag: 1 }; p.weaponOrder.push(w); } }); p.bag.size = 16; p.bag.add('rivets', 36); p.bag.add('oil', 3); H.toast('DEBUG: all tools.'); }
       else { G.god = !G.god; H.toast('DEBUG: invulnerable ' + (G.god ? 'on' : 'off')); }
@@ -703,14 +740,17 @@ H.Game = (() => {
     // Tutorial: the sailor's knots glint under the focused beam, then go dark.
     if (G.room.id === 'reef' && p.focusing) {
       const s = G.ents.find((e) => e.sailor);
-      if (s && s.knots.length && s.fadeKnots === 0 && p.beamHits(s.cx(), s.cy())) { s.fadeKnots = 3; tip('sailor', 'Under the focused beam, knots glint at knees and elbows... then dull and go dark. Just a corpse. Active knots stay bright.', 7); }
+      if (s && s.knots.length && s.fadeKnots === 0 && p.beamHits(s.cx(), s.cy())) { s.fadeKnots = 3; setTimeout(() => H.Narr.think('sailorKnots'), 1500); }
     }
-    if (G.room.id === 'reef' && !G.tips.focus && G.stats.time > 8) tip('focus', 'Hold right mouse for a focused beam: it makes knots glint, but burns double oil.', 6);
-    if (G.room.id === 'pier' && !G.tips.shoot) {
+    if (G.room.id === 'pier') {
       const s = G.ents.find((e) => e.key === 'first_shucker');
       if (s && s.mode !== 'dormant') H.Narr.think('firstStand');
-      if (s && s.mode !== 'dormant') tip('shoot', 'Torso shots spark off. Shoot the knees (left click), then finish it with the gaff (F) at the Crown.', 7);
     }
+    // A few things Maren notices for herself.
+    if (!H.Narr.had('lowOil') && p.lanternLit() && p.oil < p.oilMax() * 0.15) H.Narr.think('lowOil');
+    if (!H.Narr.had('rings') && p.has('swing') && ringNear(p, 6)) H.Narr.think('rings');
+    if (!H.Narr.had('bellmouth') && G.ents.some((b) => b.type === 'bellmouth' && !b.gone && !b.dead && b.mode !== 'downed' && H.dist(b.cx(), b.cy(), p.cx(), p.cy()) < 220)) H.Narr.think('bellmouth');
+    H.Hints.update(dt);
     // Undertow glimpse at the Tithe window.
     if (G.room.id === 'tithe' && f.titheTrapped && !f.glimpse && p.y < G.room.py + 8 * TS) {
       f.glimpse = true; G.glimpseT = 4;
@@ -751,6 +791,9 @@ H.Game = (() => {
     G.frameLights = lights;
 
     G.promptText = computePrompt();
+    // The tide holds at Low on the outer rocks until Maren reaches the reef; then the dial appears.
+    H.Tide.paused = G.room.id === 'breakers' && !f.landed;
+    if (f.landed) G.dialT = Math.min(1, G.dialT + dt * 0.6);
     updateCamera(dt);
     // Ambience follows the tide and the tension.
     const tension = H.clamp(G.swell / 9 + (G.undertow.live ? 0.6 : 0) + (G.bossBar ? 0.4 : 0), 0, 1);

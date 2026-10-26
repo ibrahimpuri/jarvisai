@@ -46,6 +46,7 @@ public class Player : Mover
     public float aim;
     float staggerT, gaffLooseT, gaffAnim, ladderCool, dropT;
     public int hanging;
+    int lastHang; float hangGrace;
     public bool dead, inBellRoom;
     public List<Vector2> beamPath;
     RingMemo lastRing;
@@ -117,7 +118,7 @@ public class Player : Mover
         mash = cracked ? 3 : 6;
         healT = 0; reloadT = 0; craftT = 0;
         if (dragging != null) StopDrag();
-        H.ToastMsg("Grabbed! Mash F / E / Space to break free.", 2);
+        H.ToastMsg("Grabbed! Mash {mash} to break free.", 2);
         return true;
     }
 
@@ -133,12 +134,13 @@ public class Player : Mover
         var r = G.room;
         inBellRoom = r.BellRoom && !(r.Id == "chapel" && G.Quest("tables") == "sold") && !G.BellRoomBreached(r.Id);
 
-        // aim from the mouse, or the right stick on a gamepad
-        if (Inp.padAim && Inp.aimStick.Length() > 0.35f) aim = MathF.Atan2(Inp.aimStick.Y, Inp.aimStick.X);
-        else if (!Inp.padAim)
+        // aim from the mouse, or from the pad
+        if (Inp.padAim) aim = PadAim(dt);
+        else
         {
             float mx = Inp.mouse.x + G.cam.X, my = Inp.mouse.y + G.cam.Y;
             aim = MathF.Atan2(my - (y + 9), mx - Cx());
+            padVec = new Vector2(MathF.Cos(aim), MathF.Sin(aim)) * 80;
         }
         if (state != "swing" && dragging == null && !Locked()) facing = MathF.Cos(aim) >= 0 ? 1 : -1;
 
@@ -153,6 +155,57 @@ public class Player : Mover
         AfterMove(dt);
     }
     bool BootsBrine() => boots && World.IsBrine(Cx(), Cy());
+
+    // ---- pad aim ----------------------------------------------------------------------
+    // The right stick points the aim; the gyro nudges it like a mouse. With the stick left alone,
+    // Maren aims where she walks, and a gentle pull settles the aim on a knot or a barrel.
+    public Vector2 padVec = new(80, 0);
+    float stickIdle;
+    float PadAim(float dt)
+    {
+        var s = Inp.aimStick;
+        bool manual = s.Length() > 0.3f;
+        if (manual) { padVec = s.Normalized() * 80; stickIdle = 0; }
+        else
+        {
+            stickIdle += dt;
+            int d = Dir();
+            if (stickIdle > 0.4f && d != 0 && MathF.Sign(padVec.X) != d && state != "swing") padVec = new Vector2(d * 80, 0);
+        }
+        padVec += Pad.GyroDelta;
+        float len = padVec.Length();
+        if (len < 20) padVec = len < 0.01f ? new Vector2(facing * 20, 0) : padVec / len * 20;
+        else if (len > 160) padVec = padVec / len * 160;
+        float a = MathF.Atan2(padVec.Y, padVec.X);
+        return Settings.AimAssist ? Assist(a, manual || Settings.Gyro ? 0.18f : 0.32f) : a;
+    }
+    public float Assist(float a, float cone)
+    {
+        var o = LanternPos();
+        float best = cone, pick = float.NaN;
+        void Try(float tx, float ty)
+        {
+            float dx = tx - o.X, dy = ty - o.Y, dist = MathF.Sqrt(dx * dx + dy * dy);
+            if (dist < 10 || dist > 300) return;
+            float ang = MathF.Atan2(dy, dx), diff = MathF.Abs(H.AngleDiff(a, ang)) + dist / 3000f;
+            if (diff < best && Phys.Los(o.X, o.Y, tx, ty)) { best = diff; pick = ang; }
+        }
+        foreach (var e in G.ents)
+        {
+            if (e is Body b)
+            {
+                if (!b.Alive() || b.corpse || b.passive) continue;
+                foreach (var k in b.knots)
+                {
+                    if (k.broken || b.IsSealed(k)) continue;
+                    var kp = b.KnotPos(k);
+                    if (kp != null) Try(kp.Value.X, kp.Value.Y);
+                }
+            }
+            else if (e is Barrel br && !br.done) Try(br.Cx(), br.Cy());
+        }
+        return float.IsNaN(pick) ? a : a + H.AngleDiff(a, pick) * 0.7f;
+    }
 
     void UpdateTimers(float dt)
     {
@@ -177,13 +230,14 @@ public class Player : Mover
         if (Inp.Hit("poultice")) UsePoultice();
         if (Inp.Hit("stitch")) UseStitch();
         if (Inp.Hit("quickcraft")) QuickCraft("rivets");
-        if (Inp.Hit("shutter")) { shut = !shut; Snd.Ui(); H.ToastMsg(shut ? "Lantern shuttered. You are nearly invisible, and blind to weak points." : "Lantern open.", 2); }
-        if (Inp.Hit("boots") && Has("boots")) { boots = !boots; Snd.Thud(); H.ToastMsg(boots ? "Ballast Boots: on. You sink." : "Ballast Boots: off.", 1.5f); }
+        if (Inp.Hit("shutter")) { shut = !shut; Snd.Ui(); Hints.Did("shutter"); H.ToastMsg(shut ? "Lantern shuttered. You are nearly invisible, and blind to weak points." : "Lantern open.", 2); }
+        if (Inp.Hit("boots") && Has("boots")) { boots = !boots; Snd.Thud(); Hints.Did("boots"); H.ToastMsg(boots ? "Ballast Boots: on. You sink." : "Ballast Boots: off.", 1.5f); }
         for (int i = 1; i <= 4; i++) if (Inp.Hit("w" + i) && weaponOrder.Count >= i) SelectWeapon(weaponOrder[i - 1]);
-        if (Inp.mouse.wheel != 0)
+        int cycle = Inp.mouse.wheel + (Inp.Hit("wnext") ? 1 : 0) - (Inp.Hit("wprev") ? 1 : 0);
+        if (cycle != 0)
         {
             int i = weaponOrder.IndexOf(cur), n = weaponOrder.Count;
-            SelectWeapon(weaponOrder[((i + Inp.mouse.wheel) % n + n) % n]);
+            if (n > 1) SelectWeapon(weaponOrder[((i + cycle) % n + n) % n]);
         }
         if (!Locked() && healKind != "stitch")
         {
@@ -292,8 +346,8 @@ public class Player : Mover
 
         // Ladders
         ladderCool -= dt;
-        if ((Inp.Held("up") || (Inp.Held("down") && !onGround && ladderCool <= 0)) && OnLadderTile() && dragging == null) { state = "ladder"; vx = 0; vy = 0; x = MathF.Floor(Cx() / TS) * TS + 8 - w / 2; return; }
-        if (Inp.Held("down") && onGround && LadderBelow() && dragging == null) { state = "ladder"; y += 4; x = MathF.Floor(Cx() / TS) * TS + 8 - w / 2; return; }
+        if ((Inp.Held("up") || (Inp.Held("down") && !onGround && ladderCool <= 0)) && OnLadderTile() && dragging == null) { state = "ladder"; Hints.Did("climb"); vx = 0; vy = 0; x = MathF.Floor(Cx() / TS) * TS + 8 - w / 2; return; }
+        if (Inp.Held("down") && onGround && LadderBelow() && dragging == null) { state = "ladder"; Hints.Did("climb"); y += 4; x = MathF.Floor(Cx() / TS) * TS + 8 - w / 2; return; }
 
         // Wall-hang on timber (never wet stone).
         int wallDir = dir;
@@ -302,20 +356,24 @@ public class Player : Mover
         {
             vy = MathF.Min(vy, 20);
             hanging = wallDir;
+            lastHang = wallDir; hangGrace = 0.15f;
         }
-        else hanging = 0;
+        else { hanging = 0; hangGrace -= dt; }
+        if (onGround) hangGrace = 0;
 
         if (jumpBuf > 0 && !Locked())
         {
-            if (Inp.Held("down") && onGround && OnOneWay()) { dropT = 0.25f; jumpBuf = 0; }
+            if (Inp.Held("down") && onGround && OnOneWay()) { dropT = 0.25f; jumpBuf = 0; Hints.Did("drop"); }
             else if (coyote > 0 && dragging == null)
             {
                 vy = boots && InWater() ? -300 : -JUMP; coyote = 0; jumpBuf = 0;
-                Snd.Jump(); Noise.Emit(Cx(), y + h, 2, "jump");
+                Snd.Jump(); Noise.Emit(Cx(), y + h, 2, "jump"); Hints.Did("jump");
             }
-            else if (hanging != 0)
+            else if (hanging != 0 || hangGrace > 0)
             {
-                vy = -380; vx = -hanging * 190; facing = -hanging; jumpBuf = 0; hanging = 0; Snd.Jump();
+                // A jump just after letting go of the wall (or while pushing away from it) still counts.
+                int wd = hanging != 0 ? hanging : lastHang;
+                vy = -380; vx = -wd * 190; facing = -wd; jumpBuf = 0; hanging = 0; hangGrace = 0; Snd.Jump(); Hints.Did("walljump");
             }
         }
         if (Inp.Up("jump") && vy < -120 && dashT <= 0) vy *= 0.5f;
@@ -371,9 +429,9 @@ public class Player : Mover
         char ch = World.CharAt(H.FloorI(Cx() / TS), H.FloorI((y + h + 2) / TS));
         return ch == 'M' || ch == 'P';
     }
-    bool OnOneWay() => World.Solid(H.FloorI(Cx() / TS), H.FloorI((y + h + 2) / TS)) == 2 || (platform != null && platform.oneWay);
-    bool OnLadderTile() => World.IsLadder(H.FloorI(Cx() / TS), H.FloorI((y + h - 4) / TS)) || World.IsLadder(H.FloorI(Cx() / TS), H.FloorI((y + 4) / TS));
-    bool LadderBelow() => World.IsLadder(H.FloorI(Cx() / TS), H.FloorI((y + h + 4) / TS));
+    public bool OnOneWay() => World.Solid(H.FloorI(Cx() / TS), H.FloorI((y + h + 2) / TS)) == 2 || (platform != null && platform.oneWay);
+    public bool OnLadderTile() => World.IsLadder(H.FloorI(Cx() / TS), H.FloorI((y + h - 4) / TS)) || World.IsLadder(H.FloorI(Cx() / TS), H.FloorI((y + 4) / TS));
+    public bool LadderBelow() => World.IsLadder(H.FloorI(Cx() / TS), H.FloorI((y + h + 4) / TS));
     bool WallAt(int dir)
     {
         int tx = H.FloorI((dir > 0 ? x + w + 2 : x - 2) / TS);
@@ -499,6 +557,7 @@ public class Player : Mover
             airDashed = inAir;
         }
         vx = dx * sp; vy = dy * sp;
+        Hints.Did(inAir || water ? "jet" : "dash");
         dashVy = dy * sp; dashAir = inAir || water;
         dashT = inAir || water ? 0.22f : 0.15f;
         dashInv = 0.2f;
@@ -549,7 +608,7 @@ public class Player : Mover
             float len = MathF.Max(24, MathF.Min(MathF.Min(H.Dist(Cx(), y + 4, b.X, b.Y), 78), floorD - 22));
             float ang = MathF.Atan2(Cx() - b.X, (y + 4) - b.Y);
             swing = new SwingState { ax = b.X, ay = b.Y, len = len, ang = ang, av = (vx * MathF.Cos(ang) - vy * MathF.Sin(ang)) / len };
-            state = "swing"; Snd.Hook(); vy = 0;
+            state = "swing"; Snd.Hook(); vy = 0; Hints.Did("swing");
             return;
         }
         if (ringOnly) return;
@@ -659,7 +718,7 @@ public class Player : Mover
     }
 
     // ---- ranged ------------------------------------------------------------------
-    public void SelectWeapon(string wn) { if (wn != null && weapons.ContainsKey(wn) && wn != cur) { cur = wn; reloadT = 0; Snd.Ui(); } }
+    public void SelectWeapon(string wn) { if (wn != null && weapons.ContainsKey(wn) && wn != cur) { cur = wn; reloadT = 0; Snd.Ui(); Hints.Did("weapon"); } }
     void StartReload()
     {
         var ws = weapons[cur]; var def = Data.Weapons.P(cur);
@@ -667,7 +726,7 @@ public class Player : Mover
         string ammo = def.S("ammo");
         if (bag.Count(ammo) <= 0) { H.ToastMsg("No " + Data.ItemName(ammo).ToLowerInvariant() + " in the satchel.", 1.5f); Snd.Empty(); return; }
         reloadT = def.F("reload") * (cur == "driver" && HasFitting("feeder") ? 0.6f : 1);
-        Snd.Reload();
+        Snd.Reload(); Hints.Did("reload");
     }
     void FinishReload()
     {
@@ -686,6 +745,7 @@ public class Player : Mover
             return;
         }
         fireCool = def.F("cooldown");
+        Pad.Rumble(cur == "harpoon" ? 0.35f : 0.28f, cur == "harpoon" ? 0.45f : 0, cur == "harpoon" ? 0.16f : 0.06f);
         var lp = new Vector2(Cx() + MathF.Cos(aim) * 6, y + 9 + MathF.Sin(aim) * 6);
         if (cur == "driver")
         {
@@ -787,14 +847,14 @@ public class Player : Mover
         healKind = "poultice"; healT = 3;
         healTotal = healLeft = 2 + (HasFitting("bilge") ? 1 : 0);
         healTick = 3f / healTotal;
-        Snd.Heal();
+        Snd.Heal(); Hints.Did("poultice");
     }
     void UseStitch()
     {
         if (healT > 0 || Locked()) return;
         if (bag.Count("stitchkit") <= 0) { H.ToastMsg("No Stitch Kits.", 1.5f); Snd.Deny(); return; }
         if (hp >= maxHp) { H.ToastMsg("You are not hurt.", 1); return; }
-        healKind = "stitch"; healT = 4; vx = 0;
+        healKind = "stitch"; healT = 4; vx = 0; Hints.Did("poultice");
         H.ToastMsg("Kneeling to stitch (4 s)...", 2);
     }
     public bool QuickCraft(string id)
@@ -805,7 +865,7 @@ public class Player : Mover
         if (!bag.Has(rc.Counts("cost"))) { H.ToastMsg("Missing materials for " + Data.ItemName(makes) + ".", 1.5f); Snd.Deny(); return false; }
         if (bag.Room(makes) < rc.I("n")) { H.ToastMsg("No room in the satchel.", 1.5f); Snd.Deny(); return false; }
         if (rc.S("where") == "bench") return false;
-        craftRecipe = rc; craftT = rc.F("time"); vx = 0;
+        craftRecipe = rc; craftT = rc.F("time"); vx = 0; Hints.Did("craft");
         H.ToastMsg($"Crafting {Data.ItemName(makes)}... ({rc.F("time")} s, crouched)", rc.F("time"));
         return true;
     }
@@ -888,12 +948,13 @@ public class Player : Mover
         }
         else pressureT = 0.5f;
         // salt crystals and fire
-        if (World.CharAt(H.FloorI(Cx() / TS), H.FloorI((y + h - 2) / TS)) == 'x') { Hurt(1); vy = -260; }
+        if (World.CharAt(H.FloorI(Cx() / TS), H.FloorI((y + h - 2) / TS)) == 'x') { Hurt(1); vy = -260; Hints.Cut(); }
         if (Hollowmere.Fire.BurnsAt(Cx(), y + h - 4)) Hurt(1);
         // splash in/out
         bool inW = InWater();
         if (inW != wasIn)
         {
+            if (wasIn == true && !inW) Hints.Did("swimout");
             if (MathF.Abs(vy) > 60) { Snd.Splash(0.2f); FX.Splash(Cx(), World.SurfaceAt(Cx(), Cy()), 8); Noise.Emit(Cx(), Cy(), 4, "splash"); }
             wasIn = inW;
         }

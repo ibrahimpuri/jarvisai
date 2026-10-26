@@ -15,9 +15,9 @@ public static class UI
     public static void Dialogue(string who, List<string> lines, Action done = null) => Inst?.Dialogue(who, lines, done);
     public static void Confirm(string text, Action yes) => Inst?.Confirm(text, yes);
     public static void Title() => Inst?.Title();
-    public static void Pause() => Inst?.Pause();
-    public static void Map() => Inst?.Map();
-    public static void Satchel() => Inst?.Satchel();
+    public static void Pause(string note = null) => Inst?.Pause(note);
+    public static void Map() => Inst?.Satchel("map");
+    public static void Satchel(string tab = "satchel") => Inst?.Satchel(tab);
     public static void BellMenu(Bell b) => Inst?.BellMenu(b);
     public static void ReliquaryMenu() => Inst?.Reliquary(null);
     public static void BenchMenu(bool chapel) => Inst?.Bench(chapel, null);
@@ -48,6 +48,8 @@ public partial class UiRoot : CanvasLayer
     public Cine cine;
     string difficulty = "keeper"; float tide = 1;
     string benchTab = "craft", satTab = "satchel";
+    Action backAction;                 // what cancel (Esc, or B on a pad) does on this screen
+    bool benchChapel; Action benchBack;
 
     public override void _Ready()
     {
@@ -99,7 +101,7 @@ public partial class UiRoot : CanvasLayer
     void Show(string k, bool clear = false)
     {
         foreach (var c in root.GetChildren()) { root.RemoveChild(c); c.QueueFree(); }
-        kind = k; Open = true; root.Visible = true;
+        kind = k; Open = true; root.Visible = true; backAction = null;
         dim = new ColorRect { Color = clear ? new Color(0, 0, 0, 0) : new Color(0, 0, 0, 0.45f), MouseFilter = clear ? Control.MouseFilterEnum.Ignore : Control.MouseFilterEnum.Stop };
         dim.SetAnchorsPreset(Control.LayoutPreset.FullRect);
         root.MouseFilter = clear ? Control.MouseFilterEnum.Ignore : Control.MouseFilterEnum.Stop;
@@ -115,7 +117,7 @@ public partial class UiRoot : CanvasLayer
         root.AddChild(center);
         var pc = new PanelContainer { CustomMinimumSize = new Vector2(width, 0) };
         center.AddChild(pc);
-        var scroll = new ScrollContainer { HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled, CustomMinimumSize = new Vector2(width - 18, 0) };
+        var scroll = new ScrollContainer { HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled, CustomMinimumSize = new Vector2(width - 18, 0), FollowFocus = true };
         pc.AddChild(scroll);
         var col = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
         scroll.AddChild(col);
@@ -189,6 +191,16 @@ public partial class UiRoot : CanvasLayer
         }
     }
 
+    // A row of button prompts, e.g. "(B) Back  (LB/RB) Change page"; actions with no control on
+    // the current device are left out, and the row redraws when the player changes device.
+    static RichLabel Footer(Control parent, params (string action, string label)[] items)
+    {
+        var l = new RichLabel(() => string.Join("     ", items.Where(i => Glyphs.Controls(i.action, Glyphs.Current).Length > 0).Select(i => "{" + i.action + "} " + i.label)), 5, MUTED, 2);
+        l.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+        parent.AddChild(l);
+        return l;
+    }
+
     public void Close()
     {
         foreach (var c in root.GetChildren()) { root.RemoveChild(c); c.QueueFree(); }
@@ -242,13 +254,40 @@ public partial class UiRoot : CanvasLayer
             return;
         }
         if (kind == "inscription" && (advance || cancel)) { GetViewport().SetInputAsHandled(); Close(); return; }
-        bool toggleKey = ev is InputEventKey k3 && k3.Pressed && !k3.Echo &&
-            (((k3.PhysicalKeycode == Key.Tab || k3.PhysicalKeycode == Key.M) && kind == "map") || (k3.PhysicalKeycode == Key.I && kind == "satchel"));
-        if (cancel || toggleKey)
+        if (kind == "satchel" && ev is InputEventKey k3 && k3.Pressed && !k3.Echo)
+        {
+            // Tab / M and I open the journal at the map and the satchel; pressed again, they close it.
+            string want = k3.PhysicalKeycode is Key.Tab or Key.M ? "map" : k3.PhysicalKeycode == Key.I ? "satchel" : null;
+            if (want != null)
+            {
+                GetViewport().SetInputAsHandled();
+                if (satTab == want) Close(); else Satchel(want);
+                return;
+            }
+        }
+        if (cancel)
         {
             if (kind == "title" || kind == "ending" || kind == "death") return;
             GetViewport().SetInputAsHandled();
-            Close();
+            if (backAction != null) backAction(); else Close();
+        }
+    }
+    // Pad buttons the menus use beyond confirm and back: bumpers turn pages, View and Start close.
+    public void PadButton(JoyButton b)
+    {
+        if (b is JoyButton.LeftShoulder or JoyButton.RightShoulder)
+        {
+            int d = b == JoyButton.RightShoulder ? 1 : -1;
+            if (kind == "satchel") { int i = Array.IndexOf(SAT_TABS, satTab); Satchel(SAT_TABS[(i + d + SAT_TABS.Length) % SAT_TABS.Length]); Snd.Ui(); }
+            else if (kind == "bench") { var tabs = BenchTabs(benchChapel); int i = tabs.IndexOf(benchTab); benchTab = tabs[(i + d + tabs.Count) % tabs.Count]; Bench(benchChapel, benchBack); Snd.Ui(); }
+            else if (kind == "controls") { Controls(controlsBack, controlsTab == "pad" ? "keys" : "pad"); Snd.Ui(); }
+        }
+        else if (b == JoyButton.Back && kind == "satchel") Close();
+        else if (b == JoyButton.Touchpad && kind == "satchel") { if (satTab == "map") Close(); else Satchel("map"); }
+        else if (b == JoyButton.Start)
+        {
+            if (cine != null) FinishCine();
+            else if (kind is "pause" or "satchel" or "controls" or "controller") Close();
         }
     }
     public override void _Process(double delta)
@@ -282,9 +321,8 @@ public partial class UiRoot : CanvasLayer
         var col = new VBoxContainer();
         pc.AddChild(col);
         if (who != null) Lbl(col, who, 6, GOLD);
-        Lbl(col, lines[i], 6).CustomMinimumSize = new Vector2(0, 16);
-        var more = Lbl(col, i < lines.Count - 1 ? "E / Space  continue" : "E / Space  close", 4, MUTED);
-        more.HorizontalAlignment = HorizontalAlignment.Right;
+        Lbl(col, Glyphs.Plain(lines[i], Glyphs.Current), 6).CustomMinimumSize = new Vector2(0, 16);
+        Footer(col, ("confirm", i < lines.Count - 1 ? "continue" : "close"));
     }
     void Advance()
     {
@@ -301,6 +339,7 @@ public partial class UiRoot : CanvasLayer
         var r = Row(c, true);
         Btn(r, "Yes", () => { Close(); yes(); }, primary: true);
         Btn(r, "No", Close);
+        Footer(c, ("confirm", "choose"), ("cancel", "no"));
         FocusFirst();
     }
 
@@ -325,49 +364,125 @@ public partial class UiRoot : CanvasLayer
         Btn(col, "Row out to the lighthouse", () => { Close(); G.NewGame(difficulty, tide); }, primary: true);
         if (G.HasSave()) Btn(col, "Continue from the last Bell Room", () => { Close(); G.LoadGame(); Input.MouseMode = Input.MouseModeEnum.Hidden; });
         Btn(col, "Controls", () => Controls(Title));
+        Btn(col, "Controller settings", () => ControllerSettings(Title));
         Btn(col, "Toggle fullscreen (F11)", Settings.ToggleFullscreen);
         Btn(col, "Quit to desktop", () => GetTree().Quit());
-        Lbl(c, "Mouse + keyboard or a gamepad. Best with headphones. F11 or Alt+Enter toggles fullscreen.", 4, MUTED, center: true);
+        Lbl(c, "Keyboard and mouse, or an Xbox, PlayStation or Switch controller. Best with headphones.", 4, MUTED, center: true);
+        Lbl(c, PadLine(), 4, MUTED, center: true);
         FocusFirst();
     }
 
-    public void Controls(Action back)
+    Action controlsBack; string controlsTab = "keys";
+    static string PadLine()
     {
+        if (Pad.Device < 0) return "No controller connected.";
+        string kind = Pad.Kind switch { PadKind.PlayStation => "PlayStation", PadKind.Switch => "Switch", _ => "Xbox" };
+        return $"Controller: {Pad.Name} ({kind} layout).";
+    }
+    public void Controls(Action back, string tab = null)
+    {
+        controlsBack = back;
+        controlsTab = tab ?? (Pad.Using ? "pad" : "keys");
         Show("controls");
-        var c = Panel(230);
+        backAction = () => (back ?? Close)();
+        var c = Panel(250);
         H2(c, "Controls");
-        var k = new (string, string)[]
-        {
-            ("A / D", "Move"), ("W / S", "Climb ladders, swim, shorten / lengthen swing rope"), ("Space", "Jump (down + Space drops through planks)"),
-            ("Shift (hold)", "Sneak: footsteps 2 m instead of 6 m"), ("C", "Dash (0.2 s invulnerable). Jet Valve: air and water bursts in any direction"),
-            ("Mouse", "Aim"), ("Left click / J", "Fire the selected weapon"), ("Right click / K (hold)", "Focused beam: makes knots glint, double oil"),
-            ("F", "Gaff strike (melee, pry plates, kick barrels)"), ("Q (hold)", "Gaff Swing from an iron ring / hook-pull a light enemy"),
-            ("E", "Interact, talk, drag a downed body"), ("X", "Burn a downed body with lantern oil"), ("R", "Reload (locks you in place)"),
-            ("T", "Shutter the lantern (nearly invisible, blind to weak points)"), ("Z", "Poultice (2 pips over 3 s)"), ("G", "Stitch Kit (full heal, kneel 4 s)"),
-            ("V", "Quick-craft 3 rivets from 1 scrap (2 s, crouched)"), ("B", "Ballast Boots on / off"), ("1-4 / wheel", "Select weapon"),
-            ("I", "Satchel, crafting, logbook"), ("Tab / M", "Map"), ("Esc / P", "Pause"),
-            ("Gamepad", "Left stick move · A jump · B dash · X gaff · Y interact · LB swing · RB reload · RT fire · LT beam · right stick aim"),
-        };
+        var tr = Row(c);
+        Btn(tr, "Keyboard and mouse", () => Controls(back, "keys"), selected: controlsTab == "keys");
+        Btn(tr, "Controller", () => Controls(back, "pad"), selected: controlsTab == "pad");
+        if (controlsTab == "pad") Small(c, PadLine() + " Prompts follow the controller in your hands.");
         var grid = new GridContainer { Columns = 2 };
-        grid.AddThemeConstantOverride("h_separation", 6); grid.AddThemeConstantOverride("v_separation", 1);
+        grid.AddThemeConstantOverride("h_separation", 6); grid.AddThemeConstantOverride("v_separation", 2);
         c.AddChild(grid);
-        foreach (var (a, b) in k)
+        if (controlsTab == "keys")
         {
-            var key = Lbl(grid, a, 5, WARM); key.SizeFlagsHorizontal = Control.SizeFlags.Fill; key.CustomMinimumSize = new Vector2(52, 0);
-            Lbl(grid, b, 5);
+            var k = new (string, string)[]
+            {
+                ("A / D", "Move"), ("W / S", "Climb ladders, swim, shorten / lengthen swing rope"), ("Space", "Jump (down + Space drops through planks)"),
+                ("Shift (hold)", "Sneak: footsteps 2 m instead of 6 m"), ("C", "Dash (0.2 s invulnerable). Jet Valve: air and water bursts in any direction"),
+                ("Mouse", "Aim"), ("Left click / J", "Fire the selected weapon"), ("Right click / K (hold)", "Focused beam: makes knots glint, double oil"),
+                ("F", "Gaff strike (melee, pry plates, kick barrels)"), ("Q (hold)", "Gaff Swing from an iron ring / hook-pull a light enemy"),
+                ("E", "Interact, talk, drag a downed body"), ("X", "Burn a downed body with lantern oil"), ("R", "Reload (locks you in place)"),
+                ("T", "Shutter the lantern (nearly invisible, blind to weak points)"), ("Z", "Poultice (2 pips over 3 s)"), ("G", "Stitch Kit (full heal, kneel 4 s)"),
+                ("V", "Quick-craft 3 rivets from 1 scrap (2 s, crouched)"), ("B", "Ballast Boots on / off"), ("1-4 / wheel", "Select weapon"),
+                ("I", "Satchel, crafting, logbook"), ("Tab / M", "Map"), ("Esc / P", "Pause"), ("F11", "Fullscreen"),
+            };
+            foreach (var (a, b) in k)
+            {
+                var key = Lbl(grid, a, 5, WARM); key.SizeFlagsHorizontal = Control.SizeFlags.Fill; key.CustomMinimumSize = new Vector2(60, 0);
+                Lbl(grid, b, 5);
+            }
+        }
+        else
+        {
+            var rows = new (string, string)[]
+            {
+                ("{move}", "Move, climb ladders, swim. A light tilt creeps quietly"), ("{sneak}", "Sneak on / off"),
+                ("{drop}", "Drop through planks"), ("{aim}", "Aim. With the stick left alone, Maren aims where she walks"),
+                ("{jump}", "Jump"), ("{dash}", "Dash (0.2 s invulnerable)"), ("{gaff}", "Gaff strike: melee, pry plates, kick barrels"),
+                ("{interact}", "Interact, talk, drag a downed body"), ("{burn}", "Burn a downed body with lantern oil"),
+                ("{swing}", "Gaff Swing from an iron ring / hook-pull a light enemy"),
+                ("{fire}", "Fire the selected weapon"), ("{focus}", "Focused beam: makes knots glint, double oil"),
+                ("{reload}", "Reload"), ("{quickcraft}", "Quick-craft 3 rivets from 1 scrap"),
+                ("{poultice}", "Poultice"), ("{stitch}", "Stitch Kit"), ("{boots}", "Ballast Boots on / off"),
+                ("{weapon}", "Change weapon"), ("{shutter}", "Shutter the lantern"),
+                ("{journal}", "Map, satchel and logbook; the bumpers turn the page"), ("{pause}", "Pause"),
+            };
+            foreach (var (a, b) in rows)
+            {
+                var g = new RichLabel(() => a, 6, WARM) { MinWidth = 50 };
+                grid.AddChild(g);
+                Lbl(grid, b, 5);
+            }
         }
         H3(c, "How Hollowmere works");
-        Small(c, "Every Brine body is held up by salt knots at its joints. Rivets on flesh barely scratch; hit the knots. The Crown knot in the chest is sealed until two limb knots break. A dropped body lying in water when the next Rising tide reaches it will stand again at High tide: haul it above the tide line (E) or burn it (X).", false);
+        Small(c, "Every Brine body is held up by salt knots at its joints. Rivets on flesh barely scratch; hit the knots. The Crown knot in the chest is sealed until two limb knots break. A dropped body lying in water when the next Rising tide reaches it will stand again at High tide: haul it above the tide line or burn it.", false);
         Small(c, "The tide dial (top right) runs a 10-minute cycle: Low, Rising, High, Ebbing. Painted tide marks on pillars show where the water will reach. Bell Rooms are safe; resting there advances the tide to the next Low.", false);
-        Btn(Row(c, true), "Back", () => (back ?? Close)());
+        var br = Row(c, true);
+        Btn(br, "Back", () => (back ?? Close)());
+        Btn(br, "Controller settings", () => ControllerSettings(() => Controls(back, controlsTab)));
+        Footer(c, ("tabs", "switch list"), ("cancel", "back"));
         FocusFirst();
     }
 
-    public void Pause()
+    public void ControllerSettings(Action back)
+    {
+        Show("controller");
+        backAction = () => (back ?? Close)();
+        var c = Panel(220);
+        H2(c, "Controller");
+        Small(c, PadLine());
+        void Again() { Settings.Save(); ControllerSettings(back); }
+        H3(c, "Vibration");
+        var r = Row(c);
+        foreach (var (v, n) in new[] { (0f, "Off"), (0.5f, "Gentle"), (1f, "Full") })
+            Btn(r, n, () => { Settings.Vibration = v; Again(); Pad.Rumble(0.5f * v, 0.5f * v, 0.25f); }, selected: MathF.Abs(Settings.Vibration - v) < 0.01f);
+        H3(c, "Aim");
+        var r2 = Row(c);
+        Btn(r2, Settings.AimAssist ? "Aim assist: on" : "Aim assist: off", () => { Settings.AimAssist = !Settings.AimAssist; Again(); }, selected: Settings.AimAssist);
+        bool gyro = Pad.HasGyro;
+        Btn(r2, Settings.Gyro ? "Gyro aim: on" : "Gyro aim: off", () => { Settings.Gyro = !Settings.Gyro; Again(); if (Settings.Gyro) H.ToastMsg("Hold the controller still for a moment.", 2); }, selected: Settings.Gyro, disabled: !gyro && !Settings.Gyro);
+        if (gyro) Btn(r2, "Recalibrate gyro", () => { Pad.Calibrate(); H.ToastMsg("Hold the controller still for a moment.", 2); });
+        Small(c, gyro ? "Gyro aim tilts the aim like a mouse; the right stick still works alongside it." : "Gyro aim needs a PlayStation or Switch controller.");
+        H3(c, "Button prompts");
+        var r3 = Row(c);
+        foreach (var (v, n) in new[] { ("auto", "Match controller"), ("xbox", "Xbox"), ("playstation", "PlayStation"), ("switch", "Switch") })
+            Btn(r3, n, () => { Settings.Prompts = v; Pad.ApplyUiMap(); Again(); }, selected: Settings.Prompts == v);
+        H3(c, "Switch controllers: confirm in menus with");
+        var r4 = Row(c);
+        Btn(r4, "A (right button)", () => { Settings.NintendoConfirm = true; Pad.ApplyUiMap(); Again(); }, selected: Settings.NintendoConfirm);
+        Btn(r4, "B (bottom button)", () => { Settings.NintendoConfirm = false; Pad.ApplyUiMap(); Again(); }, selected: !Settings.NintendoConfirm);
+        Btn(Row(c, true), "Back", () => (back ?? Close)());
+        Footer(c, ("confirm", "choose"), ("cancel", "back"));
+        FocusFirst();
+    }
+
+    public void Pause(string note = null)
     {
         Show("pause");
         var c = Panel(190);
         H2(c, "Paused");
+        if (note != null) Lbl(c, note, 6, BAD);
         Small(c, $"{G.room.Name} · {Data.Regions.P(G.room.Region).S("name")} · Act {new string('I', G.act)}");
         H3(c, "Volume");
         var r = Row(c);
@@ -378,11 +493,14 @@ public partial class UiRoot : CanvasLayer
         Btn(r2, "Fullscreen (F11)", Settings.ToggleFullscreen);
         Btn(r2, Settings.Bloom ? "Glow: on" : "Glow: off", () => { Settings.Bloom = !Settings.Bloom; Settings.Apply(); Settings.Save(); Pause(); }, selected: Settings.Bloom);
         Btn(r2, Settings.Shake ? "Shake: on" : "Shake: off", () => { Settings.Shake = !Settings.Shake; Settings.Save(); Pause(); }, selected: Settings.Shake);
+        Btn(r2, Settings.Hints ? "Hints: on" : "Hints: off", () => { Settings.Hints = !Settings.Hints; Settings.Save(); Pause(); }, selected: Settings.Hints);
         var col = Col(c);
         Btn(col, "Resume", Close, primary: true);
-        Btn(col, "Controls", () => Controls(Pause));
+        Btn(col, "Controls", () => Controls(() => Pause()));
+        Btn(col, "Controller settings", () => ControllerSettings(() => Pause()));
         Btn(col, "Quit to title (progress since the last save is lost)", () => { Close(); G.ToTitle(); });
         Btn(col, "Quit to desktop (progress since the last save is lost)", () => GetTree().Quit());
+        Footer(c, ("confirm", "choose"), ("cancel", "resume"));
         FocusFirst();
     }
 
@@ -409,6 +527,7 @@ public partial class UiRoot : CanvasLayer
         Btn(col, "Bench: craft, upgrades, fittings" + (bell.room.Id == "chapel" ? ", surgery" : ""), () => Bench(bell.room.Id == "chapel", () => BellMenu(bell)));
         Btn(col, "Leave", Close);
         Small(c, "Resting skips time. Every body left lying in water re-knots on the way.");
+        Footer(c, ("confirm", "choose"), ("cancel", "leave"));
         FocusFirst();
     }
 
@@ -416,6 +535,7 @@ public partial class UiRoot : CanvasLayer
     {
         var p = G.player; var chest = G.reliquary;
         Show("reliquary");
+        backAction = () => (back ?? Close)();
         var c = Panel(270);
         H2(c, "Reliquary");
         var cols = Row(c);
@@ -439,6 +559,7 @@ public partial class UiRoot : CanvasLayer
         var a = Col(cols, 120); H3(a, $"Satchel ({p.bag.Used()}/{p.bag.size} slots)"); Rows(a, p.bag, true);
         var b = Col(cols, 120); H3(b, "Reliquary chest"); Rows(b, chest, false);
         Btn(Row(c), "Back", () => (back ?? Close)());
+        Footer(c, ("confirm", "move"), ("cancel", "back"));
         FocusFirst();
     }
 
@@ -464,9 +585,11 @@ public partial class UiRoot : CanvasLayer
     {
         var p = G.player;
         Show("bench");
+        benchChapel = chapel; benchBack = back;
+        backAction = () => (back ?? Close)();
         var c = Panel(270);
         H2(c, "Bench");
-        var tabs = new List<string> { "craft", "upgrade", "fittings" }; if (chapel) tabs.Add("surgery");
+        var tabs = BenchTabs(chapel);
         if (!tabs.Contains(benchTab)) benchTab = "craft";
         var tr = Row(c);
         foreach (var t in tabs) Btn(tr, char.ToUpper(t[0]) + t[1..], () => { benchTab = t; Bench(chapel, back); }, selected: t == benchTab);
@@ -531,18 +654,28 @@ public partial class UiRoot : CanvasLayer
                 }
         }
         Btn(Row(c), "Back", () => (back ?? Close)());
+        Footer(c, ("tabs", "change page"), ("cancel", "back"));
         FocusFirst();
     }
+    static List<string> BenchTabs(bool chapel) { var t = new List<string> { "craft", "upgrade", "fittings" }; if (chapel) t.Add("surgery"); return t; }
 
     // ---- satchel / logbook ----------------------------------------------------------------------
-    public void Satchel()
+    static readonly string[] SAT_TABS = { "map", "satchel", "craft", "gear", "log" };
+    public void Satchel(string tab = null)
     {
         var p = G.player;
+        if (tab != null) satTab = tab;
         Show("satchel");
         var c = Panel(270);
         var tr = Row(c);
-        foreach (var (t, n) in new[] { ("satchel", "Satchel"), ("craft", "Craft"), ("gear", "Gear"), ("log", "Logbook") })
-            Btn(tr, n, () => { satTab = t; Satchel(); }, selected: t == satTab);
+        foreach (var (t, n) in new[] { ("map", "Map"), ("satchel", "Satchel"), ("craft", "Craft"), ("gear", "Gear"), ("log", "Logbook") })
+            Btn(tr, n, () => Satchel(t), selected: t == satTab);
+        if (satTab == "map")
+        {
+            Hints.Did("map");
+            var mapCtl = new MapView { CustomMinimumSize = new Vector2(253, 157) };
+            c.AddChild(mapCtl);
+        }
         if (satTab == "satchel")
         {
             Small(c, $"{p.bag.Used()} / {p.bag.size} slots. Rivets 18 per slot, bolts 6, flasks and poultices 3, raw materials 10. Key items take 2 slots.");
@@ -581,14 +714,14 @@ public partial class UiRoot : CanvasLayer
         if (satTab == "craft")
         {
             Small(c, "Simple recipes work anywhere but take time with Maren crouched and exposed. Complex ones need a Bell Room bench.");
-            RecipeRows(c, "any", Satchel);
+            RecipeRows(c, "any", () => Satchel());
         }
         if (satTab == "gear")
         {
             var cols = Row(c);
             var a = Col(cols, 120);
             H3(a, $"Health {p.hp}/{p.maxHp} · Pressure {p.pressure}");
-            foreach (var ab in p.abilities) { var d = Data.Abilities.P(ab); ItemRow(a, d.S("name"), d.S("desc")); }
+            foreach (var ab in p.abilities) { var d = Data.Abilities.P(ab); ItemRow(a, d.S("name"), Glyphs.Plain(d.S("desc"), Glyphs.Current)); }
             H3(a, "Weapons");
             foreach (var id in p.weaponOrder) { var d = Data.Weapons.P(id); ItemRow(a, d.S("name"), d.Strings("tiers")[p.weapons[id].tier], "tier " + (p.weapons[id].tier + 1)); }
             var b = Col(cols, 120);
@@ -617,24 +750,15 @@ public partial class UiRoot : CanvasLayer
             H3(c, $"Agathe's log ({G.pages.Count}/9)");
             var pr = Row(c);
             if (G.pages.Count == 0) Small(pr, "No pages yet.");
-            foreach (var n in G.pages.OrderBy(x => x)) Btn(pr, "Page " + n, () => Dialogue("Agathe's log", new List<string> { Story.PAGES[n] }, Satchel));
+            foreach (var n in G.pages.OrderBy(x => x)) Btn(pr, "Page " + n, () => Dialogue("Agathe's log", new List<string> { Story.PAGES[n] }, () => Satchel()));
             H3(c, $"Prior's tide tables ({G.tables.Count}/4)");
             var tr2 = Row(c);
             if (G.tables.Count == 0) Small(tr2, "No tables yet.");
-            foreach (var n in G.tables.OrderBy(x => x)) Btn(tr2, "Table " + n, () => Dialogue("Prior's tide table", new List<string> { Story.TABLES[n] }, Satchel));
+            foreach (var n in G.tables.OrderBy(x => x)) Btn(tr2, "Table " + n, () => Dialogue("Prior's tide table", new List<string> { Story.TABLES[n] }, () => Satchel()));
             Small(c, $"Stitches: {G.collected.Count(k => k.StartsWith("stitch"))}/4 · Brass Seals: {G.collected.Count(k => k.StartsWith("seal"))}/6 · Knots broken: {G.stats.knots.Values.Sum()}");
         }
-        Btn(Row(c), "Close (I)", Close);
-        FocusFirst();
-    }
-
-    public void Map()
-    {
-        Show("map");
-        var c = Panel(270);
-        var mapCtl = new MapView { CustomMinimumSize = new Vector2(253, 157) };
-        c.AddChild(mapCtl);
-        Btn(Row(c), "Close (Tab)", Close);
+        Btn(Row(c), "Close", Close);
+        Footer(c, ("tabs", "change page"), ("cancel", "close"));
         FocusFirst();
     }
     partial class MapView : Control
@@ -664,6 +788,7 @@ public partial class UiRoot : CanvasLayer
         var drain = Btn(col, "Drain the shrine (permanent)", () => Confirm("Drain the Sunken Choir for good? Hesper wants the shrine kept flooded for the Saint's hymn. The Choir will turn on you.", () => G.SetChoirLevel("drained")));
         drain.AddThemeColorOverride("font_color", BAD);
         Btn(col, "Leave it", Close);
+        Footer(c, ("confirm", "choose"), ("cancel", "leave"));
         FocusFirst();
     }
     public void FontMenu()
@@ -693,6 +818,7 @@ public partial class UiRoot : CanvasLayer
             });
         }
         Btn(Row(c), "Step back", Close);
+        Footer(c, ("confirm", "choose"), ("cancel", "step back"));
         FocusFirst();
     }
 
@@ -742,10 +868,10 @@ public partial class UiRoot : CanvasLayer
         var t = Lbl(col, text, 8, H.Col("#d8dfe0"), center: true);
         t.AddThemeColorOverride("font_shadow_color", new Color(0.6f, 0.78f, 0.86f, 0.25f));
         t.AddThemeConstantOverride("shadow_outline_size", 2);
-        Lbl(col, "E  close", 4, MUTED, center: true);
+        var f = Footer(col, ("confirm", "close")); f.Align = 1;
     }
 
-    // Black-screen text, one line at a time. E / Space / click advances, Esc skips.
+    // Black-screen text, one line at a time. Confirm or a click advances; cancel skips.
     public void Cinematic(List<string> lines, Action done, string first = null)
     {
         Show("cinematic");
@@ -757,10 +883,11 @@ public partial class UiRoot : CanvasLayer
         var label = new Label { AutowrapMode = TextServer.AutowrapMode.WordSmart, HorizontalAlignment = HorizontalAlignment.Center, CustomMinimumSize = new Vector2(253, 0) };
         center.AddChild(label);
         cine.label = label;
-        var skip = Lbl(root, "E  continue    Esc  skip", 4, H.Col("#5a5446"));
+        var skip = new RichLabel(() => "{confirm} continue     {cancel} skip", 4, H.Col("#5a5446"), 2);
+        root.AddChild(skip);
         skip.SetAnchorsPreset(Control.LayoutPreset.BottomRight);
         skip.GrowHorizontal = Control.GrowDirection.Begin; skip.GrowVertical = Control.GrowDirection.Begin;
-        skip.OffsetRight = -10; skip.OffsetBottom = -8; skip.HorizontalAlignment = HorizontalAlignment.Right;
+        skip.OffsetRight = -10; skip.OffsetBottom = -8;
         NextCine();
     }
     void NextCine()

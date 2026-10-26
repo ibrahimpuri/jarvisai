@@ -27,6 +27,7 @@ H.LORE = {
 
   // Words cut into the island. tx/ty are a hint; the game finds the nearest floor.
   carvings: {
+    breakers: [{ tx: 27, ty: 12, title: 'Cut beside an old mooring ring', text: 'In a hand you know: IF YOU ARE READING THIS, THE LIGHT IS OUT. GO UP, AND LIGHT IT. DO NOT WAIT FOR ME. - A.H.' }],
     reef: [{ tx: 16, ty: 12, title: 'Cut fresh into the Constance\'s rail', text: 'No light on the skull. Struck at the turn. Ennis, Bray and Coll went over the side. I told the rest the water would bring them back. It did.' }],
     pier: [{ tx: 30, ty: 16, title: 'A tide post, painted in rings', text: 'Beside the highest ring: THE SAINT BREATHES IN. THE SAINT BREATHES OUT. COUNT YOUR STEPS BY IT.' }],
     seawall: [{ tx: 15, ty: 16, title: 'A numbered stone in the seawall', text: 'Laid in the fourth year of the Keeping by the first Hult, who asked only that no one ever be buried below the tide line.' }],
@@ -88,7 +89,18 @@ H.LORE = {
 
   // Maren's few thoughts, shown once each as a quiet line at the bottom of the screen.
   thoughts: {
+    boat: 'The boat is holed through. Well. I was never planning to row back.',
+    timber: 'An old hull, stood on its end. Wet stone won\'t take a grip. Timber will.',
+    salt: 'Salt, grown clean across the way through. Mama always said it cracks in the heat.',
+    crystals: 'Salt crystals. They would open a boot like a knife. Best not to linger on them.',
     start: 'The Constance is still in one piece. More or less.',
+    torso: 'Sparks. The flesh is only weight. Something else is holding it up.',
+    crown: 'The knot in its chest is bare now. Close enough for the gaff.',
+    rising: 'The tide has turned. Anything I leave lying in the water won\'t stay lying.',
+    sailorKnots: 'Knots at his knees and elbows, going dark. Just a corpse, then. It\'s the bright ones I should fear.',
+    bellmouth: 'It turns toward my lamp, the way a flower turns to the sun.',
+    lowOil: 'The lamp is guttering. I need oil.',
+    rings: 'Iron rings, set in the rock. The old riggers swung from these.',
     pier: 'No light on the skull. Forty nights of that.',
     firstStand: 'It stood up. The water stood it up.',
     firstKnot: 'They break at the joints. Like rigging.',
@@ -104,6 +116,33 @@ H.LORE = {
     choir: 'They\'re singing. Under the water, they\'re singing.',
     skull: 'Two hundred and twelve steps.',
     agathe: 'Mama.',
+  },
+
+  // Hints: a glyph and a word or two over Maren's head. Each appears only when it is relevant and the
+  // player has stalled for a while, and never again once the action has been done, prompted or not.
+  // {action} tokens become the button for whatever the player is holding.
+  hints: {
+    move: '{move} walk',
+    jump: '{jump} jump',
+    swim: '{move} swim     {jump} leap out at the surface',
+    ladder: '{up} climb',
+    walljump: '{walljump} cling to timber and leap',
+    drop: '{drop} drop through',
+    shoot: '{aim} aim     {fire} fire',
+    dash: '{dash} dash',
+    heal: '{poultice} poultice',
+    focus: '{focus} focus the lantern',
+    swing: '{swing} swing',
+    fight: '{fire} shoot the joints',
+    gaff: '{gaff} gaff',
+    reload: '{reload} reload',
+    craft: '{quickcraft} rivets from scrap',
+    map: '{map} map',
+    weapon: '{weapon} change weapon',
+    boots: '{boots} Ballast Boots',
+    jet: '{dash} in water or mid-air',
+    shutter: '{shutter} shutter the lantern',
+    sneak: '{sneak} creep',
   },
 
   // A dream while resting at a Bell Room, one each time, in order.

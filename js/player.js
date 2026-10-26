@@ -109,7 +109,7 @@
       this.mash = cracked ? 3 : 6;
       this.healT = 0; this.reloadT = 0; this.craftT = 0;
       if (this.dragging) this.stopDrag();
-      H.toast('Grabbed! Mash F / E / Space to break free.', 2);
+      H.toast('Grabbed! Mash {mash} to break free.', 2);
       return true;
     }
 
@@ -123,10 +123,14 @@
       const r = G().room;
       this.inBellRoom = r.bellRoom && !(r.id === 'chapel' && G().quest('tables') === 'sold') && !G().bellRoomBreached(r.id);
 
-      // aim from the mouse (or facing when keyboard-only)
-      const cam = G().cam;
-      const mx = In.mouse.x + cam.x, my = In.mouse.y + cam.y;
-      this.aim = Math.atan2(my - (this.y + 9), mx - this.cx());
+      // aim from the mouse, or from the pad
+      if (In.pad.using) this.aim = this.padAim(dt);
+      else {
+        const cam = G().cam;
+        const mx = In.mouse.x + cam.x, my = In.mouse.y + cam.y;
+        this.aim = Math.atan2(my - (this.y + 9), mx - this.cx());
+        this.padVec = { x: Math.cos(this.aim) * 80, y: Math.sin(this.aim) * 80 };
+      }
       if (this.state !== 'swing' && !this.dragging && !this.locked()) this.facing = Math.cos(this.aim) >= 0 ? 1 : -1;
 
       if (this.grabbedBy) { this.updateGrabbed(dt); return; }
@@ -140,6 +144,40 @@
       this.afterMove(dt);
     }
     bootsBrine() { return this.boots && W().isBrine(this.cx(), this.cy()); }
+
+    // ---- pad aim ------------------------------------------------------------------------
+    // The right stick points the aim. With the stick left alone, Maren aims where she walks,
+    // and a gentle pull settles the aim on a knot or a barrel.
+    padAim(dt) {
+      const In = I(), s = In.pad.aim;
+      if (!this.padVec) this.padVec = { x: this.facing * 80, y: 0 };
+      const manual = Math.hypot(s.x, s.y) > 0.3;
+      if (manual) { const l = Math.hypot(s.x, s.y); this.padVec = { x: s.x / l * 80, y: s.y / l * 80 }; this.stickIdle = 0; }
+      else {
+        this.stickIdle = (this.stickIdle || 0) + dt;
+        const d = (In.held('right') ? 1 : 0) - (In.held('left') ? 1 : 0);
+        if (this.stickIdle > 0.4 && d && Math.sign(this.padVec.x) !== d && this.state !== 'swing') this.padVec = { x: d * 80, y: 0 };
+      }
+      const a = Math.atan2(this.padVec.y, this.padVec.x);
+      return H.Settings.aimAssist ? this.assist(a, manual ? 0.18 : 0.32) : a;
+    }
+    assist(a, cone) {
+      const o = this.lanternPos();
+      let best = cone, pick = null;
+      const tryAt = (tx, ty) => {
+        const d = H.dist(o.x, o.y, tx, ty);
+        if (d < 10 || d > 300) return;
+        const ang = Math.atan2(ty - o.y, tx - o.x), diff = Math.abs(H.angleDiff(a, ang)) + d / 3000;
+        if (diff < best && H.Phys.los(o.x, o.y, tx, ty)) { best = diff; pick = ang; }
+      };
+      for (const e of G().ents) {
+        if (e.isBody) {
+          if (e.dead || e.gone || e.mode === 'downed' || e.mode === 'captured' || e.corpse || e.passive || !e.knots) continue;
+          for (const k of e.knots) { if (k.broken || e.isSealed(k)) continue; const kp = e.knotPos(k); if (kp) tryAt(kp.x, kp.y); }
+        } else if (e.type === 'barrel' && !e.done) tryAt(e.cx(), e.cy());
+      }
+      return pick === null ? a : a + H.angleDiff(a, pick) * 0.7;
+    }
 
     updateTimers(dt) {
       const In = I();
@@ -165,12 +203,13 @@
       if (In.hit('poultice')) this.usePoultice();
       if (In.hit('stitch')) this.useStitch();
       if (In.hit('quickcraft')) this.quickCraft('rivets');
-      if (In.hit('shutter')) { this.shut = !this.shut; H.Audio.ui(); H.toast(this.shut ? 'Lantern shuttered. You are nearly invisible, and blind to weak points.' : 'Lantern open.', 2); }
-      if (In.hit('boots') && this.has('boots')) { this.boots = !this.boots; H.Audio.thud(); H.toast(this.boots ? 'Ballast Boots: on. You sink.' : 'Ballast Boots: off.', 1.5); }
+      if (In.hit('shutter')) { this.shut = !this.shut; H.Audio.ui(); H.Hints.did('shutter'); H.toast(this.shut ? 'Lantern shuttered. You are nearly invisible, and blind to weak points.' : 'Lantern open.', 2); }
+      if (In.hit('boots') && this.has('boots')) { this.boots = !this.boots; H.Audio.thud(); H.Hints.did('boots'); H.toast(this.boots ? 'Ballast Boots: on. You sink.' : 'Ballast Boots: off.', 1.5); }
       for (let i = 1; i <= 4; i++) if (In.hit('w' + i) && this.weaponOrder[i - 1]) this.selectWeapon(this.weaponOrder[i - 1]);
-      if (In.mouse.wheel) {
-        const i = this.weaponOrder.indexOf(this.cur);
-        this.selectWeapon(this.weaponOrder[(i + In.mouse.wheel + this.weaponOrder.length) % this.weaponOrder.length]);
+      const cycle = In.mouse.wheel + (In.hit('wnext') ? 1 : 0) - (In.hit('wprev') ? 1 : 0);
+      if (cycle) {
+        const i = this.weaponOrder.indexOf(this.cur), n = this.weaponOrder.length;
+        if (n > 1) this.selectWeapon(this.weaponOrder[((i + cycle) % n + n) % n]);
       }
       if (!this.locked() && this.healKind !== 'stitch') {
         if (In.mouse.l || In.held('fire')) this.fire();
@@ -268,8 +307,8 @@
 
       // Ladders
       this.ladderCool = (this.ladderCool || 0) - dt;
-      if ((In.held('up') || (In.held('down') && !this.onGround && this.ladderCool <= 0)) && this.onLadderTile() && !this.dragging) { this.state = 'ladder'; this.vx = 0; this.vy = 0; this.x = Math.floor(this.cx() / TS) * TS + 8 - this.w / 2; return; }
-      if (In.held('down') && this.onGround && this.ladderBelow() && !this.dragging) { this.state = 'ladder'; this.y += 4; this.x = Math.floor(this.cx() / TS) * TS + 8 - this.w / 2; return; }
+      if ((In.held('up') || (In.held('down') && !this.onGround && this.ladderCool <= 0)) && this.onLadderTile() && !this.dragging) { this.state = 'ladder'; H.Hints.did('climb'); this.vx = 0; this.vy = 0; this.x = Math.floor(this.cx() / TS) * TS + 8 - this.w / 2; return; }
+      if (In.held('down') && this.onGround && this.ladderBelow() && !this.dragging) { this.state = 'ladder'; H.Hints.did('climb'); this.y += 4; this.x = Math.floor(this.cx() / TS) * TS + 8 - this.w / 2; return; }
 
       // Wall-hang on timber (never wet stone).
       const wallDir = dir !== 0 ? dir : 0;
@@ -277,15 +316,19 @@
       if (!this.onGround && hangTile && this.vy > 0 && !this.dragging) {
         this.vy = Math.min(this.vy, 20);
         this.hanging = wallDir;
-      } else this.hanging = 0;
+        this.lastHang = wallDir; this.hangGrace = 0.15;
+      } else { this.hanging = 0; this.hangGrace = (this.hangGrace || 0) - dt; }
+      if (this.onGround) this.hangGrace = 0;
 
       if (this.jumpBuf > 0 && !this.locked()) {
-        if (In.held('down') && this.onGround && this.onOneWay()) { this.dropping = 0.25; this.jumpBuf = 0; }
+        if (In.held('down') && this.onGround && this.onOneWay()) { this.dropping = 0.25; this.jumpBuf = 0; H.Hints.did('drop'); }
         else if (this.coyote > 0 && !this.dragging) {
           this.vy = this.boots && this.inWater() ? -300 : -JUMP; this.coyote = 0; this.jumpBuf = 0;
-          H.Audio.jump(); H.Noise.emit(this.cx(), this.y + this.h, 2, 'jump');
-        } else if (this.hanging) {
-          this.vy = -380; this.vx = -this.hanging * 190; this.facing = -this.hanging; this.jumpBuf = 0; this.hanging = 0; H.Audio.jump();
+          H.Audio.jump(); H.Noise.emit(this.cx(), this.y + this.h, 2, 'jump'); H.Hints.did('jump');
+        } else if (this.hanging || this.hangGrace > 0) {
+          // A jump just after letting go of the wall (or while pushing away from it) still counts.
+          const wd = this.hanging || this.lastHang;
+          this.vy = -380; this.vx = -wd * 190; this.facing = -wd; this.jumpBuf = 0; this.hanging = 0; this.hangGrace = 0; H.Audio.jump(); H.Hints.did('walljump');
         }
       }
       if (In.up('jump') && this.vy < -120 && this.dashT <= 0) this.vy *= 0.5;
@@ -452,6 +495,7 @@
         this.airDashed = inAir;
       }
       this.vx = dx * sp; this.vy = dy * sp;
+      H.Hints.did(inAir || water ? 'jet' : 'dash');
       this.dashVy = dy * sp; this.dashAir = inAir || water;
       this.dashT = inAir || water ? 0.22 : 0.15;
       this.dashInv = 0.2;
@@ -496,7 +540,7 @@
         const len = Math.max(24, Math.min(H.dist(this.cx(), this.y + 4, best.x, best.y), 78, floorD - 22));
         const ang = Math.atan2(this.cx() - best.x, (this.y + 4) - best.y);
         this.swing = { ax: best.x, ay: best.y, len, ang, av: (this.vx * Math.cos(ang) - this.vy * Math.sin(ang)) / len };
-        this.state = 'swing'; H.Audio.hook(); this.vy = 0;
+        this.state = 'swing'; H.Audio.hook(); this.vy = 0; H.Hints.did('swing');
         return;
       }
       if (ringOnly) return;
@@ -592,13 +636,13 @@
     }
 
     // ---- ranged ------------------------------------------------------------------
-    selectWeapon(w) { if (w && this.weapons[w] && w !== this.cur) { this.cur = w; this.reloadT = 0; H.Audio.ui(); } }
+    selectWeapon(w) { if (w && this.weapons[w] && w !== this.cur) { this.cur = w; this.reloadT = 0; H.Audio.ui(); H.Hints.did('weapon'); } }
     startReload() {
       const w = this.weapons[this.cur], def = H.WEAPONS[this.cur];
       if (this.reloadT > 0 || w.mag >= this.magSize(this.cur)) return;
       if (this.bag.count(def.ammo) <= 0) { H.toast('No ' + H.ITEMS[def.ammo].name.toLowerCase() + ' in the satchel.', 1.5); H.Audio.empty(); return; }
       this.reloadT = def.reload * (this.cur === 'driver' && this.hasFitting('feeder') ? 0.6 : 1);
-      H.Audio.reload();
+      H.Audio.reload(); H.Hints.did('reload');
     }
     finishReload() {
       const w = this.weapons[this.cur], def = H.WEAPONS[this.cur];
@@ -614,6 +658,7 @@
         return;
       }
       this.fireCool = def.cooldown;
+      H.Input.rumble(this.cur === 'harpoon' ? 0.35 : 0.28, this.cur === 'harpoon' ? 0.45 : 0, this.cur === 'harpoon' ? 0.16 : 0.06);
       const lp = { x: this.cx() + Math.cos(this.aim) * 6, y: this.y + 9 + Math.sin(this.aim) * 6 };
       const pan = 0;
       if (this.cur === 'driver') {
@@ -698,13 +743,13 @@
       this.healKind = 'poultice'; this.healT = 3;
       this.healTotal = this.healLeft = 2 + (this.hasFitting('bilge') ? 1 : 0);
       this.healTick = 3 / this.healTotal;
-      H.Audio.heal();
+      H.Audio.heal(); H.Hints.did('poultice');
     }
     useStitch() {
       if (this.healT > 0 || this.locked()) return;
       if (this.bag.count('stitchkit') <= 0) { H.toast('No Stitch Kits.', 1.5); H.Audio.deny(); return; }
       if (this.hp >= this.maxHp) { H.toast('You are not hurt.', 1); return; }
-      this.healKind = 'stitch'; this.healT = 4; this.vx = 0;
+      this.healKind = 'stitch'; this.healT = 4; this.vx = 0; H.Hints.did('poultice');
       H.toast('Kneeling to stitch (4 s)...', 2);
     }
     quickCraft(id) {
@@ -713,7 +758,7 @@
       if (!this.bag.has(rc.cost)) { H.toast('Missing materials for ' + H.ITEMS[rc.makes].name + '.', 1.5); H.Audio.deny(); return false; }
       if (this.bag.room(rc.makes) < rc.n) { H.toast('No room in the satchel.', 1.5); H.Audio.deny(); return false; }
       if (rc.where === 'bench') return false;
-      this.craftRecipe = rc; this.craftT = rc.time; this.vx = 0;
+      this.craftRecipe = rc; this.craftT = rc.time; this.vx = 0; H.Hints.did('craft');
       H.toast(`Crafting ${H.ITEMS[rc.makes].name}... (${rc.time} s, crouched)`, rc.time);
       return true;
     }
@@ -783,11 +828,11 @@
         if (this.pressureT <= 0) { this.pressureT = 1.5; this.invulnT = 0; this.hurt(1); H.toast('The pressure crushes your helmet. You need a Pressure Seal.', 2); }
       } else this.pressureT = 0.5;
       // salt crystals and fire
-      if (W().charAt(Math.floor(this.cx() / TS), Math.floor((this.y + this.h - 2) / TS)) === 'x') { this.hurt(1); this.vy = -260; }
+      if (W().charAt(Math.floor(this.cx() / TS), Math.floor((this.y + this.h - 2) / TS)) === 'x') { this.hurt(1); this.vy = -260; H.Hints.cut(); }
       if (H.Fire.burnsAt(this.cx(), this.y + this.h - 4)) this.hurt(1);
       // splash in/out
       const inW = this.inWater();
-      if (inW !== this.wasIn) { if (Math.abs(this.vy) > 60) { H.Audio.splash(0.2); H.FX.splash(this.cx(), W().surfaceAt(this.cx(), this.cy()), 8); H.Noise.emit(this.cx(), this.cy(), 4, 'splash'); } this.wasIn = inW; }
+      if (inW !== this.wasIn) { if (this.wasIn === true && !inW) H.Hints.did('swimout'); if (Math.abs(this.vy) > 60) { H.Audio.splash(0.2); H.FX.splash(this.cx(), W().surfaceAt(this.cx(), this.cy()), 8); H.Noise.emit(this.cx(), this.cy(), 4, 'splash'); } this.wasIn = inW; }
       if (this.gaffAnim > 0) this.gaffAnim -= dt;
     }
 

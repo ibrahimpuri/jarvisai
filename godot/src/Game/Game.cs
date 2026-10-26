@@ -49,6 +49,7 @@ public static class G
     public static string encrustedType;
     public static bool freeGraft;
     public static float shakeAmt, flash, pressureWarn, titleT, muzzle;
+    public static float dialT = 1;                 // the tide dial fades in once Maren reaches the reef
     public static string promptText;
     public static bool god;
     public static string ended;
@@ -107,7 +108,7 @@ public static class G
         var s = ents.FirstOrDefault(e => e.type == "start");
         var p = player;
         if (s != null) { p.x = s.Cx() - p.w / 2; p.y = s.y + s.h - p.h; }
-        respawn ??= new Spot { room = "reef", x = p.x, y = p.y };
+        respawn ??= new Spot { room = room.Id, x = p.x, y = p.y };
         SnapCamera();
     }
 
@@ -126,16 +127,15 @@ public static class G
         encrustedType = null; freeGraft = false; ended = null; tips = new(); mode = "play"; narr = new NarrState();
         titheFlood = null; breachT = 0; glimpseT = 0;
         Narr.Reset();
+        Hints.Reset();
         FX.parts.Clear();
-        EnterRoom(Data.Room["reef"], true);
+        dialT = 0;
+        // Maren comes ashore on the outer rocks; the tide holds at Low until she reaches the reef.
+        EnterRoom(Data.Room["breakers"], true);
         PlaceAtStart();
         titleT = 6;
         var lines = Data.Lore.Strings("opening").Concat(Data.Lore.Strings("openingAfter")).ToList();
-        UI.Cinematic(lines, () =>
-        {
-            Narr.Think("start");
-            Tip("move", "A / D to move, Space to jump. Hold toward timber to wall-hang. Hold Q near an iron ring to swing.", 6);
-        }, "title");
+        UI.Cinematic(lines, () => After(1.2f, () => Narr.Think("boat")), "title");
     }
 
     public static void ToTitle() { mode = "title"; UI.Title(); }
@@ -272,7 +272,15 @@ public static class G
         if (r.Id == "kilns" && f.B("basinFilling")) f.Set("basinCrossed", true);
         string enterThought = r.Id switch { "pier" => "pier", "chapel" => "chapel", "choir" => "choir", "skullstair" => "skull", "lamp" => "agathe", _ => null };
         if (enterThought != null) Narr.Think(enterThought);
-        if (r.Id == "chapel" && firstVisit) Tip("bell", "A Bell Room. Rekindle its lamp with the oil flask from the Constance (E at the bell).", 5);
+        // Reaching the reef: the tide starts to move, and the dial shows it.
+        if (r.Id != "breakers" && !f.B("landed"))
+        {
+            f.Set("landed", true);
+            if (r.Id == "reef") Narr.Think("start");
+            // From here on a fall wakes Maren on the Constance's deck, not back out on the rocks.
+            if (respawn?.room == "breakers") respawn = ReefDeck();
+        }
+        Tide.paused = r.Id == "breakers" && !f.B("landed");
         // Act III: the Brine breaches one Bell Room.
         if (act >= 3 && r.Id == BreachRoom() && !f.B("breachDone"))
         {
@@ -326,6 +334,7 @@ public static class G
         H.ToastMsg("The tide turns: " + Tide.PhaseName() + ".", 2.5f);
         if (room != null) MarkSeen();
         undertow?.OnPhase(ph);
+        if (ph == "rising") Hints.TideTurned();
         var f = World.flags;
         if (ph == "rising")
         {
@@ -341,7 +350,7 @@ public static class G
                     if (InTideWater(r, s)) s.Set("reknot", true);
                 }
             }
-            if (room.Row == 4) Tip("rising", "Rising tide: the water climbs room by room. Bodies it reaches will re-knot and stand at High.", 5);
+            if (room.Row == 4) Narr.Think("rising");
         }
         if (ph == "high")
         {
@@ -426,7 +435,28 @@ public static class G
         if (swell > 9 && valveT <= 0) { valveT = H.Rand(60, 90); swell = 0; }
     }
     public static bool CanWake() => valveT <= 0;
-    public static void Shake(float n) => shakeAmt = MathF.Max(shakeAmt, n);
+    public static void Shake(float n)
+    {
+        shakeAmt = MathF.Max(shakeAmt, n);
+        // the pad feels every jolt the camera does, whether or not screen shake is on
+        Pad.Rumble(MathF.Min(1, 0.12f * n + 0.08f), n >= 2 ? MathF.Min(1, 0.11f * n) : 0, 0.08f + 0.05f * n);
+    }
+    // Where the reef's start marker stands: the Constance's deck.
+    static Spot ReefDeck()
+    {
+        var r = Data.Room["reef"];
+        for (int ty = 0; ty < r.Map.Length; ty++)
+            for (int tx = 0; tx < r.Map[ty].Length; tx++)
+                if (r.Ents.TryGetValue(r.Map[ty][tx], out var e) && e.S("type") == "start")
+                    return new Spot { room = r.Id, x = r.Px + tx * TS + 8 - player.w / 2, y = r.Py + (ty + 1) * TS - player.h };
+        return new Spot { room = r.Id, x = r.Px + 25 * TS, y = r.Py + 12 * TS };
+    }
+    static bool RingNear(Player p, int r)
+    {
+        int tx = H.FloorI(p.Cx() / TS), ty = H.FloorI(p.Cy() / TS);
+        for (int dy = -r; dy <= 2; dy++) for (int dx = -r; dx <= r; dx++) if (World.CharAt(tx + dx, ty + dy) == 'o') return true;
+        return false;
+    }
     public static void Tip(string id, string text, float t = 4) { if (tips.Contains(id)) return; tips.Add(id); H.ToastMsg(text, t); }
     public static string Quest(string k) => quests.S(k);
     public static void SetQuest(string k, string v) => quests.Set(k, v);
@@ -470,7 +500,7 @@ public static class G
     public static void OnBodyDowned(Body b, string src)
     {
         if (!b.boss) Narr.Think("firstDown");
-        if (!b.boss) Tip("downed", "Dropped. If water reaches it during the next Rising it stands again at High. Drag it clear (E) or burn it (X).", 6);
+
         AddSwell(0.5f);
         if (b.breach) { breachT = 0; World.flags.Set("breachDone", true); quests.Set("teodor", "dead"); bossBar = null; H.ToastMsg("Teodor falls for the last time. Odile is safe.", 4); }
         if (b.hesper) { quests.Set("hesperDead", true); bossBar = null; H.ToastMsg("Hesper Vane falls. The Choir's hymn goes unfinished.", 4); }
@@ -495,7 +525,7 @@ public static class G
         titheFlood = 0;
         H.ToastMsg("The crank's counterweight drops. The hall bell tolls overhead, and water pours up through the floor grates!", 5);
         Narr.Think("titheTrap");
-        Tip("escape", "The way out is up: gaff to the chandelier rings (hold Q), swing to the gallery, climb to the window.", 6);
+
     }
     public static void OnTagsTaken() { }
     public static void OnCacheOpened()
@@ -563,7 +593,7 @@ public static class G
             if (e0 is not Obj e) continue;
             if (!e.Near(p)) continue;
             string pr = e.Prompt();
-            if (pr == null || pr.StartsWith("F ") || pr.StartsWith("Lift pan")) continue;
+            if (pr == null || pr.StartsWith("{gaff}") || pr.StartsWith("Lift pan")) continue;
             float d = MathF.Abs(e.Cx() - p.Cx());
             if (d < bd) { bd = d; best = e; }
         }
@@ -586,7 +616,7 @@ public static class G
     static string ComputePrompt()
     {
         var p = player;
-        if (p.dragging != null) return "E  Let go   (dragging is slow; haul it above the tide line)";
+        if (p.dragging != null) return "{interact} Let go   (dragging is slow; haul it above the tide line)";
         string best = null; float bd = 1e9f;
         foreach (var e0 in ents)
         {
@@ -599,8 +629,8 @@ public static class G
         var b = p.NearestDownedBody(24);
         if (b != null)
         {
-            if (b.teodor && b.mode == "captured") return "E  Bind Teodor for Odile";
-            return "E  Drag body   X  Burn it (oil)";
+            if (b.teodor && b.mode == "captured") return "{interact} Bind Teodor for Odile";
+            return "{interact} Drag body   {burn} Burn it (oil)";
         }
         return null;
     }
@@ -608,6 +638,7 @@ public static class G
     // ------------------------------------------------------------------ death and rest
     public static void OnPlayerDeath()
     {
+        Pad.Rumble(0.6f, 1f, 0.7f);
         var p = player;
         if (p.dead) return;
         p.dead = true; p.grabbedBy = null; if (p.dragging != null) p.StopDrag();
@@ -721,10 +752,11 @@ public static class G
         var sdp = d.P("satchelDrop");
         satchelDrop = sdp == null ? null : new SatchelInfo { room = sdp.S("room"), x = sdp.F("x"), y = sdp.F("y"), tidal = sdp.B("tidal"), bag = Bag.From(sdp.P("bag")) };
         difficulty = d.S("difficulty") ?? "keeper"; encrustedType = d.S("encrustedType"); freeGraft = d.B("freeGraft");
-        tips = new HashSet<string>(d.Strings("tips")); narr = NarrState.From(d.P("narr"));
+        tips = new HashSet<string>(d.Strings("tips")); narr = NarrState.From(d.P("narr")); dialT = 1;
         undertow = new UndertowSystem { dead = d.B("undertowDead") }; mode = "play"; ended = null; swell = 0; valveT = 0;
         titheFlood = null; breachT = 0;
         Narr.Reset();
+        Hints.Reset();
         player.hp = player.maxHp;
         EnterRoom(Data.Room[respawn.room], true);
         player.x = respawn.x; player.y = respawn.y;
@@ -766,7 +798,8 @@ public static class G
         }
         if (Inp.Hit("pause")) { UI.Pause(); return; }
         if (Inp.Hit("map")) { UI.Map(); return; }
-        if (Inp.Hit("satchel")) { UI.Satchel(); return; }
+        if (Inp.Hit("satchel")) { UI.Satchel("satchel"); return; }
+        if (Inp.Hit("journal")) { UI.Satchel(null); return; }
         if (Inp.Hit("debug"))
         {
             if (Inp.Held("sneak"))
@@ -861,15 +894,19 @@ public static class G
         if (room.Id == "reef" && p.focusing)
         {
             var s = ents.OfType<Corpse>().FirstOrDefault(e => e.sailor);
-            if (s != null && s.knots.Count > 0 && s.fadeKnots == 0 && p.BeamHits(s.Cx(), s.Cy())) { s.fadeKnots = 3; Tip("sailor", "Under the focused beam, knots glint at knees and elbows... then dull and go dark. Just a corpse. Active knots stay bright.", 7); }
+            if (s != null && s.knots.Count > 0 && s.fadeKnots == 0 && p.BeamHits(s.Cx(), s.Cy())) { s.fadeKnots = 3; After(1.5f, () => Narr.Think("sailorKnots")); }
         }
-        if (room.Id == "reef" && stats.time > 8) Tip("focus", "Hold right mouse for a focused beam: it makes knots glint, but burns double oil.", 6);
-        if (room.Id == "pier" && !tips.Contains("shoot"))
+        if (room.Id == "pier")
         {
             var s = ents.OfType<Body>().FirstOrDefault(e => e.key == "first_shucker");
             if (s != null && s.mode != "dormant") Narr.Think("firstStand");
-            if (s != null && s.mode != "dormant") Tip("shoot", "Torso shots spark off. Shoot the knees (left click), then finish it with the gaff (F) at the Crown.", 7);
         }
+        // A few things Maren notices for herself.
+        var had = narr.thoughts;
+        if (!had.Contains("lowOil") && p.LanternLit() && p.oil < p.OilMax() * 0.15f) Narr.Think("lowOil");
+        if (!had.Contains("rings") && p.Has("swing") && RingNear(p, 6)) Narr.Think("rings");
+        if (!had.Contains("bellmouth") && ents.OfType<Body>().Any(b => b.type == "bellmouth" && b.Alive() && H.Dist(b.Cx(), b.Cy(), p.Cx(), p.Cy()) < 220)) Narr.Think("bellmouth");
+        Hints.Update(dt);
         // Undertow glimpse at the Tithe window.
         if (room.Id == "tithe" && f.B("titheTrapped") && !f.B("glimpse") && p.y < room.Py + 8 * TS)
         {
@@ -913,6 +950,9 @@ public static class G
         frameLights = lights;
 
         promptText = ComputePrompt();
+        // The tide holds at Low on the outer rocks until Maren reaches the reef; then the dial appears.
+        Tide.paused = room.Id == "breakers" && !f.B("landed");
+        if (f.B("landed")) dialT = MathF.Min(1, dialT + dt * 0.6f);
         UpdateCamera(dt);
         shakeX = (H.Rand() - 0.5f) * shakeAmt; shakeY = (H.Rand() - 0.5f) * shakeAmt;
         // Ambience follows the tide and the tension.

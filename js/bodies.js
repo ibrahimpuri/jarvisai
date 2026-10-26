@@ -174,6 +174,7 @@
       // A knot flaring during a wind-up is brittle.
       if (k.flare > 0 && src === 'rivet') dmg *= 2;
       k.hp -= dmg;
+      if (['rivet', 'gaff', 'harpoon', 'saw', 'stomp'].includes(src)) { H.Hints.did('knot'); if (src === 'gaff') H.Hints.did('gaffknot'); }
       const p = this.knotPos(k);
       H.FX.salt(p.x, p.y, 5);
       this.wake(true);
@@ -196,6 +197,7 @@
       if (this.gone) return;
       H.Audio.thud(this.pan());
       H.FX.blood(x, y, 3);
+      if (src === 'rivet' && !this.corpse && this.knots.some((k) => !k.broken)) H.Narr.think('torso');
       this.wake(true);
       // 10% of the hit reaches the nearest open knot.
       let best = null, bd = 1e9;
@@ -214,6 +216,8 @@
     flinch() { if (this.mode === 'hunt') this.vx *= 0.3; }
     onKnotBroken(k, src) {
       if (k.type === 'crown') { this.down(src); return; }
+      const crown = this.knots.find((c) => c.type === 'crown' && !c.broken);
+      if (crown && crown.sealedNeeds > 0 && !this.isSealed(crown)) H.Narr.think('crown');
       if (this.mode === 'grab' && (k.type === 'elbow' || k.type === 'shoulder' || k.type === 'arm')) this.releaseGrab();
       if (!this.legsOK() && this.pose === 'stand' && this.mode !== 'downed') this.setPose('crawl');
       if (this.mode === 'windup' && !this.canAttack()) this.mode = 'hunt';

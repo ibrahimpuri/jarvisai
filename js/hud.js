@@ -82,10 +82,11 @@ H.HUD = (() => {
     const text = G.promptText;
     if (!text) return;
     c.font = '8px monospace';
-    const w = c.measureText(text).width + 14;
-    const x = (H.VIEW_W - w) / 2, y = H.VIEW_H - 46;
-    c.fillStyle = 'rgba(10,12,14,0.7)'; c.fillRect(x, y, w, 15);
-    c.fillStyle = '#e8dcb8'; c.fillText(text, x + 7, y + 10);
+    const w = H.Glyphs.measure(c, text) + 14;
+    const x = (H.VIEW_W - w) / 2, y = H.VIEW_H - 48;
+    c.fillStyle = 'rgba(10,12,14,0.7)'; c.fillRect(x, y, w, 17);
+    c.fillStyle = 'rgba(200,170,100,0.4)'; c.fillRect(x, y, w, 1);
+    c.fillStyle = '#e8dcb8'; H.Glyphs.drawText(c, text, x + 7, y + 11.5);
   }
 
   // Notifications: a wrapped column under the HUD, leaving the centre for titles and story text.
@@ -95,14 +96,13 @@ H.HUD = (() => {
     let y = 62;
     for (const t of H.toasts) {
       const a = Math.min(1, t.t, (t.max - t.t) * 4 + 0.2);
-      const words = t.text.split(' '); const lines = []; let line = '';
-      for (const w of words) { const s = line ? line + ' ' + w : w; if (c.measureText(s).width > maxW && line) { lines.push(line); line = w; } else line = s; }
-      if (line) lines.push(line);
-      const h = lines.length * 9 + 5;
+      const lines = H.Glyphs.wrap(c, t.text, maxW);
+      const rich = t.text.includes('{'), lh = rich ? 12 : 9;
+      const h = lines.length * lh + 5;
       c.fillStyle = `rgba(8,10,12,${0.6 * a})`; c.fillRect(8, y - 8, maxW + 10, h);
       c.fillStyle = `rgba(200,170,100,${0.7 * a})`; c.fillRect(8, y - 8, 1.5, h);
       c.fillStyle = `rgba(232,220,184,${a})`;
-      lines.forEach((ln, i) => c.fillText(ln, 13, y + i * 9));
+      lines.forEach((ln, i) => H.Glyphs.drawText(c, ln, 13, y + i * lh + (rich ? 1.5 : 0), a));
       y += h + 3;
     }
   }
@@ -146,12 +146,13 @@ H.HUD = (() => {
   function grabbed(c, p) {
     if (!p.grabbedBy) return;
     c.font = '12px monospace'; c.textAlign = 'center'; c.fillStyle = '#ff9a7a';
-    c.fillText('BREAK FREE  [F / E / SPACE]  x' + p.mash, H.VIEW_W / 2, H.VIEW_H / 2 + 50);
+    H.Glyphs.drawText(c, 'BREAK FREE  {mash}  x' + p.mash, H.VIEW_W / 2, H.VIEW_H / 2 + 50);
     c.textAlign = 'left';
   }
 
   function crosshair(c) {
-    const m = H.Input.mouse;
+    let m = H.Input.mouse;
+    if (H.Input.pad.using) { const p = H.Game.player, cam = H.Game.cam; m = { x: p.cx() + Math.cos(p.aim) * 60 - cam.x, y: p.y + 9 + Math.sin(p.aim) * 60 - cam.y }; }
     c.strokeStyle = 'rgba(240,230,200,0.7)'; c.lineWidth = 1;
     c.beginPath(); c.moveTo(m.x - 4, m.y); c.lineTo(m.x - 1.5, m.y); c.moveTo(m.x + 1.5, m.y); c.lineTo(m.x + 4, m.y);
     c.moveTo(m.x, m.y - 4); c.lineTo(m.x, m.y - 1.5); c.moveTo(m.x, m.y + 1.5); c.lineTo(m.x, m.y + 4); c.stroke();
@@ -162,7 +163,10 @@ H.HUD = (() => {
     // Earlier passes leave stroke state behind (the background arches use a 10 px line).
     c.lineWidth = 1; c.lineCap = 'butt'; c.globalAlpha = 1; c.textAlign = 'left';
     pips(c, p); breath(c, p); lantern(c, p);
-    dial(c); weapon(c, p); prompt(c); toasts(c); roomTitle(c); bossBar(c); grabbed(c, p);
+    if (H.Game.dialT > 0.01) { c.globalAlpha = H.Game.dialT; dial(c); c.globalAlpha = 1; }
+    weapon(c, p); prompt(c); toasts(c); roomTitle(c); bossBar(c); grabbed(c, p);
+    H.Hints.draw(c);
+    if (H.Input.pad.sneakLatch && H.Input.pad.using) { c.font = '6px monospace'; c.fillStyle = '#9a9080'; c.fillText('creeping', 10, 56); }
     if (H.Game.god) { c.fillStyle = '#f66'; c.font = '7px monospace'; c.fillText('DEBUG', 6, H.VIEW_H - 4); }
     crosshair(c);
   }
@@ -174,7 +178,8 @@ H.HUD = (() => {
     const W = cv.width, Hh = cv.height;
     c.fillStyle = '#1a1712'; c.fillRect(0, 0, W, Hh);
     c.fillStyle = '#2a251c'; c.fillRect(8, 8, W - 16, Hh - 16);
-    const cols = 8, rows = 6;
+    // the island's extent, from the rooms themselves
+    const cols = Math.max(...H.ROOMS.map((r) => r.col + (r.w || 1))), rows = Math.max(...H.ROOMS.map((r) => r.row + (r.h || 1)));
     const sw = Math.floor((W - 40) / cols), sh = Math.floor((Hh - 60) / rows);
     const ox = 20, oy = 36;
     c.font = '11px Georgia, serif'; c.fillStyle = '#d8c8a0';

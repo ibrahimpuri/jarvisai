@@ -55,6 +55,8 @@ public partial class Tester : Node
     {
         G.DeleteSave();
         Inp.TestHeld.Clear(); Inp.ForceL = Inp.ForceR = false; Inp.MouseOverride = null;
+        if (Pad.TestMode) { PadReset(); Pad.EndSimulate(); }
+        Glyphs.Force = null; Inp.sneakLatch = false;
         G.god = false;
         G.NewGame("keeper", 1);
         UI.Close();
@@ -148,5 +150,16 @@ public partial class Tester : Node
         return (r.Id, MathF.Round(p.x), MathF.Round(p.y), H.FloorI(p.Cx() / 16) - r.Ox, H.FloorI((p.y + p.h - 1) / 16) - r.Oy, p.hp, p.state, p.onGround, Tide.PhaseId());
     }
     public void Ok(string name, bool ok, object info = null) => Check(name, ok, info?.ToString() ?? "");
+
+    // A pretend controller on device 0, fed through Godot's own input pipeline.
+    public void PadButton(JoyButton b, bool pressed) => Input.ParseInputEvent(new InputEventJoypadButton { Device = 0, ButtonIndex = b, Pressed = pressed, Pressure = pressed ? 1 : 0 });
+    public void PadAxis(JoyAxis a, float v) => Input.ParseInputEvent(new InputEventJoypadMotion { Device = 0, Axis = a, AxisValue = v });
+    public async Task PadTap(JoyButton b) { PadButton(b, true); await Frames(3); PadButton(b, false); await Frames(3); }
+    public async Task PadHold(JoyButton b, float seconds) { PadButton(b, true); await Run(seconds); PadButton(b, false); await Frames(2); }
+    public void PadReset()
+    {
+        foreach (JoyButton b in Enum.GetValues(typeof(JoyButton))) if (b >= 0 && b < JoyButton.SdlMax && Input.IsJoyButtonPressed(0, b)) PadButton(b, false);
+        foreach (var a in new[] { JoyAxis.LeftX, JoyAxis.LeftY, JoyAxis.RightX, JoyAxis.RightY, JoyAxis.TriggerLeft, JoyAxis.TriggerRight }) PadAxis(a, 0);
+    }
     public void Snap(string name) => Shot(name);
 }

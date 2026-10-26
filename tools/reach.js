@@ -29,7 +29,7 @@ const TG = targets();
 
 const PHASES = [['low', 10], ['high', 10], ['ebbing', 60], ['rising', 60]];
 
-const GW = 8 * 40, GH = 6 * 23;
+const GW = Math.max(...H.ROOMS.map((r) => r.col + r.w)) * 40, GH = Math.max(...H.ROOMS.map((r) => r.row + r.h)) * 23;
 function analyse(abil, flags, extraSolid = [], opts = {}) {
   W.flags = Object.assign({}, flags);
   const can = (a) => abil.includes(a);
@@ -70,6 +70,9 @@ function analyse(abil, flags, extraSolid = [], opts = {}) {
   const spikes = (x, y) => W.charAt(x, y) === 'x';
   const stand = (x, y) => bodyFree(x, y) && solid(x, y + 1) >= 1 && !spikes(x, y);
   const swimOK = (x, y) => water(x, y) && !(brine(x, y) && can('boots')) && !(deep(x, y) && !can('seal'));
+  // Clinging to timber or rib bone: the wall on side s covers the whole body.
+  const wallSide = (x, y) => (W.isWallHang(x - 1, y) && W.isWallHang(x - 1, y - 1) ? -1 : W.isWallHang(x + 1, y) && W.isWallHang(x + 1, y - 1) ? 1 : 0);
+  const hang = (x, y) => bodyFree(x, y) && !stand(x, y) && wallSide(x, y) !== 0;
   const queue = [];
   const dist = opts.dijkstra ? new Float64Array(GW * GH).fill(Infinity) : null;
   const heap = [];
@@ -138,7 +141,20 @@ function analyse(abil, flags, extraSolid = [], opts = {}) {
       for (const dy of [-1, 1]) if (bodyFree(x, y + dy) && (ladder(x, y + dy) || ladder(x, y + dy - 1) || stand(x, y + dy))) push(x, y + dy);
       if (!ladder(x, y - 1) && ladder(x, y)) fall(x, y - 1);
     }
+    // From a cling, leap away from the wall: up to 3 tiles higher, out to 5 across.
+    if (hang(x, y) && !grounded) {
+      curHow = 'j';
+      const away = -wallSide(x, y);
+      for (let dy = -6; dy <= 3; dy++) for (let k = 1; k <= 5; k++) {
+        const nx = x + away * k, ny = y - dy;
+        if ((stand(nx, ny) || hang(nx, ny) || ladder(nx, ny) || swimOK(nx, ny)) && arc(x, y, nx, ny)) push(nx, ny);
+      }
+      fall(x, y + 1);
+    }
     if (!(grounded || surface)) return;
+    curHow = 'd';
+    // A ground dash carries Maren across a short strip of salt crystals untouched.
+    for (const s of [-1, 1]) for (let k = 1; k <= 3; k++) { const nx = x + s * k; if (!bodyFree(nx, y)) break; if (stand(nx, y)) { if (k > 1) push(nx, y); break; } if (!spikes(nx, y)) break; }
     curHow = 'w';
     for (const dx of [-1, 1]) { if (bodyFree(x + dx, y)) fall(x + dx, y); else if (bodyFree(x + dx, y - 1) && stand(x + dx, y - 1)) push(x + dx, y - 1, 'j'); }
     curHow = 'd';
@@ -149,7 +165,7 @@ function analyse(abil, flags, extraSolid = [], opts = {}) {
       for (let dx = -lim; dx <= lim; dx++) {
         const nx = x + dx, ny = y - dy;
         if (dx === 0 && dy === 0) continue;
-        if (!(stand(nx, ny) || ladder(nx, ny) || ladder(nx, ny - 1) || swimOK(nx, ny))) continue;
+        if (!(stand(nx, ny) || ladder(nx, ny) || ladder(nx, ny - 1) || swimOK(nx, ny) || hang(nx, ny))) continue;
         if (arc(x, y, nx, ny)) push(nx, ny);
       }
     }
@@ -200,6 +216,8 @@ function near(seen, t, r = 2) {
 }
 
 const stages = [
+  { name: 'The Breakers: ashore to the reef', abil: ['swing'], flags: {}, start: 'start@breakers', breakB: true, need: ['ch_cache@breakers', 'start@reef', 'ch_constance@reef'] },
+  { name: 'GATE: the salt plug holds until it burns', abil: ['swing'], flags: {}, start: 'start@breakers', mustNot: ['start@reef'] },
   { name: 'Start (Gaff Swing only)', abil: ['swing'], flags: {}, need: ['ch_constance@reef', 'bell_chapel@chapel', 'crank@tithe', 'seawall_socket@seawall', 'first_shucker@pier', 'page_tithe@tithe', 'ch_gallery@tithe_gallery'], want: ['seal_reef@reef', 'stitch_seawall@seawall'] },
   { name: 'Seawall gate open', abil: ['swing'], flags: { seawallOpen: true }, need: ['saint@saltgate', 'sea@saltgate', 'kiln@saltgate', 'bell_salt@saltbell', 'barge@saltgate'], want: ['seal_pans@saltgate', 'ch_pans@saltgate'] },
   { name: 'Barge puzzle solved', abil: ['swing'], flags: { seawallOpen: true, basinFilling: true, basinCrossed: true }, pool: true, need: ['ch_kilns@kilns', 'harpoon@kilns', 'kiln@abbot', 'abbot@abbot'], want: ['stitch_kilns@kilns', 'page_kilns@kilns'] },
@@ -216,6 +234,8 @@ const stages = [
   { name: 'Skull open', abil: ['swing', 'boots', 'jet', 'tidekey', 'seal'], flags: { seawallOpen: true, basinFilling: true, basinCrossed: true, priorWedged: true, liftDropped: true, skullOpen: true }, pool: true, choir: 3, breakC: true, breakS: true, lift: true, need: ['shoal@skullstair', 'agathe@lamp', 'lampwork@lamp', 'beacon@lamp', 'hymnbell@lamp'] },
 ];
 
+// The barrel's fire cracks the salt plug in the Breakers.
+function breakPlug() { const r = H.ROOM.breakers; for (let y = 0; y < r.th; y++) for (let x = 0; x < r.tw; x++) if (W.charAt(r.ox + x, r.oy + y) === 'S') W.setChar(r.ox + x, r.oy + y, ' '); }
 if (require.main !== module) { module.exports = { analyse, H, W, T, TG }; return; }
 let fails = 0;
 const dumpArg = process.argv.indexOf('--dump');
@@ -228,9 +248,10 @@ for (const [si, s] of stages.entries()) {
   if (s.breakC) for (let y = 0; y < 23; y++) { const r = H.ROOM.choir; if (W.charAt(r.ox + 4, r.oy + y) === 'C') W.setChar(r.ox + 4, r.oy + y, ' '); if (s.choir === 3 && W.charAt(r.ox + 32, r.oy + y) === 'C') W.setChar(r.ox + 32, r.oy + y, ' '); }
   if (s.breakS) { const r = H.ROOM.prisms; for (let y = 0; y < r.th; y++) for (let x = 0; x < r.tw; x++) if (W.charAt(r.ox + x, r.oy + y) === 'S') W.setChar(r.ox + x, r.oy + y, ' '); }
   if (s.lift) { const r = H.ROOM.priors; for (let y = 17; y < 23; y++) W.setChar(r.ox + 21, r.oy + y, 'H'); }
+  if (s.breakB) breakPlug();
   const extra = [];
   if (!s.lift) { const r = H.ROOM.priors; for (let x = 20; x < 24; x++) extra.push([r.ox + x, r.oy + 17]); }
-  const seen = analyse(s.abil, s.flags, extra);
+  const seen = analyse(s.abil, s.flags, extra, s.start ? { start: [TG[s.start].x, TG[s.start].y] } : {});
   const miss = (s.need || []).filter((k) => { if (!TG[k]) { console.log('  unknown target', k); return true; } return !near(seen, TG[k]); });
   const wmiss = (s.want || []).filter((k) => TG[k] && !near(seen, TG[k]));
   const rooms = new Set([...seen].map((k) => { const [x, y] = k.split(',').map(Number); return W.roomAtTile(x, y).id; }));
@@ -276,6 +297,7 @@ if (!dump) {
   { const r = H.ROOM.priors; for (let y = 17; y < 23; y++) W.setChar(r.ox + 21, r.oy + y, 'H'); }
   { const c = H.ROOM.choir; for (let y = 0; y < 23; y++) for (const x of [4, 32]) if (W.charAt(c.ox + x, c.oy + y) === 'C') W.setChar(c.ox + x, c.oy + y, ' '); }
   { const r = H.ROOM.prisms; for (let y = 0; y < r.th; y++) for (let x = 0; x < r.tw; x++) if (W.charAt(r.ox + x, r.oy + y) === 'S') W.setChar(r.ox + x, r.oy + y, ' '); }
+  breakPlug();
   const allSeen = analyse(['swing', 'boots', 'jet', 'tidekey', 'seal', 'lens'], { seawallOpen: true, basinFilling: true, basinCrossed: true, priorWedged: true, liftDropped: true, skullOpen: true });
   const unreached = [];
   for (const r of H.ROOMS) for (const c of H.Narr.carvingSpecs(r, new Set())) if (!near(allSeen, { x: r.ox + c.tx, y: r.oy + c.ty }, 1)) unreached.push(r.id + ' ' + c.tx + ',' + c.ty);

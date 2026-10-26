@@ -203,7 +203,7 @@ H.Story = (() => {
         if (!p.weapons[spec.id]) { p.weapons[spec.id] = { tier: 0, mag: def.mag }; p.weaponOrder.push(spec.id); }
         const ammo = { harpoon: ['bolts', 4], sling: ['flares', 3], sawline: ['spools', 2] }[spec.id];
         if (ammo) p.bag.add(ammo[0], ammo[1]);
-        H.UI.say(def.name, { harpoon: 'Pins a limb to a wall for 4 s. Bolts can be recovered if they do not sink at Ebb. Select with 2 or the mouse wheel.', sling: 'Throws flares that burn for 10 s and draw Driftlings. A lit flare stuck to a body lets the swarm strip its knots for you.', sawline: 'Strings a wire at knee height that cuts the knots of anything crossing it.' }[spec.id]);
+        H.UI.say(def.name, { harpoon: 'Pins a limb to a wall for 4 s. Bolts can be recovered if they do not sink at Ebb. Change weapon with {weapon}.', sling: 'Throws flares that burn for 10 s and draw Driftlings. A lit flare stuck to a body lets the swarm strip its knots for you.', sawline: 'Strings a wire at knee height that cuts the knots of anything crossing it.' }[spec.id]);
         break;
       }
     }

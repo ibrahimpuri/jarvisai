@@ -210,6 +210,8 @@ public class Body : Ent
         // A knot flaring during a wind-up is brittle.
         if (k.flare > 0 && src == "rivet") dmg *= 2;
         k.hp -= dmg;
+        if (src is "rivet" or "gaff" or "harpoon" or "saw" or "stomp") Hints.Did(src == "gaff" ? "gaffknot" : "knot");
+        if (src == "gaff") Hints.Did("knot");
         FX.Salt(kp.X, kp.Y, 5);
         Wake(true);
         if (k.hp <= 0)
@@ -236,6 +238,7 @@ public class Body : Ent
         if (gone) return;
         Snd.Thud(Pan());
         FX.Blood(hx, hy, 3);
+        if (src == "rivet" && !corpse && knots.Any(k => !k.broken)) Narr.Think("torso");
         Wake(true);
         // 10% of the hit reaches the nearest open knot.
         Knot best = null; float bd = 1e9f;
@@ -257,6 +260,8 @@ public class Body : Ent
     public virtual void OnKnotBroken(Knot k, string src)
     {
         if (k.type == "crown") { Down(src); return; }
+        var crown = knots.Find(c => c.type == "crown" && !c.broken);
+        if (crown != null && crown.sealedNeeds > 0 && !IsSealed(crown)) Narr.Think("crown");
         if (mode == "grab" && (k.type == "elbow" || k.type == "shoulder" || k.type == "arm")) ReleaseGrab();
         if (!LegsOK() && pose == "stand" && mode != "downed") SetPose("crawl");
         if (mode == "windup" && !CanAttack()) mode = "hunt";

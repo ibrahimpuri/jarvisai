@@ -11,7 +11,7 @@ namespace Hollowmere;
 public class Socket : Obj
 {
     public Socket(Props spec, RoomDef room) : base(spec, room) { w = 12; h = 14; }
-    public override string Prompt() => World.flags.B("seawallOpen") ? null : G.player.bag.Count("crank") > 0 ? "E  Fit the Sluice Crank" : "E  Examine gate socket";
+    public override string Prompt() => World.flags.B("seawallOpen") ? null : G.player.bag.Count("crank") > 0 ? "{interact} Fit the Sluice Crank" : "{interact} Examine gate socket";
     public override void Interact()
     {
         if (World.flags.B("seawallOpen")) return;
@@ -34,7 +34,7 @@ public class Socket : Obj
 public class Crank : Obj
 {
     public Crank(Props spec, RoomDef room) : base(spec, room) { w = 14; h = 14; }
-    public override string Prompt() => done ? null : "E  Lift the Sluice Crank from the altar";
+    public override string Prompt() => done ? null : "{interact} Lift the Sluice Crank from the altar";
     public override void Interact()
     {
         if (done) return;
@@ -55,12 +55,13 @@ public class Crank : Obj
 public class Barrel : Obj
 {
     public Barrel(Props spec, RoomDef room) : base(spec, room) { w = 12; h = 14; }
-    public override string Prompt() => done ? null : "F  Kick over (or shoot) the oil barrel";
+    public override string Prompt() => done ? null : "{gaff} Kick over, or {fire} shoot, the oil barrel";
     public void OnShot() => Burst();
     public void OnGaff() => Burst();
     public void Burst()
     {
         if (done) return;
+        Hints.Did("barrel");
         done = true;
         FX.Spawn(Cx(), Cy(), 30, new FXOpt { color = "#ffb040", glow = true, smin = 40, smax = 200 });
         Fire.Spill(Cx(), y + h - 4, 4);
@@ -107,8 +108,8 @@ public class Lever : Obj
     {
         var f = World.flags;
         if (f.B("basinCrossed")) return null;
-        if (f.B("basinJam")) return "E  The gates are jammed until the Ebb";
-        return "E  Throw the " + spec.S("icon") + " lever";
+        if (f.B("basinJam")) return "{interact} The gates are jammed until the Ebb";
+        return "{interact} Throw the " + spec.S("icon") + " lever";
     }
     bool Pulled() => World.flags.Strings("basinSeq").Contains(spec.S("id"));
     public override void Interact()
@@ -236,7 +237,7 @@ public class Lift : Obj
         World.flags.Set("liftDropped", true);
     }
     public override Platform PlatformRect() => done ? null : new Platform { x = x, y = y, w = w, h = h, oneWay = false, dy = falling ? 220f / 60 : 0, owner = this };
-    public override string Prompt() => done ? null : "Lift pan: " + load + " / 2 bodies. Drag knotless dead onto it (E near a body).";
+    public override string Prompt() => done ? null : "Lift pan: " + load + " / 2 bodies. Drag knotless dead onto it ({interact} near a body).";
     public override void Draw(Canvas c)
     {
         if (done) return;
@@ -255,7 +256,7 @@ public class Prism : Obj
     public int dir;
     public float lit;
     public Prism(Props spec, RoomDef room) : base(spec, room) { w = 10; h = 12; x = spec.F("x") - 5; y = spec.F("y") - 12 + 2; dir = spec.I("dir"); }
-    public override string Prompt() => "E  Turn the prism";
+    public override string Prompt() => "{interact} Turn the prism";
     public override void Interact() { dir = (dir + 1) % 4; Snd.Ui(); Snd.Tink(); }
     public Vector2 Center() => new(room.Px + spec.I("tx") * H.TILE + 8, room.Py + spec.I("ty") * H.TILE + 8);
     public override void Draw(Canvas c)
@@ -310,7 +311,7 @@ public class Crystal : Obj
 public class TunedBell : Obj
 {
     public TunedBell(Props spec, RoomDef room) : base(spec, room) { w = 14; h = 18; }
-    public override string Prompt() => "E / F  Strike the tuned bell";
+    public override string Prompt() => "{interact} Strike the tuned bell";
     int BasinLevel() => World.flags.S("choirLevelName") == "raised" ? 3 : World.flags.I("basin");
     public override void Interact() => Ring();
     public void OnGaff() => Ring();
@@ -346,7 +347,7 @@ public class TunedBell : Obj
 public class Valve : Obj
 {
     public Valve(Props spec, RoomDef room) : base(spec, room) { w = 10; h = 10; }
-    public override string Prompt() => "E  Turn the basin valve (level " + World.flags.I("basin") + ")";
+    public override string Prompt() => "{interact} Turn the basin valve (level " + World.flags.I("basin") + ")";
     public override void Interact() { World.flags.Set("basin", (World.flags.I("basin") + 1) % 3); Snd.Ui(); Snd.Splash(0.1f); }
     public override void Draw(Canvas c)
     {
@@ -357,7 +358,7 @@ public class Valve : Obj
 public class Sluice : Obj
 {
     public Sluice(Props spec, RoomDef room) : base(spec, room) { w = 12; h = 18; }
-    public override string Prompt() => G.player.Has("tidekey") ? "E  Work the sluice with the Tide Key" : "E  Examine the sluice";
+    public override string Prompt() => G.player.Has("tidekey") ? "{interact} Work the sluice with the Tide Key" : "{interact} Examine the sluice";
     public override void Interact()
     {
         if (!G.player.Has("tidekey")) { UI.Say(null, "A sluice wheel with a keyhole shaped like a wave. The Choir's water is held here."); return; }
@@ -372,7 +373,7 @@ public class Sluice : Obj
 public class FontObj : Obj
 {
     public FontObj(Props spec, RoomDef room) : base(spec, room) { w = 16; h = 12; }
-    public override string Prompt() => Story.ChoirFriendly() ? "E  The Brine font" : null;
+    public override string Prompt() => Story.ChoirFriendly() ? "{interact} The Brine font" : null;
     public override void Interact() => UI.FontMenu();
     public override void Draw(Canvas c)
     {
@@ -385,7 +386,7 @@ public class FontObj : Obj
 public class Bowl : Obj
 {
     public Bowl(Props spec, RoomDef room) : base(spec, room) { w = 12; h = 10; }
-    public override string Prompt() => Story.ChoirFriendly() && G.Quest("tables") != "given" && G.Quest("tables") != "sold" ? "E  The offering bowl" : null;
+    public override string Prompt() => Story.ChoirFriendly() && G.Quest("tables") != "given" && G.Quest("tables") != "sold" ? "{interact} The offering bowl" : null;
     public override void Interact() => Story.OfferTables();
     public override void Draw(Canvas c) { c.FillStyle = "#7a6a4a"; c.BeginPath(); c.Ellipse(Cx(), y + 4, 6, 3, 0, 0, H.PI); c.FillPath(); c.FillRect(Cx() - 1, y + 5, 2, 5); }
 }
@@ -484,7 +485,7 @@ public class SatchelDrop : Obj
 public class Lampwork : Obj
 {
     public Lampwork(Props spec, RoomDef room) : base(spec, room) { w = 30; h = 40; }
-    public override string Prompt() => "E  The great lamp";
+    public override string Prompt() => "{interact} The great lamp";
     public override void Interact() => Story.Ending("relight");
     public override LightSrc Light() => new() { x = Cx(), y = y + 8, r = 60, i = 0.4f, color = "255,230,180" };
     public override void Draw(Canvas c)
@@ -500,14 +501,14 @@ public class Lampwork : Obj
 public class Beacon : Obj
 {
     public Beacon(Props spec, RoomDef room) : base(spec, room) { w = 12; h = 22; }
-    public override string Prompt() => "E  The warning beacon";
+    public override string Prompt() => "{interact} The warning beacon";
     public override void Interact() => Story.Ending("dark");
     public override void Draw(Canvas c) { c.FillStyle = "#5a2a1a"; c.FillRect(x + 2, y + 6, 8, 16); c.FillStyle = "#c03020"; c.FillRect(x, y, 12, 6); }
 }
 public class HymnBell : Obj
 {
     public HymnBell(Props spec, RoomDef room) : base(spec, room) { w = 14; h = 20; }
-    public override string Prompt() => "E  The Saint's bell";
+    public override string Prompt() => "{interact} The Saint's bell";
     public override void Interact() => Story.Ending("hymn");
     public override void Draw(Canvas c)
     {
@@ -532,7 +533,7 @@ public static class ObjTypes
         "stitch" or "seal" or "page" or "table" or "ability" or "weapon" => new Collectible(spec, room),
         "wrackpool" => new WrackPool(spec, room), "start" => new StartObj(spec, room), "driftnest" => new DriftNest(spec, room),
         "lampwork" => new Lampwork(spec, room), "beacon" => new Beacon(spec, room), "hymnbell" => new HymnBell(spec, room),
-        "kiln" => new Kiln(spec, room),
+        "kiln" => new Kiln(spec, room), "zone" => new Zone(spec, room), "boat" => new Boat(spec, room),
         _ => null,
     };
 }
