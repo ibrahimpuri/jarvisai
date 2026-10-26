@@ -962,80 +962,252 @@ public class Player : Mover
     }
 
     // ---- render -------------------------------------------------------------------------------
+    // Maren is drawn as a small rig: legs solved from where the feet should be, a long oilskin coat that
+    // trails behind her, a brass diving helmet and corselet, the air bottle on her back, and her working
+    // arm following the aim. All of it is vector work, so it stays sharp at any window size.
+    float animT, runPhase, coatSway, landT, lastVy, bob;
+    bool wasOnGround = true;
+
+    static Vector2 Knee(Vector2 hip, Vector2 foot, float len, int dir)
+    {
+        var d = foot - hip; float dist = MathF.Min(d.Length(), len * 2 - 0.01f);
+        if (dist < 0.01f) return hip + new Vector2(0, len);
+        var mid = hip + d.Normalized() * dist / 2;
+        float off = MathF.Sqrt(MathF.Max(0, len * len - dist * dist / 4));
+        var n = new Vector2(-d.Y, d.X).Normalized() * dir;
+        return mid + n * off;
+    }
+
     public void Draw(Canvas c)
     {
         if (dead) return;
+        float dt = Math.Clamp(G.Now - animT, 0, 0.05f); animT = G.Now;
         float x0 = Cx(), gy = y + h; int f = facing;
         bool blink = invulnT > 0 && H.FloorI(invulnT * 20) % 2 == 0;
         if (blink) c.GlobalAlpha = 0.5f;
         bool kneel = (healT > 0 && healKind == "stitch") || craftT > 0;
-        float run = onGround && MathF.Abs(vx) > 20 ? MathF.Sin(G.Now * 1000 / 80) : 0;
-        float bodyTop = kneel ? gy - 16 : gy - 22;
-        // legs
-        c.StrokeStyle = "#2a2622"; c.LineWidth = 3;
-        if (kneel) { c.BeginPath(); c.MoveTo(x0, gy - 8); c.LineTo(x0 + f * 5, gy - 2); c.LineTo(x0 - f * 2, gy); c.StrokePath(); }
-        else if (state == "ladder") { c.BeginPath(); c.MoveTo(x0 - 2, gy - 9); c.LineTo(x0 - 2, gy - 1 + run); c.MoveTo(x0 + 2, gy - 9); c.LineTo(x0 + 2, gy - 3 - run); c.StrokePath(); }
-        else { c.BeginPath(); c.MoveTo(x0, gy - 9); c.LineTo(x0 + f * run * 4, gy); c.MoveTo(x0, gy - 9); c.LineTo(x0 - f * run * 4, gy); c.StrokePath(); }
-        // diving coat
-        c.FillStyle = "#4a3c2c";
-        c.FillRect(x0 - 4.5f, bodyTop + 8, 9, kneel ? 8 : 12);
-        c.Fill = H.Rgba(255, 230, 190, 0.08f); c.FillRect(x0 + f * 1.5f - 1, bodyTop + 8, 2, kneel ? 8 : 12);
-        c.Fill = H.Rgba(0, 0, 0, 0.22f); c.FillRect(f > 0 ? x0 - 4.5f : x0 + 2.5f, bodyTop + 8, 2, kneel ? 8 : 12);
-        c.FillStyle = "#3a2e22"; c.FillRect(x0 - 4.5f, bodyTop + 14, 9, 2);
-        c.FillStyle = "#a08040"; c.FillRect(x0 - 1, bodyTop + 14.5f, 2, 1);
-        // boots
-        if (Has("boots")) { c.FillStyle = boots ? "#6a5a40" : "#3a3228"; c.FillRect(x0 - 4, gy - 3, 8, 3); }
-        // brass helmet
-        c.FillStyle = "#b08840";
-        c.BeginPath(); c.Arc(x0, bodyTop + 4.5f, 5.5f, 0, H.PI * 2); c.FillPath();
-        c.Fill = H.Rgba(255, 230, 160, 0.35f);
-        c.BeginPath(); c.Arc(x0 - f * 1.5f, bodyTop + 3, 3, H.PI * 1.0f, H.PI * 1.6f); c.LineTo(x0 - f * 1.5f, bodyTop + 3); c.FillPath();
-        c.Fill = H.Rgba(60, 40, 10, 0.35f);
-        c.BeginPath(); c.Arc(x0, bodyTop + 4.5f, 5.5f, H.PI * 0.1f, H.PI * 0.9f); c.FillPath();
-        c.FillStyle = "#8a6a30"; c.FillRect(x0 - 5, bodyTop + 7, 10, 2.5f);
-        c.FillStyle = HeadUnder() ? "#7aa8b8" : "#2a3a40";
-        c.BeginPath(); c.Arc(x0 + f * 2, bodyTop + 4.5f, 2.6f, 0, H.PI * 2); c.FillPath();
-        c.StrokeStyle = "#6a5020"; c.LineWidth = 0.7f; c.BeginPath(); c.Arc(x0 + f * 2, bodyTop + 4.5f, 2.6f, 0, H.PI * 2); c.StrokePath();
-        c.Fill = H.Rgba(255, 240, 200, 0.6f); c.FillRect(x0 + f * 2 - 1, bodyTop + 3, 1, 1);
-        // lantern on the chest
-        c.FillStyle = LanternLit() ? "#ffd27a" : "#3a3020";
-        c.FillRect(x0 + f * 3 - 1.5f, bodyTop + 9, 3, 3);
-        if (LanternLit()) { c.Fill = H.Rgba(255, 250, 220, 0.9f); c.FillRect(x0 + f * 3 - 0.5f, bodyTop + 10, 1, 1); }
-        // arm + gaff or weapon toward aim
-        float ax = x0 + f * 1, ay = bodyTop + 10;
-        float aimA = state == "swing" ? MathF.Atan2(swing.ay - ay, swing.ax - ax) : aim;
-        c.StrokeStyle = "#3a2e22"; c.LineWidth = 2.5f;
-        float hx = ax + MathF.Cos(aimA) * 7, hy = ay + MathF.Sin(aimA) * 7;
-        c.BeginPath(); c.MoveTo(ax, ay); c.LineTo(hx, hy); c.StrokePath();
+        bool swim = InWater() && !onGround && state == "normal";
+        bool sneak = Inp.Held("sneak") && onGround && !kneel;
+        float speed = MathF.Abs(vx);
+        // timing: the stride follows distance covered, the coat lags behind the body
+        if (onGround && speed > 20) runPhase += dt * speed / 9.5f;
+        else if (swim) runPhase += dt * 6;
+        else if (state == "ladder" && MathF.Abs(vy) > 10) runPhase += dt * 9;
+        coatSway = H.Lerp(coatSway, Math.Clamp(vx / 160f, -1.5f, 1.5f) * -f + (onGround ? 0 : Math.Clamp(-vy / 300f, -1, 1)), MathF.Min(1, dt * 8));
+        if (onGround && !wasOnGround && lastVy > 200) landT = 0.14f;
+        wasOnGround = onGround; lastVy = vy;
+        if (landT > 0) landT -= dt;
+        float run = onGround && speed > 20 ? MathF.Min(1, speed / 120f) : 0;
+        bob = onGround && speed < 20 && !kneel ? MathF.Sin(G.Now * 2.2f) * 0.35f : run > 0 ? MathF.Abs(MathF.Sin(runPhase)) * -1.1f * run : 0;
+        float crouch = kneel ? 6 : sneak ? 2.5f : landT > 0 ? landT / 0.14f * 2.5f : 0;
+
+        // squash on landing, a slight lean into the run
+        c.Save();
+        c.Translate(x0, gy);
+        float lean = state == "ladder" ? 0 : dashT > 0 ? 0.28f * f : run * 0.12f * MathF.Sign(vx) + (swim ? 0.5f * MathF.Sign(vx) * MathF.Min(1, speed / 80f) : 0);
+        c.Rotate(lean);
+        c.Translate(-x0, -gy);
+
+        float hipY = gy - 9.5f + crouch + bob, shY = gy - 17 + crouch + bob, headY = gy - 21.5f + crouch * 0.9f + bob;
+        var hip = new Vector2(x0, hipY);
+        // ---- legs ----
+        Vector2 footA, footB;
+        if (kneel) { footA = new(x0 + f * 4, gy); footB = new(x0 - f * 3, gy); }
+        else if (state == "ladder") { float s = MathF.Sin(runPhase); footA = new(x0 - 2, gy - 1.5f + s * 2); footB = new(x0 + 2, gy - 1.5f - s * 2); }
+        else if (swim) { float s = MathF.Sin(runPhase); footA = new(x0 - f * 3 + s * 1.5f, gy + 1 + s * 2); footB = new(x0 - f * 4 - s * 1.5f, gy + 1 - s * 2); }
+        else if (!onGround) { footA = vy < 0 ? new(x0 + f * 3.5f, gy - 3.5f) : new(x0 + f * 2.5f, gy - 0.5f); footB = vy < 0 ? new(x0 - f * 2, gy - 1.5f) : new(x0 - f * 3, gy - 1.5f); }
+        else if (run > 0)
+        {
+            float pa = runPhase, pb = runPhase + H.PI;
+            footA = new(x0 + f * MathF.Sin(pa) * 5 * run, gy - MathF.Max(0, MathF.Cos(pa)) * 3.2f * run);
+            footB = new(x0 + f * MathF.Sin(pb) * 5 * run, gy - MathF.Max(0, MathF.Cos(pb)) * 3.2f * run);
+        }
+        else { footA = new(x0 + f * 2, gy); footB = new(x0 - f * 1.5f, gy); }
+        void Leg(Vector2 foot, bool back)
+        {
+            var knee = Knee(hip, foot, 5.1f, -f);
+            c.Stroke = back ? H.Col("#1e2226") : H.Col("#2c3238"); c.LineWidth = 2.6f;
+            c.BeginPath(); c.MoveTo(hip.X, hip.Y); c.LineTo(knee.X, knee.Y); c.LineTo(foot.X, foot.Y - 1); c.StrokePath();
+            // boot, brass toe cap
+            c.Fill = back ? H.Col("#1a1612") : H.Col("#2a221a");
+            c.BeginPath(); c.MoveTo(foot.X - f * 1.6f, foot.Y - 2.6f); c.LineTo(foot.X + f * 1.4f, foot.Y - 2.6f); c.QuadraticCurveTo(foot.X + f * 3.4f, foot.Y - 1.4f, foot.X + f * 3.2f, foot.Y); c.LineTo(foot.X - f * 1.8f, foot.Y); c.ClosePath(); c.FillPath();
+            c.Fill = boots && !back ? H.Col("#d0a050") : H.Col("#8a6a30"); c.FillRect(Math.Min(foot.X + f * 1.8f, foot.X + f * 3.1f), foot.Y - 1.3f, 1.3f, 1.3f);
+            if (boots && Has("boots")) { c.Fill = H.Rgba(255, 210, 120, 0.5f); c.FillRect(foot.X - 1.8f, foot.Y - 0.6f, 5, 0.6f); }
+        }
+        Leg(footB, true);
+
+        // ---- air bottle and hose on her back ----
+        float bx = x0 - f * 4.6f;
+        c.FillRectGradH(bx - 1.7f, shY - 1, 3.4f, 8, H.Col("#c09850"), H.Col("#6a4a20"));
+        c.Fill = H.Col("#4a3418"); c.FillRect(bx - 1.9f, shY + 1.5f, 3.8f, 0.8f); c.FillRect(bx - 1.9f, shY + 5, 3.8f, 0.8f);
+        c.Fill = H.Col("#7a7a72"); c.FillRect(bx - 0.6f, shY - 2.2f, 1.2f, 1.4f);
+        c.Stroke = H.Col("#2a2a26"); c.LineWidth = 1.1f;
+        c.BeginPath(); c.MoveTo(bx, shY - 2); c.QuadraticCurveTo(bx - f * 1.5f, headY - 4, x0 - f * 3.5f, headY - 1.5f); c.StrokePath();
+
+        // ---- the oilskin coat ----
+        float hem = gy - 4.5f + crouch * 0.4f, sway = coatSway * 2.2f + (run > 0 ? MathF.Sin(runPhase * 2) * 0.6f : 0);
+        float flap = swim ? 2 : 0;
+        var coat = new[]
+        {
+            new Vector2(x0 - f * 3.8f, shY), new Vector2(x0 + f * 3.6f, shY),
+            new Vector2(x0 + f * 4.4f, hipY), new Vector2(x0 + f * 4.6f + sway * 0.3f, hem),
+            new Vector2(x0 + f * 1.5f + sway * 0.6f, hem + 0.8f),
+            new Vector2(x0 - f * 1.5f + sway, hem + 1.2f + flap),
+            new Vector2(x0 - f * 5.6f + sway * 1.4f, hem + 0.4f + flap - MathF.Max(0, -vy / 120f)),
+            new Vector2(x0 - f * 4.8f, hipY),
+        };
+        c.Fill = H.Col("#3c3a26"); c.Poly(coat);
+        // sheen down the front, shadow down the back, the seam and the belt
+        c.Fill = H.Rgba(220, 210, 160, 0.13f); c.Poly(new[] { coat[1], coat[2], coat[3], new Vector2(x0 + f * 2.8f + sway * 0.4f, hem), new Vector2(x0 + f * 2.2f, shY + 1) });
+        c.Fill = H.Rgba(0, 0, 0, 0.28f); c.Poly(new[] { coat[0], new Vector2(x0 - f * 2.2f, shY + 1), new Vector2(x0 - f * 2.6f + sway, hem + 1), coat[6], coat[7] });
+        c.Stroke = H.Rgba(0, 0, 0, 0.35f); c.LineWidth = 0.5f; c.Line(x0 + f * 0.8f, hipY + 1, x0 + f * 0.8f + sway * 0.5f, hem);
+        c.Fill = H.Col("#2a2016"); c.FillRect(x0 - 4.6f, hipY - 1.6f, 9.2f, 1.7f);
+        c.Fill = H.Col("#c9a050"); c.FillRect(x0 + f * 0.6f - 0.8f, hipY - 1.7f, 1.6f, 1.9f);
+        // satchel on the hip
+        c.Fill = H.Col("#5a4228"); c.FillRect(x0 - f * 5.2f - 1.6f, hipY - 0.5f, 3.2f, 3.6f);
+        c.Fill = H.Col("#3a2a18"); c.FillRect(x0 - f * 5.2f - 1.6f, hipY - 0.5f, 3.2f, 1.2f);
+
+        Leg(footA, false);
+
+        // ---- brass corselet over the shoulders ----
+        c.Fill = H.Col("#9a7434");
+        c.BeginPath(); c.MoveTo(x0 - 5, shY + 0.5f); c.QuadraticCurveTo(x0, shY - 2.4f, x0 + 5, shY + 0.5f); c.LineTo(x0 + 3.8f, shY + 3.2f); c.QuadraticCurveTo(x0, shY + 4.2f, x0 - 3.8f, shY + 3.2f); c.ClosePath(); c.FillPath();
+        c.Fill = H.Rgba(255, 230, 160, 0.35f); c.FillRect(x0 + f * 1 - 1.5f, shY - 0.8f, 3, 0.7f);
+        c.Fill = H.Col("#5a4018"); for (int i = -2; i <= 2; i++) c.FillCircle(x0 + i * 1.8f, shY + 2.2f - MathF.Abs(i) * 0.5f, 0.35f);
+
+        // ---- the lantern on her chest ----
+        float lx = x0 + f * 3, ly = gy - 13 + crouch * 0.7f + bob;
+        c.Fill = H.Col("#2a2420"); c.FillRect(lx - 1.8f, ly - 2.4f, 3.6f, 0.8f); c.FillRect(lx - 1.8f, ly + 1.6f, 3.6f, 0.8f);
+        c.Fill = LanternLit() ? H.Col("#ffd27a") : H.Col("#3a3020"); c.FillRect(lx - 1.3f, ly - 1.6f, 2.6f, 3.2f);
+        if (LanternLit()) { c.Fill = H.Rgba(255, 250, 225, 0.95f); c.FillRect(lx - 0.4f, ly - 0.6f, 0.8f, 1.4f); }
+        c.Fill = H.Col("#2a2420"); c.FillRect(lx - 0.25f, ly - 1.6f, 0.5f, 3.2f);
+        if (shut) { c.Fill = H.Col("#3a3226"); c.FillRect(lx - 1.5f, ly - 1.7f, 3, 3.4f); }
+
+        // ---- the helmet ----
+        float hr = 5.6f;
+        c.Fill = H.Col("#a87e38"); c.FillCircle(x0, headY, hr);
+        c.Fill = H.Rgba(60, 36, 8, 0.45f); c.BeginPath(); c.Arc(x0, headY, hr, H.PI * 0.05f, H.PI * 0.95f); c.QuadraticCurveTo(x0, headY + 1.5f, x0 + hr * 0.99f, headY + 0.3f); c.FillPath();
+        c.Fill = H.Rgba(255, 236, 170, 0.45f); c.BeginPath(); c.Ellipse(x0 - f * 1.6f, headY - 2.6f, 2.6f, 1.4f, -0.5f * f, 0, H.PI * 2); c.FillPath();
+        c.Fill = H.Rgba(255, 250, 230, 0.8f); c.FillCircle(x0 - f * 2.2f, headY - 3, 0.6f);
+        // top valve and the bonnet seam
+        c.Fill = H.Col("#7a5a24"); c.FillRect(x0 - 0.9f, headY - hr - 1.3f, 1.8f, 1.6f);
+        c.Stroke = H.Rgba(60, 40, 10, 0.6f); c.LineWidth = 0.5f; c.BeginPath(); c.Arc(x0, headY + 2.5f, hr * 0.95f, -H.PI * 0.95f, -H.PI * 0.05f); c.StrokePath();
+        // side port at the back of the head
+        c.Fill = H.Col("#3a3424"); c.FillCircle(x0 - f * 2.6f, headY + 0.4f, 1.2f);
+        c.Stroke = H.Col("#6a4a1c"); c.LineWidth = 0.5f; c.BeginPath(); c.Arc(x0 - f * 2.6f, headY + 0.4f, 1.2f, 0, H.PI * 2); c.StrokePath();
+        // the faceplate: glass, frame, two guard bars
+        float px = x0 + f * 2.4f, py = headY + 0.2f, pr = 2.9f;
+        bool under = HeadUnder();
+        c.Fill = under ? H.Col("#4a7a88") : H.Col("#1a262c"); c.FillCircle(px, py, pr);
+        c.Fill = H.Rgba(160, 200, 210, under ? 0.4f : 0.22f); c.BeginPath(); c.Arc(px, py, pr * 0.8f, H.PI * 1.05f, H.PI * 1.55f); c.LineTo(px, py); c.FillPath();
+        c.Stroke = H.Col("#d4a85a"); c.LineWidth = 0.9f; c.BeginPath(); c.Arc(px, py, pr, 0, H.PI * 2); c.StrokePath();
+        c.Stroke = H.Col("#7a5a24"); c.LineWidth = 0.45f; c.Line(px - 1, py - pr + 0.4f, px - 1, py + pr - 0.4f); c.Line(px + 1, py - pr + 0.4f, px + 1, py + pr - 0.4f);
+        if (LanternLit()) c.Glow(px + f * 0.6f, py - 0.6f, 1.2f, H.Rgba(255, 220, 160, 0.5f));
+        // the collar where helmet meets corselet, studded
+        c.Fill = H.Col("#7a5a24"); c.FillRect(x0 - 4.2f, headY + hr - 1.6f, 8.4f, 1.8f);
+        c.Fill = H.Col("#d4b070"); for (int i = -1; i <= 1; i++) c.FillCircle(x0 + i * 2.8f, headY + hr - 0.7f, 0.4f);
+        // bubbles from the valve under water
+        if (under)
+            for (int i = 0; i < 3; i++)
+            {
+                float ph = (G.Now * 0.8f + i / 3f) % 1;
+                c.Stroke = H.Rgba(200, 230, 240, 0.6f * (1 - ph)); c.LineWidth = 0.4f;
+                c.BeginPath(); c.Arc(x0 + MathF.Sin(ph * 9 + i) * 1.2f, headY - hr - 1 - ph * 12, 0.6f + ph * 0.8f, 0, H.PI * 2); c.StrokePath();
+            }
+
+        // ---- the free arm swings, the working arm follows the aim ----
+        var sh = new Vector2(x0 + f * 1.2f, shY + 1.2f);
+        if (state != "ladder")
+        {
+            float sw = run > 0 ? -MathF.Sin(runPhase) * 0.6f * run : swim ? MathF.Sin(runPhase) * 0.8f : 0.1f;
+            var back = new Vector2(x0 - f * 1.4f, shY + 1.2f);
+            var hand = back + new Vector2(-f * MathF.Sin(sw) * 6, MathF.Cos(sw) * 6);
+            c.Stroke = H.Col("#2e2c1e"); c.LineWidth = 2.1f; c.Line(back.X, back.Y, hand.X, hand.Y);
+            c.Fill = H.Col("#4a3626"); c.FillCircle(hand.X, hand.Y, 1.1f);
+        }
+        float aimA = state == "swing" ? MathF.Atan2(swing.ay - sh.Y, swing.ax - sh.X) : state == "ladder" ? -H.PI / 2 : aim;
+        float reach = state == "ladder" ? 5 : 6.4f;
+        var elbowBend = new Vector2(MathF.Cos(aimA + 0.5f * f), MathF.Sin(aimA + 0.5f * f)) * 3.4f;
+        var hx2 = sh + new Vector2(MathF.Cos(aimA), MathF.Sin(aimA)) * reach;
+        var elbow = sh + elbowBend;
+        c.Stroke = H.Col("#34321f"); c.LineWidth = 2.3f;
+        c.BeginPath(); c.MoveTo(sh.X, sh.Y); c.LineTo(elbow.X, elbow.Y); c.LineTo(hx2.X, hx2.Y); c.StrokePath();
+        c.Fill = H.Col("#4a3626"); c.FillCircle(hx2.X, hx2.Y, 1.2f);
+        float hx = hx2.X, hy = hx2.Y;
         if (state == "swing")
         {
-            c.StrokeStyle = "#8a8a8a"; c.LineWidth = 1; c.BeginPath(); c.MoveTo(hx, hy); c.LineTo(swing.ax, swing.ay); c.StrokePath();
+            c.Stroke = H.Col("#9a9a90"); c.LineWidth = 0.9f; c.Line(hx, hy, swing.ax, swing.ay);
+            c.Fill = H.Col("#6a6a62"); c.FillCircle(swing.ax, swing.ay, 1.4f);
         }
         else if (gaffAnim > 0)
         {
             float a2 = aimA + (gaffAnim / 0.18f - 0.5f) * 1.6f * f;
-            c.StrokeStyle = "#8a8a8a"; c.LineWidth = 1.5f;
-            c.BeginPath(); c.MoveTo(hx, hy); c.LineTo(hx + MathF.Cos(a2) * 14, hy + MathF.Sin(a2) * 14); c.StrokePath();
-            c.BeginPath(); c.Arc(hx + MathF.Cos(a2) * 14, hy + MathF.Sin(a2) * 14, 2.5f, a2, a2 + H.PI * 1.2f * f, f < 0); c.StrokePath();
+            float ex = hx + MathF.Cos(a2) * 14, ey = hy + MathF.Sin(a2) * 14;
+            c.Stroke = H.Col("#6a5034"); c.LineWidth = 1.4f; c.Line(hx, hy, ex, ey);
+            c.Stroke = H.Col("#b0b0a8"); c.LineWidth = 1.2f;
+            c.BeginPath(); c.Arc(ex, ey, 2.6f, a2, a2 + H.PI * 1.2f * f, f < 0); c.StrokePath();
+            c.Stroke = H.Rgba(220, 230, 240, 0.35f); c.LineWidth = 3;
+            c.BeginPath(); c.Arc(hx, hy, 13, aimA - 0.8f * f, aimA + 0.8f * f, f < 0); c.StrokePath();
         }
-        else
+        else if (state != "ladder") DrawWeapon(c, hx, hy, aimA);
+
+        c.Restore();
+        // what she is busy with, as a thin bar over the helmet
+        float prog = reloadT > 0 ? 1 - reloadT / Data.Weapons.P(cur).F("reload") : healT > 0 ? healT / (healKind == "stitch" ? 4 : 3) : craftT > 0 ? 1 - craftT / craftRecipe.F("time") : -1;
+        if (prog >= 0)
         {
-            string col = cur switch { "driver" => "#7a7a72", "harpoon" => "#8a9aa0", "sling" => "#8a6a4a", _ => "#aaaaaa" };
-            c.StrokeStyle = col; c.LineWidth = 3;
-            c.BeginPath(); c.MoveTo(hx, hy); c.LineTo(hx + MathF.Cos(aimA) * 7, hy + MathF.Sin(aimA) * 7); c.StrokePath();
+            var col = reloadT > 0 ? H.Col("#e0c070") : healT > 0 ? H.Col("#8fd08f") : H.Col("#d0d0d0");
+            float by = headY - hr - 6;
+            c.Fill = H.Rgba(0, 0, 0, 0.6f); c.FillRect(x0 - 7, by - 0.5f, 14, 2.4f);
+            c.Fill = col; c.FillRect(x0 - 6.5f, by, 13 * Math.Clamp(prog, 0, 1), 1.4f);
         }
-        if (reloadT > 0) { c.FillStyle = "#c9b37a"; c.FillRect(x0 - 6, bodyTop - 5, 12 * (1 - reloadT / Data.Weapons.P(cur).F("reload")), 1.5f); }
-        if (healT > 0) { c.FillStyle = "#7fbf7f"; c.FillRect(x0 - 6, bodyTop - 5, 12 * (healT / (healKind == "stitch" ? 4 : 3)), 1.5f); }
-        if (craftT > 0) { c.FillStyle = "#c0c0c0"; c.FillRect(x0 - 6, bodyTop - 5, 12 * (1 - craftT / craftRecipe.F("time")), 1.5f); }
-        // graft knots on Maren herself
+        // graft knots grown into her, faintly alight
         if (grafts.Count > 0)
         {
-            c.Fill = H.Rgba(200, 245, 255, 0.85f);
-            if (grafts.Contains("ear")) c.FillRect(x0 - f * 3, bodyTop + 8, 2, 2);
-            if (grafts.Contains("arm")) c.FillRect(hx - 1, hy - 1, 2, 2);
-            if (grafts.Contains("lung")) c.FillRect(x0 - 1, bodyTop + 12, 2, 2);
+            var gc = H.Rgba(200, 245, 255, 0.9f);
+            if (grafts.Contains("ear")) { c.Fill = gc; c.FillCircle(x0 - f * 3.4f, headY + 1.5f, 0.9f); c.Glow(x0 - f * 3.4f, headY + 1.5f, 3, H.Rgba(160, 230, 255, 0.4f)); }
+            if (grafts.Contains("arm")) { c.Fill = gc; c.FillCircle(hx, hy, 0.9f); c.Glow(hx, hy, 3, H.Rgba(160, 230, 255, 0.4f)); }
+            if (grafts.Contains("lung")) { c.Fill = gc; c.FillCircle(x0, shY + 4, 0.9f); c.Glow(x0, shY + 4, 3, H.Rgba(160, 230, 255, 0.4f)); }
         }
         c.GlobalAlpha = 1;
+    }
+
+    // The weapon in her hand, drawn along the aim and kept upright whichever way she faces.
+    void DrawWeapon(Canvas c, float hx, float hy, float a)
+    {
+        c.Save();
+        c.Translate(hx, hy); c.Rotate(a);
+        if (MathF.Cos(a) < 0) c.Scale(1, -1);
+        switch (cur)
+        {
+            case "driver":
+                c.Fill = H.Col("#5a5a54"); c.FillRect(-1.5f, -1.8f, 8.5f, 3.4f);
+                c.Fill = H.Col("#8a8a80"); c.FillRect(-1.5f, -1.8f, 8.5f, 0.8f);
+                c.Fill = H.Col("#b08840"); c.FillRect(1.5f, -1.9f, 1.2f, 3.6f); c.FillRect(5, -1.9f, 0.8f, 3.6f);
+                c.Fill = H.Col("#3a3a36"); c.FillRect(7, -1.1f, 2.6f, 2.2f);
+                c.Fill = H.Col("#4a3626"); c.FillRect(-0.8f, 1.4f, 1.8f, 2.6f);
+                c.Fill = H.Col("#c0c0b8"); c.FillRect(9.4f, -0.4f, 1, 0.8f);
+                break;
+            case "harpoon":
+                c.Fill = H.Col("#4a3626"); c.FillRect(-3, -1, 6, 2.2f);
+                c.Fill = H.Col("#6a7a80"); c.FillRect(2, -1.3f, 9, 2.4f);
+                c.Fill = H.Col("#9aaab0"); c.FillRect(2, -1.3f, 9, 0.6f);
+                c.Stroke = H.Col("#c8d0d4"); c.LineWidth = 0.8f; c.Line(10, 0, 15, 0);
+                c.Fill = H.Col("#c8d0d4"); c.Poly(new[] { new Vector2(15, -1.4f), new Vector2(17.5f, 0), new Vector2(15, 1.4f) });
+                c.Fill = H.Col("#4a3626"); c.FillRect(0, 1, 1.6f, 2.4f);
+                break;
+            case "sling":
+                c.Stroke = H.Col("#7a5a3a"); c.LineWidth = 1.3f;
+                c.Line(0, 0, 4, 0); c.Line(4, 0, 7, -2.6f); c.Line(4, 0, 7, 2.6f);
+                c.Stroke = H.Col("#c0a070"); c.LineWidth = 0.5f; c.BeginPath(); c.MoveTo(7, -2.6f); c.QuadraticCurveTo(3, 0, 7, 2.6f); c.StrokePath();
+                break;
+            default:
+                c.Fill = H.Col("#5a5a54"); c.FillCircle(3, 0, 2.6f);
+                c.Fill = H.Col("#9a9a90"); c.FillCircle(3, 0, 1.2f);
+                c.Stroke = H.Col("#c0c0c0"); c.LineWidth = 0.5f; c.Line(5.5f, 0, 10, 0);
+                break;
+        }
+        c.Restore();
     }
 
     public JsonObject ToJson()

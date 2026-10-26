@@ -160,21 +160,60 @@ public class Gullet : Body
             c.BeginPath(); c.MoveTo(ax, ay); c.QuadraticCurveTo(ax + MathF.Sin(anim) * 3, ay + len / 2, j["s1"].X, j["s1"].Y); c.StrokePath();
             c.Fill = H.Rgba(220, 240, 250, 0.7f); c.FillRect(ax - 3, ay, 6, 2);
         }
-        c.StrokeStyle = burnT > 0 ? "#2a1c10" : "#4a5550"; c.LineWidth = 6;
-        c.BeginPath(); c.MoveTo(j["s1"].X, j["s1"].Y); c.LineTo(j["s2"].X, j["s2"].Y); c.LineTo(j["s3"].X, j["s3"].Y); c.LineTo(j["head"].X, j["head"].Y); c.StrokePath();
-        c.FillStyle = burnT > 0 ? "#2a1c10" : "#4a5550";
-        foreach (var n in new[] { "s1", "s2", "s3", "head" }) c.FillCircle(j[n].X, j[n].Y, 3);
-        // a paler belly line
-        c.Stroke = H.Rgba(150, 170, 160, 0.35f); c.LineWidth = 1.5f;
-        c.BeginPath(); c.MoveTo(j["s1"].X, j["s1"].Y + 1.5f); c.LineTo(j["s2"].X, j["s2"].Y + 1.5f); c.LineTo(j["s3"].X, j["s3"].Y + 1.5f); c.StrokePath();
-        c.StrokeStyle = "#2a3230"; c.LineWidth = 1;
-        foreach (var n in new[] { "s1", "s2", "s3" })
+        // a smooth spine through the segments, a body tapering from tail to a heavy head
+        var sp = new[] { j["s1"], j["s2"], j["s3"], j["head"] };
+        var pts = new List<Vector2>();
+        for (int seg = 0; seg < 3; seg++)
         {
-            var s = j[n];
-            c.BeginPath(); c.MoveTo(s.X - 4, s.Y + 3); c.LineTo(s.X - 6, s.Y + 6); c.MoveTo(s.X + 4, s.Y + 3); c.LineTo(s.X + 6, s.Y + 6); c.StrokePath();
+            Vector2 p0 = sp[Math.Max(0, seg - 1)], p1 = sp[seg], p2 = sp[seg + 1], p3 = sp[Math.Min(3, seg + 2)];
+            for (int q = 0; q < 6; q++)
+            {
+                float u = q / 6f, u2 = u * u, u3 = u2 * u;
+                pts.Add(0.5f * (2 * p1 + (-p0 + p2) * u + (2 * p0 - 5 * p1 + 4 * p2 - p3) * u2 + (-p0 + 3 * p1 - 3 * p2 + p3) * u3));
+            }
         }
-        c.FillStyle = "#c0d0c8"; c.BeginPath(); c.Arc(j["head"].X, j["head"].Y, 2.5f, 0, H.PI * 2); c.FillPath();
-        if (mode == "windup") { c.FillStyle = "#e0f0ff"; c.FillRect(j["head"].X - 1, j["head"].Y - 1, 2, 2); }
+        pts.Add(sp[3]);
+        int n = pts.Count;
+        var left = new Vector2[n]; var right = new Vector2[n];
+        for (int q = 0; q < n; q++)
+        {
+            var d = (pts[Math.Min(n - 1, q + 1)] - pts[Math.Max(0, q - 1)]).Normalized();
+            var nn = new Vector2(-d.Y, d.X);
+            float k2 = q / (float)(n - 1);
+            float wdt = 1.2f + 3.4f * MathF.Sin(MathF.Min(1, k2 * 1.15f) * H.PI * 0.55f) + (k2 > 0.85f ? (k2 - 0.85f) * 6 : 0);
+            wdt *= 1 + 0.08f * MathF.Sin(anim * 6 - q * 0.8f);
+            left[q] = pts[q] + nn * wdt; right[q] = pts[q] - nn * wdt * 0.9f;
+        }
+        bool burnt = burnT > 0;
+        c.Fill = burnt ? H.Col("#2a1c10") : H.Col("#3e4a46");
+        c.Poly(left.Concat(right.Reverse()).ToArray());
+        // pale belly, darker mottled back, a ragged fin along the spine
+        c.Fill = burnt ? H.Rgba(60, 40, 20, 0.5f) : H.Rgba(150, 172, 160, 0.45f);
+        c.Poly(right.Concat(pts.AsEnumerable().Reverse().Select((v, q) => v.Lerp(right[n - 1 - q], 0.45f))).ToArray());
+        c.Fill = H.Rgba(0, 0, 0, 0.25f);
+        for (int q = 2; q < n - 3; q += 3) c.FillCircle(H.Lerp(left[q].X, pts[q].X, 0.4f), H.Lerp(left[q].Y, pts[q].Y, 0.4f), 1.1f);
+        c.Fill = burnt ? H.Col("#1a120a") : H.Col("#2e3836");
+        for (int q = 1; q < n - 3; q += 2)
+        {
+            var d = (pts[q + 1] - pts[q - 1]).Normalized(); var nn = new Vector2(-d.Y, d.X);
+            float fl = 2 + MathF.Sin(anim * 8 + q) * 0.8f;
+            c.Poly(new[] { left[q], left[q] + nn * fl + d * 1.2f, left[q + 1] });
+        }
+        // the head: a wide jaw, needle teeth, one pale eye
+        var head = sp[3]; var hd = (sp[3] - sp[2]).Normalized(); var hn = new Vector2(-hd.Y, hd.X);
+        bool open = mode == "windup" || mode == "attack";
+        float gape = open ? 0.5f : 0.12f;
+        var jawTip = head + hd * 5.5f;
+        c.Fill = burnt ? H.Col("#2a1c10") : H.Col("#46524e");
+        c.Poly(new[] { head + hn * 3.4f, jawTip + hn * 0.6f, head + hd * 2 });
+        c.Poly(new[] { head - hn * 3, jawTip.Rotated(0) - hn * (0.6f + gape * 6) - hd * gape * 2, head + hd * 2 });
+        c.Fill = H.Rgba(10, 6, 8, 0.9f); c.Poly(new[] { head + hd * 1.5f, jawTip + hn * 0.2f, jawTip - hn * (0.4f + gape * 6) - hd * gape * 2 });
+        c.Stroke = H.Col("#d8d4c4"); c.LineWidth = 0.4f;
+        for (int q = 1; q <= 3; q++) { var tp = head.Lerp(jawTip, q / 4f); c.Line(tp.X + hn.X * 0.4f, tp.Y + hn.Y * 0.4f, tp.X - hn.X * (0.4f + gape * 2), tp.Y - hn.Y * (0.4f + gape * 2)); }
+        var eye = head + hn * 1.8f - hd * 0.4f;
+        c.Fill = H.Col("#c0d0c8"); c.FillCircle(eye.X, eye.Y, 1.1f);
+        c.Fill = H.Col("#101418"); c.FillCircle(eye.X + hd.X * 0.3f, eye.Y + hd.Y * 0.3f, 0.5f);
+        if (mode == "windup") c.Glow(eye.X, eye.Y, 4, H.Rgba(220, 240, 255, 0.7f));
     }
     public override Props Serialize() { var s = base.Serialize(); s.Set("mode", mode == "fall" ? "ground" : mode); return s; }
     public override void Restore(Props s)
@@ -397,9 +436,18 @@ public class Driftling : Body
         if (gone) return;
         float a = MathF.Atan2(vy, vx);
         c.Save(); c.Translate(Cx(), Cy()); c.Rotate(a);
-        c.FillStyle = "#5c7078"; c.BeginPath(); c.Ellipse(0, 0, 4, 2, 0, 0, H.PI * 2); c.FillPath();
-        c.BeginPath(); c.MoveTo(-3, 0); c.LineTo(-6, -2 + MathF.Sin(anim * 20)); c.LineTo(-6, 2 + MathF.Sin(anim * 20)); c.FillPath();
-        c.Fill = H.Rgba(200, 230, 240, 0.6f); c.FillRect(1.5f, -1, 1, 1);
+        if (MathF.Cos(a) < 0) c.Scale(1, -1);
+        float wag = MathF.Sin(anim * 20) * 1.4f;
+        // a lean grey fish with a forked tail, a ragged dorsal fin and one white eye
+        c.FillStyle = "#4c5e66";
+        c.Poly(new[] { new Vector2(-4, 0), new Vector2(-7.5f, -2.6f + wag), new Vector2(-6.4f, 0 + wag * 0.5f), new Vector2(-7.5f, 2.6f + wag) });
+        c.Poly(new[] { new Vector2(-1.5f, -1.8f), new Vector2(0.5f, -3.6f), new Vector2(2, -1.8f) });
+        c.FillStyle = "#5c7078"; c.BeginPath(); c.Ellipse(0, 0, 4.6f, 2, 0, 0, H.PI * 2); c.FillPath();
+        c.Fill = H.Rgba(190, 210, 210, 0.45f); c.BeginPath(); c.Ellipse(0.4f, 0.8f, 3.6f, 0.9f, 0, 0, H.PI * 2); c.FillPath();
+        c.Fill = H.Rgba(0, 0, 0, 0.3f); c.FillRect(-2.5f, -1.4f, 4, 0.5f);
+        c.Stroke = H.Rgba(0, 0, 0, 0.4f); c.LineWidth = 0.4f; c.Line(2.2f, -1.4f, 2.6f, 1.2f);
+        c.Fill = H.Rgba(220, 240, 245, 0.95f); c.FillCircle(3, -0.4f, 0.65f);
+        c.Fill = H.Col("#101418"); c.FillCircle(3.2f, -0.4f, 0.3f);
         c.Restore();
     }
     public override Props Serialize() => null;

@@ -153,26 +153,62 @@ public class Undertow : Body
         if (gone) return;
         var j = Skel();
         float f = facing, x = Cx(), y = Cy();
-        // the drowned bell-ringer, fused to a channel buoy
-        c.FillStyle = "#1c2a2e";
+        // the drowned bell-ringer, fused to a channel buoy: a swollen, barnacled mass trailing weed and chain
+        float sw = MathF.Sin(anim * 2) * 1.5f;
+        for (int i = 0; i < 6; i++)
+        {
+            float wx = x - f * (18 - i * 7), wy = y + 9;
+            c.Stroke = i % 2 == 0 ? H.Col("#22382e") : H.Col("#2e2a22"); c.LineWidth = 1.6f;
+            c.BeginPath(); c.MoveTo(wx, wy); c.QuadraticCurveTo(wx - f * 6 + sw, wy + 10, wx - f * 12 + sw * 2, wy + 18 + i % 3 * 4); c.StrokePath();
+        }
+        c.Stroke = H.Col("#3a3632"); c.LineWidth = 1;
+        for (int i = 0; i < 7; i++) { float cx2 = x - f * (6 + i * 3.6f), cy2 = y + 10 + i * 2.6f + sw * (i / 7f); c.BeginPath(); c.Ellipse(cx2, cy2, 1.4f, 0.9f, 0.6f, 0, H.PI * 2); c.StrokePath(); }
+        c.FillStyle = "#1a272b";
         c.BeginPath(); c.Ellipse(x, y, 34, 14, 0, 0, H.PI * 2); c.FillPath();
-        c.Fill = H.Rgba(60, 80, 84, 0.35f);
-        c.BeginPath(); c.Ellipse(x - f * 4, y - 6, 26, 5, 0, 0, H.PI * 2); c.FillPath();
-        c.FillStyle = "#23353a";
-        for (int i = 0; i < 5; i++) { c.BeginPath(); c.Arc(x - f * (24 - i * 11), y + 10 + MathF.Sin(anim * 3 + i) * 2, 5, 0, H.PI * 2); c.FillPath(); }
-        // arms like bell ropes
-        c.StrokeStyle = "#3a4a48"; c.LineWidth = 3;
+        for (int i = 0; i < 6; i++) { float bx = x - f * (26 - i * 10), by = y + 8 + MathF.Sin(anim * 3 + i) * 2; c.FillCircle(bx, by, 6 + (i % 2)); }
+        c.FillCircle(x + f * 18, y - 6, 9); c.FillCircle(x - f * 12, y - 9, 8);
+        // a wet sheen over the hump, sickly skin showing through rents
+        c.Fill = H.Rgba(90, 120, 124, 0.3f); c.BeginPath(); c.Ellipse(x - f * 4, y - 9, 24, 4, 0, 0, H.PI * 2); c.FillPath();
+        c.Fill = H.Rgba(120, 140, 130, 0.35f);
+        for (int i = 0; i < 4; i++) { c.BeginPath(); c.Ellipse(x - f * (16 - i * 9), y + 2 + (i % 2) * 3, 3, 1.4f, 0.3f, 0, H.PI * 2); c.FillPath(); }
+        // barnacles crusting the back
+        for (int i = 0; i < 18; i++)
+        {
+            float ang = H.PI * (1.05f + i * 0.05f), rr = 0.85f + TileArt.Hash(i, 5) * 0.1f;
+            float bx = x + MathF.Cos(ang) * 34 * rr, by = y + MathF.Sin(ang) * 14 * rr;
+            c.Fill = H.Col("#9a968a"); c.FillCircle(bx, by, 1.4f + TileArt.Hash(i, 9)); c.Fill = H.Col("#2a2824"); c.FillCircle(bx, by - 0.2f, 0.5f);
+        }
+        // arms like bell ropes, each ending in a clapper of a fist
+        c.StrokeStyle = "#3a4a48"; c.LineWidth = 3.4f;
         c.BeginPath(); c.MoveTo(x + f * 10, y); c.QuadraticCurveTo(x + f * 22, y + 14, j["ropeL"].X, j["ropeL"].Y + 8); c.StrokePath();
         c.BeginPath(); c.MoveTo(x - f * 12, y); c.QuadraticCurveTo(x - f * 26, y + 16, j["ropeR"].X, j["ropeR"].Y + 10); c.StrokePath();
-        // head
+        c.Stroke = H.Rgba(150, 140, 110, 0.4f); c.LineWidth = 0.8f;
+        c.BeginPath(); c.MoveTo(x + f * 10, y - 1); c.QuadraticCurveTo(x + f * 22, y + 13, j["ropeL"].X, j["ropeL"].Y + 7); c.StrokePath();
+        foreach (var (rx, ry) in new[] { (j["ropeL"].X, j["ropeL"].Y + 8), (j["ropeR"].X, j["ropeR"].Y + 10) })
+        { c.FillStyle = "#4a5852"; c.FillCircle(rx, ry + 1, 3.6f); c.FillStyle = "#6a6a5a"; c.FillCircle(rx - 1, ry, 1.2f); }
+        // the head under its rotten hood
         var hd = j["head"];
         c.FillStyle = "#56645e"; c.BeginPath(); c.Arc(hd.X, hd.Y, 7, 0, H.PI * 2); c.FillPath();
-        c.FillStyle = "#0a0f10"; c.FillRect(hd.X + f * 2, hd.Y - 2, 3, 2);
-        // the buoy cage on its back
+        c.Fill = H.Rgba(0, 0, 0, 0.25f); c.BeginPath(); c.Arc(hd.X, hd.Y, 7, 0.2f, H.PI - 0.2f); c.FillPath();
+        c.FillStyle = "#1c2624";
+        c.BeginPath(); c.MoveTo(hd.X + f * 7, hd.Y - 2); c.QuadraticCurveTo(hd.X + f * 5, hd.Y - 10, hd.X - f * 2, hd.Y - 9); c.QuadraticCurveTo(hd.X - f * 10, hd.Y - 6, hd.X - f * 9, hd.Y + 6); c.LineTo(hd.X - f * 4, hd.Y + 8); c.QuadraticCurveTo(hd.X - f * 2, hd.Y - 4, hd.X + f * 7, hd.Y - 2); c.ClosePath(); c.FillPath();
+        c.FillStyle = "#0a0f10"; c.FillRect(hd.X + f * 2 - (f < 0 ? 3 : 0), hd.Y - 2, 3, 2); c.FillRect(hd.X + f * 1.5f - (f < 0 ? 4 : 0), hd.Y + 3, 4, 1.2f);
+        bool angry = mode is "charge" or "windup" or "attack" or "slam";
+        c.Fill = angry ? H.Rgba(200, 240, 255, 0.95f) : H.Rgba(150, 190, 200, 0.6f); c.FillCircle(hd.X + f * 3.5f, hd.Y - 1, 0.8f);
+        if (angry) c.Glow(hd.X + f * 3.5f, hd.Y - 1, 5, H.Rgba(160, 230, 255, 0.6f));
+        // the buoy cage grown into its back, its light still blinking
         var bu = j["buoy"];
-        c.FillStyle = K("buoy").broken ? "#4a2a20" : "#8a3a2a";
-        c.BeginPath(); c.MoveTo(bu.X - 7, bu.Y + 8); c.LineTo(bu.X, bu.Y - 10); c.LineTo(bu.X + 7, bu.Y + 8); c.FillPath();
-        c.FillStyle = "#c0a060"; c.BeginPath(); c.Arc(bu.X, bu.Y - 2, 3, 0, H.PI * 2); c.FillPath();
+        bool bb = K("buoy").broken;
+        c.FillStyle = bb ? "#4a2a20" : "#8a3a2a";
+        c.BeginPath(); c.MoveTo(bu.X - 8, bu.Y + 8); c.LineTo(bu.X - 3, bu.Y - 9); c.LineTo(bu.X + 3, bu.Y - 9); c.LineTo(bu.X + 8, bu.Y + 8); c.ClosePath(); c.FillPath();
+        c.Fill = H.Rgba(0, 0, 0, 0.3f); c.Poly(new[] { new Vector2(bu.X + 1, bu.Y - 9), new Vector2(bu.X + 3, bu.Y - 9), new Vector2(bu.X + 8, bu.Y + 8), new Vector2(bu.X + 3, bu.Y + 8) });
+        c.StrokeStyle = bb ? "#2a1a14" : "#3a2018"; c.LineWidth = 0.9f;
+        for (int i = 0; i < 3; i++) c.Line(bu.X - 7 + i * 0.6f, bu.Y + 6 - i * 5, bu.X + 7 - i * 0.6f, bu.Y + 6 - i * 5);
+        c.Fill = H.Rgba(255, 255, 255, 0.12f); c.FillRect(bu.X - 3, bu.Y - 8, 1, 15);
+        c.FillStyle = "#2a2622"; c.FillRect(bu.X - 1.5f, bu.Y - 13, 3, 4);
+        bool blinkOn = !bb && (anim % 2.4f) < 0.5f;
+        c.FillStyle = bb ? "#3a3020" : blinkOn ? "#ffe0a0" : "#c0a060"; c.FillCircle(bu.X, bu.Y - 14, 2.4f);
+        if (blinkOn) c.Glow(bu.X, bu.Y - 14, 14, H.Rgba(255, 210, 140, 0.5f));
     }
     public override Props Serialize() => null;
 }
@@ -387,33 +423,64 @@ public class Abbot : Body
         if (gone) return;
         var j = Skel();
         float x = Cx(), gy = Feet(), f = facing;
-        // robe
-        c.FillStyle = "#4a3f36";
-        c.BeginPath(); c.MoveTo(x - 18, gy); c.LineTo(x - 14, gy - 50); c.LineTo(x + 14, gy - 50); c.LineTo(x + 18, gy); c.FillPath();
-        c.Fill = H.Rgba(0, 0, 0, 0.2f);
-        c.BeginPath(); c.MoveTo(x - 18 * f, gy); c.LineTo(x - 14 * f, gy - 50); c.LineTo(x - 6 * f, gy - 50); c.LineTo(x - 8 * f, gy); c.FillPath();
-        // salt armour
-        c.FillStyle = "#d8d0c0";
-        c.FillRect(x - 15, gy - 52, 30, 8);
-        c.FillRect(x - 10, gy - 30, 20, 4);
-        c.Fill = H.Rgba(255, 255, 255, 0.3f); c.FillRect(x - 15, gy - 52, 30, 1.5f);
-        // head + mitre
+        // the Abbot: a vast robe gone stiff with salt, armour of crystal grown over the shoulders and chest
+        float br = MathF.Sin(anim * 1.4f) * 0.6f;
+        c.Fill = H.Rgba(0, 0, 0, 0.4f); c.BeginPath(); c.Ellipse(x, gy, 22, 2.4f, 0, 0, H.PI * 2); c.FillPath();
+        var robe = new List<Vector2> { new(x - 14, gy - 50 + br), new(x + 14, gy - 50 + br), new(x + 19, gy) };
+        for (int i = 1; i < 9; i++) robe.Add(new Vector2(x + 19 - i * 38f / 9, gy - (i % 2 == 0 ? 0 : 2.5f + TileArt.Hash(i, 3) * 2)));
+        robe.Add(new Vector2(x - 19, gy));
+        c.FillStyle = "#4a3f36"; c.Poly(robe.ToArray());
+        c.Fill = H.Rgba(0, 0, 0, 0.25f);
+        c.BeginPath(); c.MoveTo(x - 19 * f, gy); c.LineTo(x - 14 * f, gy - 50 + br); c.LineTo(x - 6 * f, gy - 50 + br); c.LineTo(x - 8 * f, gy); c.FillPath();
+        c.Stroke = H.Rgba(0, 0, 0, 0.3f); c.LineWidth = 0.8f;
+        for (int i = -2; i <= 2; i++) c.Line(x + i * 5, gy - 40, x + i * 6.5f, gy - 2);
+        // salt creeping up from the hem
+        c.Fill = H.Rgba(225, 222, 212, 0.55f);
+        for (int i = 0; i < 12; i++) { float sx = x - 17 + TileArt.Hash(i, 21) * 34, sy = gy - 2 - TileArt.Hash(i, 22) * 14; c.FillCircle(sx, sy, 0.8f + TileArt.Hash(i, 23) * 1.4f); }
+        // crystal armour: faceted plates on the shoulders and across the chest
+        void Crystal(float cx, float cy, float w2, float h2, float lean)
+        {
+            c.FillStyle = "#d8d0c0"; c.Poly(new[] { new Vector2(cx - w2, cy), new Vector2(cx + lean, cy - h2), new Vector2(cx + w2, cy) });
+            c.Fill = H.Rgba(255, 255, 255, 0.45f); c.Poly(new[] { new Vector2(cx - w2 * 0.5f, cy), new Vector2(cx + lean, cy - h2), new Vector2(cx, cy) });
+            c.Fill = H.Rgba(120, 110, 100, 0.35f); c.Poly(new[] { new Vector2(cx + w2 * 0.4f, cy), new Vector2(cx + lean, cy - h2), new Vector2(cx + w2, cy) });
+        }
+        c.FillStyle = "#c8c0b0"; c.FillRect(x - 15, gy - 52 + br, 30, 8); c.FillRect(x - 10, gy - 31 + br, 20, 4);
+        c.Fill = H.Rgba(255, 255, 255, 0.3f); c.FillRect(x - 15, gy - 52 + br, 30, 1.5f);
+        Crystal(x - 13, gy - 51 + br, 3, 9, -1.5f); Crystal(x - 8, gy - 51 + br, 2.4f, 6, -0.5f); Crystal(x + 9, gy - 51 + br, 2.6f, 7, 0.8f); Crystal(x + 13.5f, gy - 51 + br, 3.2f, 11, 1.8f);
+        Crystal(x - 6, gy - 30 + br, 2, 4, 0); Crystal(x + 4, gy - 30 + br, 2.4f, 5, 0.6f);
+        float pulse = 0.5f + 0.5f * MathF.Sin(anim * 3);
+        c.Glow(x + 13.5f, gy - 58 + br, 6, H.Rgba(220, 235, 255, 0.15f + 0.15f * pulse));
+        // head, crusted white, under a tall mitre
         var hd = j["head"];
         c.FillStyle = "#8a9088"; c.BeginPath(); c.Arc(hd.X, hd.Y, 7, 0, H.PI * 2); c.FillPath();
-        c.FillStyle = "#e8e0d0"; c.BeginPath(); c.MoveTo(hd.X - 6, hd.Y - 5); c.LineTo(hd.X, hd.Y - 18); c.LineTo(hd.X + 6, hd.Y - 5); c.FillPath();
-        // pick arm
+        c.Fill = H.Rgba(230, 228, 220, 0.7f); c.BeginPath(); c.Arc(hd.X - f * 1.5f, hd.Y + 1, 6, H.PI * 0.3f, H.PI * 1.1f); c.FillPath();
+        c.Fill = H.Rgba(0, 0, 0, 0.7f); c.FillRect(hd.X + f * 2.5f - 1, hd.Y - 1.5f, 2.4f, 1.6f); c.FillRect(hd.X + f * 1 - 2, hd.Y + 3, 4, 1);
+        bool hunting = mode is "windup" or "attack" or "charge";
+        c.Fill = hunting ? H.Rgba(255, 230, 190, 0.95f) : H.Rgba(200, 200, 190, 0.6f); c.FillCircle(hd.X + f * 3.2f, hd.Y - 0.8f, 0.8f);
+        if (hunting) c.Glow(hd.X + f * 3.2f, hd.Y - 0.8f, 5, H.Rgba(255, 220, 160, 0.6f));
+        c.FillStyle = "#e8e0d0"; c.BeginPath(); c.MoveTo(hd.X - 6.5f, hd.Y - 4.5f); c.QuadraticCurveTo(hd.X - 6, hd.Y - 14, hd.X, hd.Y - 19); c.QuadraticCurveTo(hd.X + 6, hd.Y - 14, hd.X + 6.5f, hd.Y - 4.5f); c.ClosePath(); c.FillPath();
+        c.Fill = H.Rgba(0, 0, 0, 0.18f); c.Poly(new[] { new Vector2(hd.X, hd.Y - 19), new Vector2(hd.X + 6.5f, hd.Y - 4.5f), new Vector2(hd.X + 2, hd.Y - 4.5f) });
+        c.FillStyle = "#c0a060"; c.FillRect(hd.X - 6.5f, hd.Y - 6, 13, 1.6f); c.FillRect(hd.X - 0.6f, hd.Y - 17, 1.2f, 11);
+        c.FillRect(hd.X - 2.5f, hd.Y - 13, 5, 1.2f);
+        // the pick arm
         var arm = j["armL"]; var hand = j["hand"];
-        c.StrokeStyle = "#3a322a"; c.LineWidth = 6;
+        c.StrokeStyle = "#3a322a"; c.LineWidth = 6.4f;
         c.BeginPath(); c.MoveTo(arm.X, arm.Y); c.LineTo(hand.X, hand.Y); c.StrokePath();
-        c.FillStyle = "#3a322a"; c.FillCircle(arm.X, arm.Y, 3); c.FillCircle(hand.X, hand.Y, 3);
+        c.Stroke = H.Rgba(220, 218, 210, 0.45f); c.LineWidth = 1.2f; c.Line(arm.X, arm.Y - 2, H.Lerp(arm.X, hand.X, 0.6f), H.Lerp(arm.Y, hand.Y, 0.6f) - 2);
+        c.FillStyle = "#3a322a"; c.FillCircle(arm.X, arm.Y, 3.4f);
+        c.FillStyle = "#9a9a90"; c.FillCircle(hand.X, hand.Y, 3);
         float ang = mode == "windup" ? -2.4f * f : mode == "recover" ? 1.3f * f : 0.4f * f;
         c.Save(); c.Translate(hand.X, hand.Y); c.Rotate(ang);
-        c.StrokeStyle = "#6a5030"; c.LineWidth = 4; c.BeginPath(); c.MoveTo(0, 0); c.LineTo(0, -36); c.StrokePath();
-        c.StrokeStyle = "#b0b8bc"; c.LineWidth = 5; c.BeginPath(); c.MoveTo(-14, -34); c.QuadraticCurveTo(0, -42, 16, -30); c.StrokePath();
+        c.StrokeStyle = "#6a5030"; c.LineWidth = 4; c.BeginPath(); c.MoveTo(0, 4); c.LineTo(0, -36); c.StrokePath();
+        c.Stroke = H.Rgba(255, 220, 170, 0.2f); c.LineWidth = 1; c.Line(-1, 2, -1, -34);
+        c.FillStyle = "#4a4640"; c.FillRect(-3, -37, 6, 5);
+        c.FillStyle = "#b0b8bc"; c.BeginPath(); c.MoveTo(-16, -31); c.QuadraticCurveTo(-6, -40, 0, -37); c.QuadraticCurveTo(8, -40, 18, -28); c.QuadraticCurveTo(8, -34, 0, -32); c.QuadraticCurveTo(-6, -34, -16, -31); c.ClosePath(); c.FillPath();
+        c.Fill = H.Rgba(255, 255, 255, 0.4f); c.BeginPath(); c.MoveTo(-14, -32); c.QuadraticCurveTo(-6, -39, 0, -36.5f); c.LineTo(0, -35.5f); c.QuadraticCurveTo(-6, -37.5f, -14, -32); c.FillPath();
         c.Restore();
         var ar = j["armR"];
-        c.StrokeStyle = "#3a322a"; c.LineWidth = 5;
+        c.StrokeStyle = "#3a322a"; c.LineWidth = 5.4f;
         c.BeginPath(); c.MoveTo(ar.X, ar.Y); c.LineTo(ar.X - f * 6, ar.Y + 18); c.StrokePath();
+        c.FillStyle = "#9a9a90"; c.FillCircle(ar.X - f * 6, ar.Y + 18, 2.6f);
     }
     public override Props Serialize() => null;
 }
@@ -438,17 +505,30 @@ public class Kiln : Ent
     public override LightSrc Light() => broken ? null : new LightSrc { x = Cx(), y = y + 14, r = 70, i = 0.7f, color = "255,120,40" };
     public override void Draw(Canvas c)
     {
-        c.FillStyle = broken ? "#2a2420" : "#5a4a3a";
-        c.FillRect(x, y, w, h);
+        // a salt kiln: a brick dome on a plinth, a chimney, an iron door and the fire behind its grate
+        float cx = x + w / 2, by = y + h;
+        c.FillStyle = broken ? "#2a2420" : "#5a463a";
+        c.BeginPath(); c.MoveTo(x, by); c.LineTo(x, y + 6); c.QuadraticCurveTo(cx, y - 6, x + w, y + 6); c.LineTo(x + w, by); c.ClosePath(); c.FillPath();
+        c.Fill = H.Rgba(0, 0, 0, 0.3f);
+        for (int r = 0; r < (int)(h / 4); r++) { float ry = y + 6 + r * 4; c.FillRect(x, ry, w, 0.6f); for (float bx = x + (r % 2) * 3; bx < x + w; bx += 6) c.FillRect(bx, ry, 0.6f, 4); }
+        c.Fill = H.Rgba(255, 220, 180, 0.08f); c.FillRect(x, y + 6, 2, h - 6);
+        c.FillStyle = "#3a2e26"; c.FillRect(x + w - 7, y - 10, 5, 12); c.FillRect(x + w - 8, y - 11, 7, 2);
+        c.FillStyle = "#4a3e34"; c.FillRect(x - 2, by - 3, w + 4, 3);
         if (!broken)
         {
-            c.Fill = H.Rgba(0, 0, 0, 0.25f); c.FillRect(x, y + h - 4, w, 4);
             float fl = 0.85f + 0.15f * MathF.Sin(G.Now * 9 + x);
-            c.Fill = new Color(1, 0.54f * fl, 0.19f * fl); c.FillRect(x + 7, y + 12, 10, 8);
-            c.Fill = H.Rgba(255, 220, 140, 0.8f); c.FillRect(x + 9, y + 16, 6, 3);
-            c.FillStyle = "#6a5a4a"; c.FillRect(x - 2, y - 3, w + 4, 4);
+            c.FillStyle = "#1a1210"; c.BeginPath(); c.MoveTo(x + 6, by - 3); c.LineTo(x + 6, y + 13); c.QuadraticCurveTo(cx, y + 9, x + w - 6, y + 13); c.LineTo(x + w - 6, by - 3); c.ClosePath(); c.FillPath();
+            c.Fill = new Color(1, 0.5f * fl, 0.16f * fl); c.FillRect(x + 7, y + 13, w - 14, by - y - 16);
+            c.Fill = new Color(1.4f, 1.0f * fl, 0.5f * fl, 0.9f); c.FillRect(x + 9, by - 9, w - 18, 4);
+            c.FillStyle = "#2a2420"; for (float gx = x + 8; gx < x + w - 7; gx += 2.6f) c.FillRect(gx, y + 12, 0.9f, by - y - 15);
+            c.Glow(cx, by - 8, 18, new Color(1, 0.5f, 0.2f, 0.25f * fl));
+            for (int i = 0; i < 3; i++) { float ph = (G.Now * 0.5f + i / 3f + x * 0.01f) % 1; c.Glow(x + w - 4.5f + MathF.Sin(ph * 5 + i) * 2, y - 12 - ph * 18, 2 + ph * 4, H.Rgba(120, 110, 100, 0.25f * (1 - ph))); }
         }
-        else { c.FillStyle = "#1a1410"; c.FillRect(x + 4, y, 16, 12); }
+        else
+        {
+            c.FillStyle = "#120e0c"; c.BeginPath(); c.MoveTo(x + 4, by - 3); c.LineTo(x + 5, y + 6); c.LineTo(x + 10, y + 2); c.LineTo(x + 14, y + 8); c.LineTo(x + 19, y + 3); c.LineTo(x + w - 4, by - 3); c.ClosePath(); c.FillPath();
+            c.FillStyle = "#3a2e26"; c.FillRect(x + 2, by - 4, 4, 2); c.FillRect(x + w - 7, by - 3, 5, 2);
+        }
     }
     public override Props Serialize() { var p = Props.Empty(); p.Set("broken", broken); return p; }
     public override void Restore(Props s) { broken = s.B("broken"); }
@@ -510,16 +590,30 @@ public class Shoal : Body
     {
         if (gone) return;
         float x = Cx(), y = Cy();
-        c.FillStyle = "#3a3a34";
-        c.BeginPath(); c.Arc(x, y, 20, 0, H.PI * 2); c.FillPath();
-        c.StrokeStyle = "#7f8b80"; c.LineWidth = 2.5f;
-        for (int i = 0; i < 10; i++)
+        // the Shoal: a knot of drowned fish wheeling around a dark heart, never quite the same shape twice
+        c.Glow(x, y, 34, H.Rgba(10, 20, 24, 0.6f));
+        c.FillStyle = "#24282a";
+        c.BeginPath(); for (int i = 0; i <= 24; i++) { float a = i / 24f * H.PI * 2, rr = 13 + MathF.Sin(a * 3 + rot * 2) * 2 + MathF.Sin(a * 5 - rot * 3) * 1.4f; float px = x + MathF.Cos(a) * rr, py = y + MathF.Sin(a) * rr; if (i == 0) c.MoveTo(px, py); else c.LineTo(px, py); } c.FillPath();
+        for (int i = 0; i < 38; i++)
         {
-            float a = rot * 1.0f + i * 0.63f;
-            c.BeginPath(); c.MoveTo(x + MathF.Cos(a) * 10, y + MathF.Sin(a) * 10); c.LineTo(x + MathF.Cos(a + 0.3f) * 23, y + MathF.Sin(a + 0.3f) * 22); c.StrokePath();
+            float ring = 0.45f + TileArt.Hash(i, 3) * 0.6f, spd = (i % 2 == 0 ? 1 : -0.7f) * (1.2f - ring * 0.5f);
+            float a = rot * spd * 1.3f + i * 2.39f;
+            float rx = 22 * ring, ry = 19 * ring + MathF.Sin(rot + i) * 2;
+            float fx = x + MathF.Cos(a) * rx, fy = y + MathF.Sin(a) * ry;
+            float heading = a + (spd > 0 ? H.PI / 2 : -H.PI / 2);
+            c.Save(); c.Translate(fx, fy); c.Rotate(heading);
+            float sz = 1.6f + TileArt.Hash(i, 7) * 1.4f, wag = MathF.Sin(rot * 9 + i) * 0.5f;
+            c.Fill = i % 5 == 0 ? H.Col("#9aa8a4") : H.Col("#6c7a78");
+            c.BeginPath(); c.Ellipse(0, 0, sz * 1.6f, sz * 0.7f, 0, 0, H.PI * 2); c.FillPath();
+            c.Poly(new[] { new Vector2(-sz * 1.3f, 0), new Vector2(-sz * 2.4f, -sz * 0.7f + wag), new Vector2(-sz * 2.4f, sz * 0.7f + wag) });
+            c.Fill = H.Rgba(230, 240, 240, 0.8f); c.FillCircle(sz * 0.9f, -sz * 0.15f, 0.35f);
+            c.Restore();
         }
+        // what holds it together: the pale shapes of limbs and a face, turning in the middle
         c.FillStyle = "#7f8b80";
-        for (int i = 0; i < 5; i++) { float a = rot + i * 1.25f; c.BeginPath(); c.Arc(x + MathF.Cos(a) * 14, y + MathF.Sin(a) * 12, 3.2f, 0, H.PI * 2); c.FillPath(); }
+        for (int i = 0; i < 5; i++) { float a = rot + i * 1.25f; c.BeginPath(); c.Arc(x + MathF.Cos(a) * 9, y + MathF.Sin(a) * 7, 2.4f, 0, H.PI * 2); c.FillPath(); }
+        c.Fill = H.Rgba(180, 230, 240, 0.6f + 0.3f * MathF.Sin(rot * 2)); c.FillCircle(x, y, 1.6f);
+        c.Glow(x, y, 8, H.Rgba(150, 220, 240, 0.25f));
     }
     public override Props Serialize() => null;
 }

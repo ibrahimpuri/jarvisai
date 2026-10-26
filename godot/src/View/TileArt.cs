@@ -16,7 +16,7 @@ public static class TileArt
         ["cloister"] = new Pal { stone = new[] { 60, 74, 70 }, back = new[] { 24, 32, 31 }, accent = "moss", grade = H.Rgba(30, 70, 55), bg0 = H.Col("#0c1212"), bg1 = H.Col("#182222"), ambient = new Color(0.33f, 0.39f, 0.37f) },
         ["choir"] = new Pal { stone = new[] { 64, 70, 94 }, back = new[] { 24, 28, 44 }, accent = "mosaic", grade = H.Rgba(40, 40, 100), bg0 = H.Col("#0c0e16"), bg1 = H.Col("#181c2e"), ambient = new Color(0.33f, 0.35f, 0.46f) },
         ["ribvault"] = new Pal { stone = new[] { 104, 94, 78 }, back = new[] { 38, 33, 27 }, accent = "bone", grade = H.Rgba(90, 65, 35), bg0 = H.Col("#16130e"), bg1 = H.Col("#262118"), ambient = new Color(0.40f, 0.37f, 0.32f) },
-        ["gullet"] = new Pal { stone = new[] { 46, 62, 68 }, back = new[] { 12, 20, 24 }, accent = "flesh", grade = H.Rgba(20, 60, 70), bg0 = H.Col("#050c0f"), bg1 = H.Col("#0c1a20"), ambient = new Color(0.12f, 0.16f, 0.19f) },
+        ["gullet"] = new Pal { stone = new[] { 46, 62, 68 }, back = new[] { 12, 20, 24 }, accent = "flesh", grade = H.Rgba(20, 60, 70), bg0 = H.Col("#050c0f"), bg1 = H.Col("#0c1a20"), ambient = new Color(0.17f, 0.23f, 0.26f) },
         ["skull"] = new Pal { stone = new[] { 106, 96, 78 }, back = new[] { 40, 34, 26 }, accent = "bone", grade = H.Rgba(110, 75, 30), bg0 = H.Col("#18130c"), bg1 = H.Col("#2a1f12"), ambient = new Color(0.42f, 0.37f, 0.30f) },
     };
 
@@ -59,12 +59,54 @@ public static class TileArt
     }
     public static void WindowHole(Canvas c, float x, float y) => c.FillRectGradV(x, y, TS, TS, H.Col("#24384a"), H.Col("#16222e"));
 
+    // ---- natural rock on the shore -------------------------------------------------------------------
+    // Shaded from world-space noise in 4px cells so a cliff reads as one mass rather than a grid,
+    // with strata running through it and the convex corners worn round.
+    static void RockTile(Canvas c, float x, float y, Pal pal, bool up, bool down, bool left, bool right)
+    {
+        const int CELL = 4;
+        bool exposed = up || down || left || right;
+        for (int j = 0; j < TS / CELL; j++)
+            for (int i = 0; i < TS / CELL; i++)
+            {
+                float cx = x + i * CELL, cy = y + j * CELL;
+                float n = Hollowmere.Decor.Fbm(cx / 38f, cy / 30f), fine = Hash((int)cx, (int)cy);
+                float edge = exposed ? 1 : 0.62f;
+                // light falls from above: the top few px of a surface are brighter, overhangs darker
+                float lift = (up && j == 0 ? 0.22f : up && j == 1 ? 0.08f : 0) - (down && j == 3 ? 0.18f : 0) + (left && i == 0 ? 0.06f : 0) - (right && i == 3 ? 0.12f : 0);
+                c.Fill = Rgb(pal.stone, (0.55f + n * 0.55f + fine * 0.06f + lift) * edge);
+                bool ul = up && left && i == 0 && j == 0, ur = up && right && i == 3 && j == 0, dl = down && left && i == 0 && j == 3, dr = down && right && i == 3 && j == 3;
+                if (ul) c.Poly(new[] { new Vector2(cx + CELL, cy), new Vector2(cx + CELL, cy + CELL), new Vector2(cx, cy + CELL) });
+                else if (ur) c.Poly(new[] { new Vector2(cx, cy), new Vector2(cx + CELL, cy + CELL), new Vector2(cx, cy + CELL) });
+                else if (dl) c.Poly(new[] { new Vector2(cx, cy), new Vector2(cx + CELL, cy), new Vector2(cx + CELL, cy + CELL) });
+                else if (dr) c.Poly(new[] { new Vector2(cx, cy), new Vector2(cx + CELL, cy), new Vector2(cx, cy + CELL) });
+                else c.FillRect(cx, cy, CELL, CELL);
+            }
+        // strata: gently waving bedding lines, continuous from tile to tile
+        c.Stroke = new Color(0, 0, 0, exposed ? 0.3f : 0.18f); c.LineWidth = 0.8f;
+        for (int k = (int)MathF.Floor(y / 9) - 1; k <= (int)MathF.Ceiling((y + TS) / 9) + 1; k++)
+        {
+            float Y(float wx) => k * 9 + MathF.Sin(wx * 0.045f + k * 1.7f) * 3 + MathF.Sin(wx * 0.13f + k) * 0.8f;
+            float y0 = Y(x), y1 = Y(x + 8), y2 = Y(x + TS);
+            if (Hash(k, (int)(x / 48)) < 0.35f) continue;   // bedding lines break off here and there
+            if (MathF.Max(y0, MathF.Max(y1, y2)) < y || MathF.Min(y0, MathF.Min(y1, y2)) > y + TS) continue;
+            float a0 = Math.Clamp(y0, y, y + TS), a1 = Math.Clamp(y1, y, y + TS), a2 = Math.Clamp(y2, y, y + TS);
+            c.BeginPath(); c.MoveTo(x + (left ? 2 : 0), a0); c.LineTo(x + 8, a1); c.LineTo(x + TS - (right ? 2 : 0), a2); c.StrokePath();
+        }
+        // cracks and pits
+        float h = Hash((int)x * 7, (int)y * 3);
+        if (exposed && h > 0.78f) { c.Stroke = new Color(0, 0, 0, 0.4f); c.LineWidth = 0.7f; c.BeginPath(); c.MoveTo(x + 4 + h * 6, y + 3); c.LineTo(x + 7 + h * 4, y + 8); c.LineTo(x + 5 + h * 6, y + 13); c.StrokePath(); }
+        if (h < 0.18f) { c.Fill = new Color(0, 0, 0, 0.25f); c.FillCircle(x + 5 + h * 30, y + 9, 1.2f); }
+        if (up) { c.Fill = H.Rgba(190, 210, 215, 0.18f); c.FillRect(x + (left ? 3 : 0), y, TS - (left ? 3 : 0) - (right ? 3 : 0), 1); }
+    }
+
     // ---- solid masonry -------------------------------------------------------------------------------
     public static void SolidTile(Canvas c, char ch, float x, float y, int tx, int ty, RoomDef room, Pal pal, Func<int, int, bool> solidAt, int lx, int ly)
     {
         float h = Hash(tx, ty);
         bool up = !solidAt(lx, ly - 1), down = !solidAt(lx, ly + 1), left = !solidAt(lx - 1, ly), right = !solidAt(lx + 1, ly);
         bool exposed = up || down || left || right;
+        if (ch == '#' && room.Outdoor && room.Id != "seawall") { RockTile(c, x, y, pal, up, down, left, right); return; }
         switch (ch)
         {
             case '_': return;

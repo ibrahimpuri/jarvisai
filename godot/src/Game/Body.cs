@@ -416,39 +416,134 @@ public class Body : Ent
         // round caps
         c.FillStyle = col; c.FillCircle(a.X, a.Y, w / 2); c.FillCircle(b.X, b.Y, w / 2);
     }
+    // The drowned: a sodden robe with a torn hem, a rope cinch, a deep hood over a bloated face, salt
+    // crusted on the cloth and weed trailing from the shoulders. The robe follows the skeleton, so it
+    // hangs when they stand, drags when they crawl and lies flat when they are down.
     protected void DrawHuman(Canvas c, Palette pal)
     {
         var j = Skel();
+        int f = facing;
         string robe = pal.robe, skin = pal.skin, dark = pal.dark ?? "#1a1d1e";
-        // back limbs
-        DrawLimb(c, j["hip"], j["kneeR"], 2.6f, dark); DrawLimb(c, j["kneeR"], j["footR"], 2.2f, dark);
-        DrawLimb(c, j["shoulderR"], j["elbowR"], 2.2f, dark); DrawLimb(c, j["elbowR"], j["handR"], 1.8f, dark);
-        // robe body
-        c.FillStyle = robe;
-        var sl = j["shoulderL"]; var hip = j["hip"];
-        c.BeginPath();
-        c.MoveTo(sl.X - 3, sl.Y - 1);
-        c.LineTo(sl.X + 3, sl.Y - 1);
-        if (pose == "stand") { c.LineTo(hip.X + 4.5f, hip.Y + 4); c.LineTo(hip.X - 4.5f, hip.Y + 4); }
-        else { c.LineTo(hip.X + 3, hip.Y + 2.5f); c.LineTo(hip.X - 3, hip.Y - 2.5f); }
-        c.ClosePath(); c.FillPath();
-        if (pose == "stand") c.FillRect(hip.X - 4.5f, hip.Y, 9, 6);
-        // robe shading: a darker fold down the back edge
-        c.Fill = new Color(0, 0, 0, 0.18f);
-        c.BeginPath(); c.MoveTo(sl.X - 3 * facing, sl.Y - 1); c.LineTo(sl.X - 1 * facing, sl.Y - 1); c.LineTo(hip.X - 2.5f * facing, hip.Y + 4); c.LineTo(hip.X - 4.5f * facing, hip.Y + 4); c.ClosePath(); c.FillPath();
-        // front limbs
-        DrawLimb(c, j["hip"], j["kneeL"], 2.8f, robe); DrawLimb(c, j["kneeL"], j["footL"], 2.4f, skin);
-        DrawLimb(c, j["shoulderL"], j["elbowL"], 2.6f, robe); DrawLimb(c, j["elbowL"], j["handL"], 2, skin);
-        // head + cowl
-        var head = j["head"];
-        c.FillStyle = skin; c.BeginPath(); c.Arc(head.X, head.Y, 3.4f, 0, H.PI * 2); c.FillPath();
-        if (pal.cowl != null) { c.FillStyle = pal.cowl; c.BeginPath(); c.Arc(head.X - facing * 0.8f, head.Y - 0.5f, 3.8f, H.PI * 0.9f, H.PI * 2.1f); c.FillPath(); }
-        // salt crust speckles
-        c.Fill = new Color(230 / 255f, 240 / 255f, 245 / 255f, 0.55f);
-        for (int i = 0; i < 4; i++)
+        var robeC = H.Col(robe); var skinC = H.Col(skin);
+        var sl = j["shoulderL"]; var sr = j["shoulderR"]; var hip = j["hip"]; var head = j["head"]; var neck = j["neck"];
+        var sh = (sl + sr) / 2;
+        float seed = (key?.Length ?? 3) * 0.37f + x * 0.013f;
+        // back limbs, in shadow
+        DrawLimb(c, j["hip"], j["kneeR"], 2.6f, dark); DrawLimb(c, j["kneeR"], j["footR"], 2.0f, dark);
+        DrawLimb(c, j["shoulderR"], j["elbowR"], 2.2f, dark); DrawLimb(c, j["elbowR"], j["handR"], 1.6f, dark);
+        DrawLimb(c, j["hip"], j["kneeL"], 2.8f, robe);
+
+        // the robe
+        Vector2[] body;
+        if (pose == "stand")
         {
-            float t = (i * 0.37f + (key != null ? key.Length * 0.13f : 0)) % 1;
-            c.FillRect(H.Lerp(sl.X, hip.X, t) + ((i * 7) % 5) - 2, H.Lerp(sl.Y, hip.Y, t), 1, 1);
+            float sway = Math.Clamp(-vx / 40f, -2, 2) + MathF.Sin(anim * 2 + seed) * 0.4f;
+            float hemY = MathF.Max(j["kneeL"].Y, j["kneeR"].Y) + 3.5f;
+            var pts = new List<Vector2> { new(sh.X - f * 3.6f, sh.Y - 0.6f), new(sh.X + f * 3.2f, sh.Y - 0.8f), new(hip.X + f * 3.8f, hip.Y), new(hip.X + f * 5f + sway * 0.5f, hemY) };
+            // a torn hem, ragged differently on every body
+            int teeth = 6;
+            for (int i = 1; i < teeth; i++)
+            {
+                float k = i / (float)teeth;
+                float hx = H.Lerp(hip.X + f * 5f + sway * 0.5f, hip.X - f * 5.6f + sway * 1.5f, k);
+                float hy = hemY - ((i % 2 == 0) ? 0 : 1.6f + TileArt.Hash((int)(seed * 100) + i, 7) * 2.2f);
+                pts.Add(new Vector2(hx, hy));
+            }
+            pts.Add(new Vector2(hip.X - f * 5.6f + sway * 1.5f, hemY - 0.6f));
+            pts.Add(new Vector2(hip.X - f * 4.2f, hip.Y));
+            body = pts.ToArray();
+        }
+        else
+        {
+            var axis = hip - sh; float len = axis.Length(); var d = len > 0.01f ? axis / len : new Vector2(1, 0);
+            var n = new Vector2(-d.Y, d.X);
+            var tail = hip + d * 6;
+            body = new[] { sh + n * 3.2f - d, sh - n * 3.2f - d, hip - n * 3.8f, tail - n * 3.2f, tail - n * 1 + d * 1.5f, tail + n * 1.2f + d * 0.6f, tail + n * 3.4f, hip + n * 3.8f };
+        }
+        c.Fill = robeC; c.Poly(body);
+        // folds: the back half in shadow, a sheen down the front, creases
+        c.Fill = new Color(0, 0, 0, 0.26f);
+        if (pose == "stand") c.Poly(new[] { body[0], new Vector2(sh.X - f * 1.2f, sh.Y), new Vector2(hip.X - f * 1.6f, hip.Y + 2), new Vector2(body[^2].X + f * 2, body[^2].Y), body[^2], body[^1] });
+        c.Fill = new Color(1, 1, 1, 0.07f);
+        if (pose == "stand") c.Poly(new[] { body[1], body[2], body[3], new Vector2(body[3].X - f * 1.6f, body[3].Y), new Vector2(sh.X + f * 1.4f, sh.Y) });
+        c.Stroke = new Color(0, 0, 0, 0.3f); c.LineWidth = 0.5f;
+        if (pose == "stand") { c.Line(hip.X + f * 1.2f, hip.Y + 1.5f, body[4].X, body[4].Y - 1); c.Line(hip.X - f * 1.8f, hip.Y + 1.5f, body[^3].X, body[^3].Y - 1); }
+        // the rope cinch with its knot and a trailing end
+        c.Stroke = H.Col("#8a7650"); c.LineWidth = 1.1f;
+        var bl = pose == "stand" ? new Vector2(hip.X - f * 4, hip.Y - 0.5f) : hip + (sh - hip).Normalized().Orthogonal() * 3.6f;
+        var br = pose == "stand" ? new Vector2(hip.X + f * 3.6f, hip.Y - 0.5f) : hip - (sh - hip).Normalized().Orthogonal() * 3.6f;
+        c.Line(bl.X, bl.Y, br.X, br.Y);
+        c.Fill = H.Col("#a08a5a"); c.FillCircle(H.Lerp(bl.X, br.X, 0.6f), H.Lerp(bl.Y, br.Y, 0.6f), 0.9f);
+        if (pose == "stand")
+        {
+            float kx = H.Lerp(bl.X, br.X, 0.6f), ky = H.Lerp(bl.Y, br.Y, 0.6f), sw = MathF.Sin(anim * 3 + seed) * 0.8f - vx / 60f;
+            c.Stroke = H.Col("#8a7650"); c.LineWidth = 0.7f; c.BeginPath(); c.MoveTo(kx, ky); c.QuadraticCurveTo(kx + sw, ky + 2.5f, kx + sw * 1.6f, ky + 5); c.StrokePath();
+        }
+        // salt crusted into the cloth
+        c.Fill = new Color(0.9f, 0.94f, 0.96f, 0.5f);
+        for (int i = 0; i < 6; i++)
+        {
+            float t = TileArt.Hash((int)(seed * 50) + i, 3), s2 = TileArt.Hash((int)(seed * 50) + i, 5);
+            var p = sh.Lerp(hip, t) + new Vector2((s2 - 0.5f) * 5, s2 * 2);
+            c.FillRect(p.X, p.Y, 0.9f, 0.9f);
+        }
+        // weed hanging off a shoulder
+        c.Stroke = H.Col("#2f4a30"); c.LineWidth = 0.8f;
+        for (int i = 0; i < 2; i++)
+        {
+            float wx = sh.X - f * (1.5f + i * 1.6f), wy = sh.Y + 0.5f, sw = MathF.Sin(anim * 2.2f + i + seed) * 1.2f - vx / 50f;
+            c.BeginPath(); c.MoveTo(wx, wy); c.QuadraticCurveTo(wx + sw, wy + 4, wx + sw * 1.8f - f * 0.5f, wy + 7 + i * 2); c.StrokePath();
+        }
+
+        // front shin and bare foot under the hem, front arm in its sleeve
+        DrawLimb(c, j["kneeL"], j["footL"], 2.1f, skin);
+        c.Fill = skinC; c.BeginPath(); c.Ellipse(j["footL"].X + f * 1, j["footL"].Y - 0.6f, 2, 0.9f, 0, 0, H.PI * 2); c.FillPath();
+        DrawLimb(c, j["shoulderL"], j["elbowL"], 2.7f, robe);
+        DrawLimb(c, j["elbowL"], j["handL"], 1.8f, skin);
+        var hand = j["handL"];
+        c.Stroke = skinC; c.LineWidth = 0.6f;
+        var fd = (j["handL"] - j["elbowL"]).Normalized();
+        for (int i = -1; i <= 1; i++) { var tip = hand + fd.Rotated(i * 0.35f) * 2.4f; c.Line(hand.X, hand.Y, tip.X, tip.Y); }
+        // sleeve cuff
+        c.Fill = robeC; c.FillCircle(j["elbowL"].X, j["elbowL"].Y, 1.6f);
+
+        // the head: grey and swollen, eye hollows, the jaw slack
+        c.Fill = skinC; c.FillCircle(head.X, head.Y, 3.3f);
+        c.Fill = new Color(0, 0, 0, 0.18f); c.BeginPath(); c.Arc(head.X, head.Y, 3.3f, H.PI * 0.1f, H.PI * 0.9f); c.FillPath();
+        c.Fill = new Color(0.05f, 0.06f, 0.07f, 0.75f); c.BeginPath(); c.Ellipse(head.X + f * 1.5f, head.Y - 0.4f, 0.9f, 1.1f, 0, 0, H.PI * 2); c.FillPath();
+        c.FillRect(head.X + f * 1.2f - 0.6f, head.Y + 1.6f, 1.6f, 0.6f);
+        bool hostile = mode is "hunt" or "windup" or "attack" or "grab" or "inhale";
+        if (hostile && !corpse) { c.Fill = new Color(0.7f, 0.95f, 1f, 0.9f); c.FillCircle(head.X + f * 1.6f, head.Y - 0.4f, 0.45f); c.Glow(head.X + f * 1.6f, head.Y - 0.4f, 2.5f, new Color(0.6f, 0.9f, 1f, 0.5f)); }
+        if (pal.cowl != null)
+        {
+            // a deep hood: over the crown, down the back and onto the shoulders, the face in its shadow
+            c.Fill = H.Col(pal.cowl);
+            c.BeginPath();
+            c.MoveTo(head.X + f * 3.2f, head.Y - 1.2f);
+            c.QuadraticCurveTo(head.X + f * 2.4f, head.Y - 4.8f, head.X - f * 0.6f, head.Y - 4.6f);
+            c.QuadraticCurveTo(head.X - f * 4.8f, head.Y - 3.8f, head.X - f * 4.6f, head.Y + 1);
+            c.QuadraticCurveTo(head.X - f * 4.4f, sh.Y - 1, sh.X - f * 3.8f, sh.Y + 0.6f);
+            c.LineTo(sh.X + f * 1.6f, sh.Y);
+            c.QuadraticCurveTo(head.X + f * 0.4f, head.Y + 2.4f, head.X + f * 0.6f, head.Y - 0.6f);
+            c.QuadraticCurveTo(head.X + f * 1.4f, head.Y - 2.4f, head.X + f * 3.2f, head.Y - 1.2f);
+            c.ClosePath(); c.FillPath();
+            c.Fill = new Color(0, 0, 0, 0.35f); c.BeginPath(); c.Arc(head.X + f * 1.6f, head.Y - 0.2f, 2.4f, f > 0 ? -H.PI * 0.9f : -H.PI * 0.1f, f > 0 ? -H.PI * 0.3f : -H.PI * 0.7f, f < 0); c.LineTo(head.X + f * 1.6f, head.Y - 0.2f); c.FillPath();
+            c.Fill = new Color(1, 1, 1, 0.08f); c.FillRect(head.X - f * 1.6f - 1, head.Y - 4.2f, 2.4f, 0.7f);
+        }
+        else
+        {
+            // matted hair clinging to the skull
+            c.Fill = H.Col(dark);
+            c.BeginPath(); c.Arc(head.X - f * 0.4f, head.Y - 0.6f, 3.4f, f > 0 ? H.PI * 0.8f : -H.PI * 0.2f, f > 0 ? H.PI * 2.05f : H.PI * 1.05f, f < 0); c.FillPath();
+            c.Stroke = H.Col(dark); c.LineWidth = 0.6f;
+            for (int i = 0; i < 3; i++) c.Line(head.X - f * (1.6f + i), head.Y + 1, head.X - f * (1.8f + i * 1.1f), head.Y + 3.6f + i * 0.5f);
+        }
+        // water still running off them
+        if (!World.IsWater(Cx(), Cy()) && pose == "stand" && !corpse)
+        {
+            float ph = (anim * 0.9f + seed) % 1;
+            c.Fill = new Color(0.6f, 0.75f, 0.85f, 0.6f * (1 - ph));
+            c.FillRect(body[4].X, body[4].Y + ph * 6, 0.6f, 1.2f);
         }
         if (mode == "windup" || mode == "inhale")
         {

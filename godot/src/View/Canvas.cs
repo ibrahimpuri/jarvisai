@@ -9,7 +9,7 @@ namespace Hollowmere;
 public class Canvas
 {
     struct State { public Transform2D T; public Color Fill, Stroke; public float LineWidth, Alpha; public FontSpec Font; public int Align; }
-    public struct FontSpec { public bool Mono, Italic, Bold; public int Size; }
+    public struct FontSpec { public bool Mono, Italic, Bold, Caps; public int Size; }
 
     CanvasItem ci;
     Rid rid;
@@ -89,6 +89,7 @@ public class Canvas
     public void Glow(float x, float y, float r, Color col) { ApplyT(); ci.DrawTextureRect(Radial, new Rect2(x - r, y - r, r * 2, r * 2), false, A(col)); }
     public void Glow(float x, float y, float rx, float ry, Color col) { ApplyT(); ci.DrawTextureRect(Radial, new Rect2(x - rx, y - ry, rx * 2, ry * 2), false, A(col)); }
     public void Texture(Texture2D tex, float x, float y) { ApplyT(); ci.DrawTexture(tex, new Vector2(x, y), A(s.Fill)); }
+    public void Texture(Texture2D tex, float x, float y, float w, float h) { ApplyT(); ci.DrawTextureRect(tex, new Rect2(x, y, w, h), false, A(s.Fill)); }
     public void Poly(Vector2[] pts)
     {
         if (pts.Length < 3) return;
@@ -172,23 +173,31 @@ public class Canvas
     public void Line(float x1, float y1, float x2, float y2) { ApplyT(); ci.DrawLine(new Vector2(x1, y1), new Vector2(x2, y2), A(s.Stroke), s.LineWidth, true); }
 
     // ---- text ------------------------------------------------------------------------------------
-    static readonly Dictionary<(bool, bool, bool), Font> fonts = new();
-    public static Font GetFont(bool mono, bool italic, bool bold)
+    // Bundled faces (SIL Open Font Licence, see fonts/): IM Fell English for words, its small caps for
+    // titles, and Alegreya Sans for numbers and small labels ("monospace" in the old CSS strings).
+    static readonly Dictionary<(bool, bool, bool, bool), Font> fonts = new();
+    static Font fallback;
+    public static Font GetFont(bool mono, bool italic, bool bold, bool caps = false)
     {
-        var key = (mono, italic, bold);
+        var key = (mono, italic, bold, caps);
         if (fonts.TryGetValue(key, out var f)) return f;
-        var sf = new SystemFont
+        string file = mono ? (bold ? "AlegreyaSans-Bold.ttf" : "AlegreyaSans-Medium.ttf") : caps ? "IMFeENsc28P.ttf" : italic ? "IMFeENit28P.ttf" : "IMFeENrm28P.ttf";
+        fallback ??= new SystemFont { FontNames = new[] { "Segoe UI Symbol", "DejaVu Sans", "Noto Sans Symbols", "sans-serif" } };
+        var ff = ResourceLoader.Exists("res://fonts/" + file) ? GD.Load<FontFile>("res://fonts/" + file) : null;
+        Font font;
+        if (ff != null)
         {
-            FontNames = mono ? new[] { "Consolas", "Cascadia Mono", "DejaVu Sans Mono", "Liberation Mono", "monospace" }
-                             : new[] { "Georgia", "Times New Roman", "DejaVu Serif", "Liberation Serif", "serif" },
-            FontItalic = italic,
-            FontWeight = bold ? 700 : 400,
-            Antialiasing = TextServer.FontAntialiasing.Gray,
-            Hinting = TextServer.Hinting.Light,
-            SubpixelPositioning = TextServer.SubpixelPositioning.Auto,
-        };
-        fonts[key] = sf;
-        return sf;
+            ff = (FontFile)ff.Duplicate();
+            ff.Antialiasing = TextServer.FontAntialiasing.Gray;
+            ff.Hinting = TextServer.Hinting.Light;
+            ff.SubpixelPositioning = TextServer.SubpixelPositioning.Auto;
+            ff.Fallbacks = new Godot.Collections.Array<Font> { fallback };
+            // there is no bold cut of IM Fell: thicken it a little
+            font = bold && !mono ? new FontVariation { BaseFont = ff, VariationEmbolden = 0.6f } : ff;
+        }
+        else font = new SystemFont { FontNames = mono ? new[] { "Consolas", "DejaVu Sans Mono" } : new[] { "Georgia", "DejaVu Serif" }, FontItalic = italic, FontWeight = bold ? 700 : 400 };
+        fonts[key] = font;
+        return font;
     }
     public static FontSpec ParseFont(string css)
     {
@@ -198,11 +207,12 @@ public class Canvas
             if (part == "italic") f.Italic = true;
             else if (part == "bold") f.Bold = true;
             else if (part.EndsWith("px") && float.TryParse(part[..^2], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var px)) f.Size = (int)MathF.Round(px);
-            else if (part.StartsWith("monospace")) f.Mono = true;
+            else if (part.StartsWith("monospace") || part.StartsWith("sans")) f.Mono = true;
+            else if (part == "caps") f.Caps = true;
         }
         return f;
     }
-    Font CurFont => GetFont(s.Font.Mono, s.Font.Italic, s.Font.Bold);
+    Font CurFont => GetFont(s.Font.Mono, s.Font.Italic, s.Font.Bold, s.Font.Caps);
     public float MeasureText(string text) => CurFont.GetStringSize(text, HorizontalAlignment.Left, -1, s.Font.Size).X;
     public void FillText(string text, float x, float y)
     {

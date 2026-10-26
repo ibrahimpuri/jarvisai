@@ -20,11 +20,14 @@ public partial class WorldView : Node2D
     const int VW = H.VIEW_W, VH = H.VIEW_H;
 
     CanvasModulate modulate;
-    DrawLayer back, entities, water, waterLines, solid, dyn, fxShaded, fxGlow, fxText, sky, rain, overlay, hud;
+    DrawLayer back, deco, entities, water, waterLines, solid, dyn, fxShaded, fxGlow, fxText, sky, rain, overlay, hud;
     // Static room art is baked once per room into offscreen textures and drawn as single lit quads.
     SubViewport backBake, solidBake;
     DrawLayer backArt, solidArt;
     int bakeWait;
+    const float BAKE = 2;   // the bakes hold twice the pixels so props and edges stay crisp when the view is scaled up
+    List<DecorItem> decor = new();
+    static readonly Dictionary<string, List<DecorItem>> decorCache = new();
     Node2D occluders, lightRoot;
     PointLight2D lantern, aura;
     readonly List<PointLight2D> pool = new();
@@ -47,8 +50,6 @@ public partial class WorldView : Node2D
     readonly List<Drop> drops = new();
     readonly List<Mote> motes = new();
     float lightningNext = 12, lightningFlash, lightningSecond = -1, underSmooth;
-    readonly (float x, float y, float s, float p)[] stars = Enumerable.Range(0, 90).Select(_ => (H.Rand(), H.Rand() * 0.55f, H.Rand(), H.Rand() * 6)).ToArray();
-    readonly (float x, float y, float r)[] clouds = Enumerable.Range(0, 26).Select(_ => (H.Rand() * 1280, 30 + H.Rand() * 110, 30 + H.Rand() * 60)).ToArray();
 
     public override void _Ready()
     {
@@ -67,13 +68,14 @@ public partial class WorldView : Node2D
         AddChild(modulate);
         backBake = MakeBake(out backArt, PaintBack);
         solidBake = MakeBake(out solidArt, PaintSolid);
-        back = Add(new DrawLayer { Paint = c => DrawBake(c, backBake) });
+        back = Add(new DrawLayer { Paint = c => DrawBake(c, backBake), TextureFilter = TextureFilterEnum.Linear });
+        deco = Add(new DrawLayer { Paint = c => Decor.PaintDynamic(c, decor, G.Now, ViewRect()) });
         entities = Add(new DrawLayer { Paint = PaintEntities });
         water = Add(new DrawLayer { Paint = PaintWater });
         waterMat = new ShaderMaterial { Shader = GD.Load<Shader>("res://shaders/water.gdshader") };
         water.Material = waterMat;
         waterLines = Add(new DrawLayer { Paint = PaintWaterLines });
-        solid = Add(new DrawLayer { Paint = c => DrawBake(c, solidBake) });
+        solid = Add(new DrawLayer { Paint = c => DrawBake(c, solidBake), TextureFilter = TextureFilterEnum.Linear });
         dyn = Add(new DrawLayer { Paint = PaintDynamic });
         fxShaded = Add(new DrawLayer { Paint = PaintFxShaded });
         fxGlow = Add(new DrawLayer { Paint = PaintFxGlow, Material = new CanvasItemMaterial { BlendMode = CanvasItemMaterial.BlendModeEnum.Add, LightMode = CanvasItemMaterial.LightModeEnum.Unshaded } });
@@ -111,7 +113,7 @@ public partial class WorldView : Node2D
     DrawLayer Add(DrawLayer d) { AddChild(d); return d; }
     SubViewport MakeBake(out DrawLayer art, Action<Canvas> paint)
     {
-        var vp = new SubViewport { TransparentBg = true, Disable3D = true, RenderTargetUpdateMode = SubViewport.UpdateMode.Disabled, CanvasItemDefaultTextureFilter = Viewport.DefaultCanvasItemTextureFilter.Nearest };
+        var vp = new SubViewport { TransparentBg = true, Disable3D = true, RenderTargetUpdateMode = SubViewport.UpdateMode.Disabled, CanvasItemDefaultTextureFilter = Viewport.DefaultCanvasItemTextureFilter.Linear };
         AddChild(vp);
         art = new DrawLayer { Paint = paint };
         vp.AddChild(art);
@@ -122,9 +124,10 @@ public partial class WorldView : Node2D
         var r = G.room;
         if (r == null || cached != r || bakeWait > 0) return;
         c.Fill = Colors.White;
-        c.Texture(vp.GetTexture(), r.Px, r.Py);
+        c.Texture(vp.GetTexture(), r.Px, r.Py, r.Pw, r.Ph);
     }
     T Add<T>(T n) where T : Node { AddChild(n); return n; }
+    static Rect2 ViewRect() => new(G.cam, new Vector2(VW, VH));
 
     // ---- per-room cache -------------------------------------------------------------------------
     char At(RoomDef r, int lx, int ly) => (lx < 0 || ly < 0 || lx >= r.Tw || ly >= r.Th) ? World.CharAt(r.Ox + lx, r.Oy + ly) : r.Live[ly * r.Tw + lx];
@@ -159,13 +162,17 @@ public partial class WorldView : Node2D
             }
         pillars.AddRange(pset);
         BuildOccluders(r);
+        // set dressing is decided once per room, so it does not shuffle when a door opens or a pickup goes
+        if (!decorCache.TryGetValue(r.Id, out decor))
+            decorCache[r.Id] = decor = Decor.Build(r, (lx, ly) => SolidAt(r, lx, ly), G.ents);
         var pal = TileArt.PAL[r.Region];
-        ambient = r.Outdoor ? new Color(0.46f, 0.5f, 0.58f) : r.BellRoom ? pal.ambient * 1.3f : pal.ambient;
+        ambient = r.Outdoor ? new Color(0.54f, 0.58f, 0.68f) : (r.BellRoom ? pal.ambient * 1.55f : pal.ambient * 1.25f);
         ambient.A = 1;
         foreach (var (vp, art) in new[] { (backBake, backArt), (solidBake, solidArt) })
         {
-            vp.Size = new Vector2I((int)r.Pw, (int)r.Ph);
-            art.Position = new Vector2(-r.Px, -r.Py);
+            vp.Size = new Vector2I((int)(r.Pw * BAKE), (int)(r.Ph * BAKE));
+            art.Scale = new Vector2(BAKE, BAKE);
+            art.Position = new Vector2(-r.Px * BAKE, -r.Py * BAKE);
             art.QueueRedraw();
             vp.RenderTargetUpdateMode = SubViewport.UpdateMode.Once;
         }
@@ -211,7 +218,7 @@ public partial class WorldView : Node2D
         modulate.Color = G.room.Outdoor ? ambient.Lerp(new Color(0.85f, 0.9f, 1f), lightningFlash * 0.6f) : ambient;
         UpdateLights(p);
         UpdatePost(p, dt);
-        foreach (var l in new[] { sky, back, entities, water, waterLines, solid, dyn, fxShaded, fxGlow, fxText, rain, overlay, hud }) l.QueueRedraw();
+        foreach (var l in new[] { sky, back, deco, entities, water, waterLines, solid, dyn, fxShaded, fxGlow, fxText, rain, overlay, hud }) l.QueueRedraw();
     }
 
     void UpdateLights(Player p)
@@ -238,6 +245,9 @@ public partial class WorldView : Node2D
         var srcs = new List<LightSrc>();
         foreach (var l in G.frameLights) if (!l.player) srcs.Add(l);
         foreach (var f in Fire.cells.Values) srcs.Add(new LightSrc { x = f.tx * TS + 8, y = f.ty * TS + 8, r = 60, i = 0.8f, color = "255,140,50" });
+        // the room's own candles and sconces, nearest the middle of the view first
+        var mid = G.cam + new Vector2(VW / 2f, VH / 2f);
+        srcs.AddRange(Decor.Lights(decor, G.Now, ViewRect()).OrderBy(l => (new Vector2(l.x, l.y) - mid).LengthSquared()).Take(10));
         while (pool.Count < srcs.Count)
         {
             var pl = new PointLight2D { Texture = lightTex, ShadowFilter = Light2D.ShadowFilterEnum.Pcf5, ShadowFilterSmooth = 2f };
@@ -363,45 +373,7 @@ public partial class WorldView : Node2D
             c.FillRectGradV(0, 0, VW, VH, pal.bg0, pal.bg1);
             return;
         }
-        c.FillRectGradV(0, 0, VW, VH * 0.55f, H.Col("#04070b"), H.Col("#0c141b"));
-        c.FillRectGradV(0, VH * 0.55f, VW, VH * 0.45f, H.Col("#0c141b"), H.Col("#16222b"));
-        float mx = 150, my = 62;
-        c.Glow(mx, my, 125, H.Rgba(180, 200, 215, 0.3f));
-        foreach (var s in stars)
-        {
-            float tw = 0.35f + 0.35f * MathF.Sin(t * 1.5f + s.p);
-            float sxp = ((s.x * 900 - cam.X * 0.03f) % 900 + 900) % 900;
-            c.Fill = H.Rgba(210, 220, 230, tw); c.FillRect(sxp, s.y * 220, s.s > 0.85f ? 1.5f : 1, s.s > 0.85f ? 1.5f : 1);
-        }
-        c.FillStyle = "#d8e0e4"; c.FillCircle(mx, my, 13);
-        c.Fill = H.Rgba(150, 165, 175, 0.5f); c.FillCircle(mx + 4, my - 3, 3); c.FillCircle(mx - 4, my + 4, 2);
-        // drifting clouds
-        float cx = -((cam.X * 0.04f + t * 3) % 1280);
-        foreach (var cl in clouds)
-            for (int k = -1; k <= 1; k++)
-            {
-                float x = cl.x + cx + k * 1280;
-                if (x < -cl.r || x > VW + cl.r) continue;
-                c.Glow(x, cl.y + 10, cl.r, cl.r * 0.7f, H.Rgba(40, 52, 62, 0.55f));
-            }
-        // the dark lighthouse on the skull
-        float lx = 470 - (cam.X - r.Px) * 0.06f, ly = 120 - (cam.Y - r.Py) * 0.03f;
-        c.FillStyle = "#070b0e";
-        c.BeginPath(); c.MoveTo(lx, ly + 150); c.QuadraticCurveTo(lx + 40, ly + 70, lx + 70, ly + 74); c.QuadraticCurveTo(lx + 105, ly + 72, lx + 140, ly + 150); c.FillPath();
-        c.BeginPath(); c.Arc(lx + 70, ly + 92, 26, H.PI, H.PI * 2); c.FillPath();
-        c.FillRect(lx + 64, ly + 30, 12, 50);
-        c.FillRect(lx + 60, ly + 24, 20, 8);
-        c.BeginPath(); c.MoveTo(lx + 60, ly + 24); c.LineTo(lx + 70, ly + 12); c.LineTo(lx + 80, ly + 24); c.FillPath();
-        c.FillStyle = "#0d1418"; c.FillRect(lx + 66, ly + 26, 8, 4);
-        // the far sea with a moon path
-        c.FillRectGradV(0, 250, VW, VH - 250, H.Col("#0d1820"), H.Col("#060c11"));
-        for (int i = 0; i < 60; i++)
-        {
-            float y = 252 + i * 1.8f, w = 6 + i * 0.9f + TileArt.Hash(i, 7) * 10;
-            float wob = MathF.Sin(t * 1.3f + i * 0.7f) * 3;
-            c.Fill = H.Rgba(190, 210, 220, 0.22f - i * 0.003f);
-            c.FillRect(mx - w / 2 + (TileArt.Hash(i, 3) - 0.5f) * 8 + wob, y, w, 1);
-        }
+        Backdrop.Outdoor(c, cam, t, lightningFlash);
     }
 
     void PaintBack(Canvas c)
@@ -412,11 +384,18 @@ public partial class WorldView : Node2D
         for (int ly = 0; ly < r.Th; ly++) for (int lx = 0; lx < r.Tw; lx++)
             {
                 char ch = r.Live[ly * r.Tw + lx];
+                if (!r.Outdoor && !TileArt.COVERS.Contains(ch) && ch != 'w') TileArt.BackTile(c, r.Px + lx * TS, r.Py + ly * TS, r.Ox + lx, r.Oy + ly, pal, r, dist.Length > 0 ? dist[ly * r.Tw + lx] : 4);
+            }
+        Decor.PaintWallWear(c, r, (lx, ly) => SolidAt(r, lx, ly));
+        Decor.PaintArchitecture(c, r, (lx, ly) => SolidAt(r, lx, ly));
+        for (int ly = 0; ly < r.Th; ly++) for (int lx = 0; lx < r.Tw; lx++)
+            {
+                char ch = r.Live[ly * r.Tw + lx];
                 float x = r.Px + lx * TS, y = r.Py + ly * TS; int tx = r.Ox + lx, ty = r.Oy + ly;
-                if (!r.Outdoor && !TileArt.COVERS.Contains(ch) && ch != 'w') TileArt.BackTile(c, x, y, tx, ty, pal, r, dist.Length > 0 ? dist[ly * r.Tw + lx] : 4);
                 if (ch == 'w') TileArt.WindowHole(c, x, y);
                 if (TileArt.DECOR.Contains(ch)) TileArt.Decor(c, ch, x, y, tx, ty);
             }
+        Decor.PaintBackProps(c, r, decor);
         // tide marks on pillars (static per room; drawn with the back wall)
         if (r.Row == 4 && r.FixedWater == null)
         {
@@ -443,6 +422,7 @@ public partial class WorldView : Node2D
                 if (!TileArt.SOLIDS.Contains(ch)) continue;
                 TileArt.SolidTile(c, ch, r.Px + lx * TS, r.Py + ly * TS, r.Ox + lx, r.Oy + ly, r, pal, SA, lx, ly);
             }
+        Decor.PaintSolidDetail(c, r, SA);
     }
 
     void PaintDynamic(Canvas c)
@@ -571,6 +551,7 @@ public partial class WorldView : Node2D
             c.Glow(l.x, l.y, l.r * 0.9f, new Color(col.R, col.G, col.B, 0.15f * l.i));
             c.Glow(l.x, l.y, 5, new Color(col.R * 1.6f, col.G * 1.6f, col.B * 1.6f, 0.9f * l.i));
         }
+        Decor.PaintGlow(c, decor, t, ViewRect());
         // light shafts through stained glass
         if (!r.Outdoor)
         {
