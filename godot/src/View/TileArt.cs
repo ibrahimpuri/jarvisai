@@ -1,4 +1,6 @@
-// Tile art: back walls with ambient occlusion, masonry with region accents, decor and dynamic tiles.
+// Tile art for the pieces the terrain and depth layers do not cover: timber and bone platforms, ladders,
+// planks, rings and crystals, and the dynamic tiles (doors, gates, salt walls). Drawn encoded with the
+// rest of the room, except the dynamic layer, which is redrawn each frame.
 using System;
 using System.Collections.Generic;
 using Godot;
@@ -8,16 +10,17 @@ namespace Hollowmere;
 public static class TileArt
 {
     const int TS = H.TILE;
-    public class Pal { public int[] stone, back; public string accent; public Color grade, bg0, bg1, ambient; }
+    // Stone and back-wall tones the room props are drawn in, and each region's colour grade for the post pass.
+    public class Pal { public int[] stone, back; public Color grade; }
     public static readonly Dictionary<string, Pal> PAL = new()
     {
-        ["wrackline"] = new Pal { stone = new[] { 66, 76, 82 }, back = new[] { 26, 32, 36 }, accent = "barnacle", grade = H.Rgba(30, 60, 80), bg0 = H.Col("#0e1216"), bg1 = H.Col("#1a2228"), ambient = new Color(0.36f, 0.40f, 0.46f) },
-        ["saltworks"] = new Pal { stone = new[] { 98, 92, 84 }, back = new[] { 42, 38, 34 }, accent = "salt", grade = H.Rgba(90, 70, 40), bg0 = H.Col("#1a1713"), bg1 = H.Col("#2a251f"), ambient = new Color(0.42f, 0.39f, 0.35f) },
-        ["cloister"] = new Pal { stone = new[] { 60, 74, 70 }, back = new[] { 24, 32, 31 }, accent = "moss", grade = H.Rgba(30, 70, 55), bg0 = H.Col("#0c1212"), bg1 = H.Col("#182222"), ambient = new Color(0.33f, 0.39f, 0.37f) },
-        ["choir"] = new Pal { stone = new[] { 64, 70, 94 }, back = new[] { 24, 28, 44 }, accent = "mosaic", grade = H.Rgba(40, 40, 100), bg0 = H.Col("#0c0e16"), bg1 = H.Col("#181c2e"), ambient = new Color(0.33f, 0.35f, 0.46f) },
-        ["ribvault"] = new Pal { stone = new[] { 104, 94, 78 }, back = new[] { 38, 33, 27 }, accent = "bone", grade = H.Rgba(90, 65, 35), bg0 = H.Col("#16130e"), bg1 = H.Col("#262118"), ambient = new Color(0.40f, 0.37f, 0.32f) },
-        ["gullet"] = new Pal { stone = new[] { 46, 62, 68 }, back = new[] { 12, 20, 24 }, accent = "flesh", grade = H.Rgba(20, 60, 70), bg0 = H.Col("#050c0f"), bg1 = H.Col("#0c1a20"), ambient = new Color(0.17f, 0.23f, 0.26f) },
-        ["skull"] = new Pal { stone = new[] { 106, 96, 78 }, back = new[] { 40, 34, 26 }, accent = "bone", grade = H.Rgba(110, 75, 30), bg0 = H.Col("#18130c"), bg1 = H.Col("#2a1f12"), ambient = new Color(0.42f, 0.37f, 0.30f) },
+        ["wrackline"] = new Pal { stone = new[] { 66, 76, 82 }, back = new[] { 26, 32, 36 }, grade = H.Rgba(30, 60, 80) },
+        ["saltworks"] = new Pal { stone = new[] { 98, 92, 84 }, back = new[] { 42, 38, 34 }, grade = H.Rgba(90, 70, 40) },
+        ["cloister"] = new Pal { stone = new[] { 60, 74, 70 }, back = new[] { 24, 32, 31 }, grade = H.Rgba(30, 70, 55) },
+        ["choir"] = new Pal { stone = new[] { 64, 70, 94 }, back = new[] { 24, 28, 44 }, grade = H.Rgba(40, 40, 100) },
+        ["ribvault"] = new Pal { stone = new[] { 104, 94, 78 }, back = new[] { 38, 33, 27 }, grade = H.Rgba(90, 65, 35) },
+        ["gullet"] = new Pal { stone = new[] { 46, 62, 68 }, back = new[] { 12, 20, 24 }, grade = H.Rgba(20, 60, 70) },
+        ["skull"] = new Pal { stone = new[] { 106, 96, 78 }, back = new[] { 40, 34, 26 }, grade = H.Rgba(110, 75, 30) },
     };
 
     public static float Hash(int x, int y)
@@ -31,131 +34,16 @@ public static class TileArt
     public static readonly HashSet<char> SOLIDS = new("#_TRMPG");
     public static readonly HashSet<char> DECOR = new("=|wHoxa");
     public static readonly HashSet<char> DYNAMIC = new("ELVKZYhyCSb");
-    public static readonly HashSet<char> COVERS = new("#GTPM");
     public static bool IsSolidCh(char ch) => SOLIDS.Contains(ch) || ch is 'S' or 'C' or 'E' or 'L' or 'V' or 'K' or 'Z' or 'Y' or 'h';
 
-    // ---- back wall -----------------------------------------------------------------------------------
-    public static void BackTile(Canvas c, float x, float y, int tx, int ty, Pal pal, RoomDef room, int d)
-    {
-        float ao = 0.5f + 0.125f * Math.Min(d, 4);
-        float h = Hash(tx, ty);
-        string reg = room.Region;
-        // big shapes in the back wall: pilasters, ribs, folds
-        float shape = 1;
-        if (reg is "cloister" or "choir" or "wrackline") { int m = ((tx % 10) + 10) % 10; if (m == 0) shape = 1.35f; else if (m == 1) shape = 0.8f; }
-        if (reg is "ribvault" or "skull") shape = 1 + 0.25f * MathF.Sin(tx * 0.9f + MathF.Sin(ty * 0.35f) * 1.5f);
-        if (reg == "gullet") shape = 1 + 0.3f * MathF.Sin(ty * 0.6f + tx * 0.25f);
-        float k = ao * shape;
-        c.Fill = Rgb(pal.back, k * (0.94f + h * 0.12f));
-        c.FillRect(x, y, TS, TS);
-        // brick courses (bigger and fainter than the solid masonry)
-        c.Fill = new Color(0, 0, 0, 0.22f * ao);
-        c.FillRect(x, y + 7, TS, 1); c.FillRect(x, y + 15, TS, 1);
-        int off = (((ty % 2) + 2) % 2) * 8;
-        c.FillRect(x + ((off + 4) % 16), y, 1, 7); c.FillRect(x + ((off + 12) % 16), y + 8, 1, 7);
-        if (reg == "saltworks" && h > 0.72f) { c.Fill = H.Rgba(230, 232, 236, 0.10f); c.FillRect(x + h * 12, y + 3, 2, 1); }
-        if (reg == "cloister" && h > 0.85f) { c.Fill = H.Rgba(70, 110, 70, 0.12f); c.FillRect(x + 2, y + h * 10, 3, 2); }
-        if (reg == "choir" && h > 0.9f) { c.Fill = ((tx + ty) & 1) == 0 ? H.Rgba(80, 90, 170, 0.12f) : H.Rgba(150, 120, 60, 0.12f); c.FillRect(x + 4, y + 4, 3, 3); }
-    }
-    public static void WindowHole(Canvas c, float x, float y) => c.FillRectGradV(x, y, TS, TS, H.Col("#24384a"), H.Col("#16222e"));
-
-    // ---- natural rock on the shore -------------------------------------------------------------------
-    // Shaded from world-space noise in 4px cells so a cliff reads as one mass rather than a grid,
-    // with strata running through it and the convex corners worn round.
-    static void RockTile(Canvas c, float x, float y, Pal pal, bool up, bool down, bool left, bool right)
-    {
-        const int CELL = 4;
-        bool exposed = up || down || left || right;
-        for (int j = 0; j < TS / CELL; j++)
-            for (int i = 0; i < TS / CELL; i++)
-            {
-                float cx = x + i * CELL, cy = y + j * CELL;
-                float n = Hollowmere.Decor.Fbm(cx / 38f, cy / 30f), fine = Hash((int)cx, (int)cy);
-                float edge = exposed ? 1 : 0.7f;
-                // light falls from above: the top few px of a surface are brighter, overhangs darker
-                float lift = (up && j == 0 ? 0.22f : up && j == 1 ? 0.08f : 0) - (down && j == 3 ? 0.18f : 0) + (left && i == 0 ? 0.06f : 0) - (right && i == 3 ? 0.12f : 0);
-                c.Fill = Rgb(pal.stone, (0.72f + n * 0.62f + fine * 0.07f + lift) * edge);
-                bool ul = up && left && i == 0 && j == 0, ur = up && right && i == 3 && j == 0, dl = down && left && i == 0 && j == 3, dr = down && right && i == 3 && j == 3;
-                if (ul) c.Poly(new[] { new Vector2(cx + CELL, cy), new Vector2(cx + CELL, cy + CELL), new Vector2(cx, cy + CELL) });
-                else if (ur) c.Poly(new[] { new Vector2(cx, cy), new Vector2(cx + CELL, cy + CELL), new Vector2(cx, cy + CELL) });
-                else if (dl) c.Poly(new[] { new Vector2(cx, cy), new Vector2(cx + CELL, cy), new Vector2(cx + CELL, cy + CELL) });
-                else if (dr) c.Poly(new[] { new Vector2(cx, cy), new Vector2(cx + CELL, cy), new Vector2(cx, cy + CELL) });
-                else c.FillRect(cx, cy, CELL, CELL);
-            }
-        // strata: gently waving bedding lines, continuous from tile to tile
-        c.Stroke = new Color(0, 0, 0, exposed ? 0.3f : 0.18f); c.LineWidth = 0.8f;
-        for (int k = (int)MathF.Floor(y / 9) - 1; k <= (int)MathF.Ceiling((y + TS) / 9) + 1; k++)
-        {
-            float Y(float wx) => k * 9 + MathF.Sin(wx * 0.045f + k * 1.7f) * 3 + MathF.Sin(wx * 0.13f + k) * 0.8f;
-            float y0 = Y(x), y1 = Y(x + 8), y2 = Y(x + TS);
-            if (Hash(k, (int)(x / 48)) < 0.35f) continue;   // bedding lines break off here and there
-            if (MathF.Max(y0, MathF.Max(y1, y2)) < y || MathF.Min(y0, MathF.Min(y1, y2)) > y + TS) continue;
-            float a0 = Math.Clamp(y0, y, y + TS), a1 = Math.Clamp(y1, y, y + TS), a2 = Math.Clamp(y2, y, y + TS);
-            c.BeginPath(); c.MoveTo(x + (left ? 2 : 0), a0); c.LineTo(x + 8, a1); c.LineTo(x + TS - (right ? 2 : 0), a2); c.StrokePath();
-        }
-        // cracks and pits
-        float h = Hash((int)x * 7, (int)y * 3);
-        if (exposed && h > 0.78f) { c.Stroke = new Color(0, 0, 0, 0.4f); c.LineWidth = 0.7f; c.BeginPath(); c.MoveTo(x + 4 + h * 6, y + 3); c.LineTo(x + 7 + h * 4, y + 8); c.LineTo(x + 5 + h * 6, y + 13); c.StrokePath(); }
-        if (h < 0.18f) { c.Fill = new Color(0, 0, 0, 0.25f); c.FillCircle(x + 5 + h * 30, y + 9, 1.2f); }
-        if (up) { c.Fill = H.Rgba(190, 210, 215, 0.18f); c.FillRect(x + (left ? 3 : 0), y, TS - (left ? 3 : 0) - (right ? 3 : 0), 1); }
-        // lichen on the weathered faces
-        if (exposed && h > 0.45f)
-            for (int i = 0; i < 3; i++)
-            {
-                float lx = x + 2 + Hash((int)x + i, (int)y * 3) * 12, ly = y + 2 + Hash((int)x * 5, (int)y + i) * 12;
-                c.Fill = i == 0 ? H.Rgba(170, 168, 120, 0.45f) : H.Rgba(150, 165, 150, 0.35f);
-                c.FillCircle(lx, ly, 0.7f + Hash(i, (int)x) * 0.8f);
-            }
-    }
-
-    // ---- solid masonry -------------------------------------------------------------------------------
+    // ---- timber and bone ----------------------------------------------------------------------------
     public static void SolidTile(Canvas c, char ch, float x, float y, int tx, int ty, RoomDef room, Pal pal, Func<int, int, bool> solidAt, int lx, int ly)
     {
         float h = Hash(tx, ty);
         bool up = !solidAt(lx, ly - 1), down = !solidAt(lx, ly + 1), left = !solidAt(lx - 1, ly), right = !solidAt(lx + 1, ly);
-        bool exposed = up || down || left || right;
-        if (ch == '#' && room.Outdoor && room.Id != "seawall") { RockTile(c, x, y, pal, up, down, left, right); return; }
         switch (ch)
         {
             case '_': return;
-            case '#':
-            case 'G':
-                {
-                    if (!exposed)
-                    {
-                        // inside a rock mass: dark and quiet
-                        c.Fill = Rgb(pal.stone, 0.42f + h * 0.05f); c.FillRect(x, y, TS, TS);
-                        if (h > 0.8f) { c.Fill = new Color(0, 0, 0, 0.18f); c.FillRect(x + h * 10, y + 4, 4, 3); }
-                        break;
-                    }
-                    // masonry: two courses of bricks, offset by row
-                    for (int r = 0; r < 2; r++)
-                    {
-                        int row = ty * 2 + r, off = (((row % 2) + 2) % 2) * 8;
-                        for (int b = -1; b < 2; b++)
-                        {
-                            float bx = x + off + b * 16 - 8;
-                            float v = Hash(tx * 3 + b, row) - 0.5f;
-                            c.Fill = Rgb(pal.stone, 0.88f + v * 0.18f);
-                            float x0 = MathF.Max(x, bx), x1 = MathF.Min(x + TS, bx + 16);
-                            if (x1 > x0) c.FillRect(x0, y + r * 8, x1 - x0, 8);
-                        }
-                        c.Fill = new Color(0, 0, 0, 0.32f);
-                        c.FillRect(x, y + r * 8 + 7, TS, 1);
-                        c.FillRect(x + ((off + 8) % 16), y + r * 8, 1, 7);
-                    }
-                    c.Fill = new Color(1, 1, 1, 0.04f); c.FillRect(x, y, TS, 1);
-                    if (up)
-                    {
-                        c.Fill = H.Rgba(170, 200, 210, 0.24f); c.FillRect(x, y, TS, 2);
-                        AccentTop(c, x, y, tx, ty, h, pal.accent, room);
-                    }
-                    if (down) { c.Fill = new Color(0, 0, 0, 0.38f); c.FillRect(x, y + TS - 3, TS, 3); }
-                    if (left) { c.Fill = H.Rgba(170, 200, 210, 0.08f); c.FillRect(x, y, 1, TS); }
-                    if (right) { c.Fill = new Color(0, 0, 0, 0.22f); c.FillRect(x + TS - 2, y, 2, TS); }
-                    if (ch == 'G') { c.FillStyle = "#121212"; for (int i = 2; i < TS; i += 4) c.FillRect(x + i, y + 1, 2, 6); }
-                    break;
-                }
             case 'T':
             case 'P':
                 {
@@ -176,35 +64,8 @@ public static class TileArt
                     c.Fill = H.Rgba(255, 250, 230, 0.25f); c.FillRect(x, y + 3, TS, 1);
                     break;
                 }
-            case 'M':
-                {
-                    c.FillStyle = "#4c4642"; c.FillRect(x, y, TS, TS);
-                    c.FillStyle = "#6c5c4c"; c.FillRect(x, y, TS, 2);
-                    c.Fill = new Color(0, 0, 0, 0.35f); c.FillRect(x + 7, y + 2, 1, TS - 2);
-                    c.FillStyle = "#8a7a64"; c.FillRect(x + 2, y + 4, 1.5f, 1.5f); c.FillRect(x + TS - 4, y + 4, 1.5f, 1.5f); c.FillRect(x + 2, y + 12, 1.5f, 1.5f);
-                    c.Fill = H.Rgba(150, 70, 30, 0.18f + h * 0.2f); c.FillRect(x + h * 8, y + 6, 4, 8);
-                    break;
-                }
         }
     }
-    static void AccentTop(Canvas c, float x, float y, int tx, int ty, float h, string accent, RoomDef room)
-    {
-        if (accent == "salt" || h > 0.78f)
-        {
-            c.Fill = H.Rgba(236, 240, 245, 0.55f);
-            for (int i = 0; i < 4; i++) { float px = x + ((h * 97 + i * 5) % 15); c.FillRect(px, y - 1, 1.5f, 2 + ((i + tx) % 2 + 2) % 2); }
-        }
-        if (accent == "barnacle" && room.Row == 4)
-        {
-            c.Fill = H.Rgba(30, 40, 40, 0.6f); c.FillRect(x + h * 12, y + 2, 2, 2); c.FillRect(x + ((h * 31) % 13), y + 3, 1, 1);
-            c.Fill = H.Rgba(60, 110, 70, 0.5f); c.FillRect(x + ((h * 53) % 12), y + 1, 3, 1);
-        }
-        if (accent == "moss") { c.Fill = H.Rgba(70, 120, 70, 0.55f); c.FillRect(x + h * 8, y, 6, 2); c.FillRect(x + ((h * 41) % 13), y + 2, 2, 1); }
-        if (accent == "mosaic" && h > 0.6f) { c.Fill = H.Col(new[] { "#5a64b0", "#b09050", "#4a8a7a" }[(int)(h * 3) % 3]); c.FillRect(x + 6, y + 4, 2, 2); }
-        if (accent == "flesh") { c.Fill = H.Rgba(120, 50, 50, 0.35f); c.FillRect(x, y + 2, TS, 1); }
-        if (accent == "bone" && h > 0.5f) { c.Fill = H.Rgba(230, 220, 195, 0.3f); c.FillRect(x + 2, y + 1, 10, 1); }
-    }
-
     // ---- decor ---------------------------------------------------------------------------------------
     public static void Decor(Canvas c, char ch, float x, float y, int tx, int ty)
     {

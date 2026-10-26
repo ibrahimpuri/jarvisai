@@ -321,7 +321,7 @@ public class NPC : Obj
         if (!Present()) return;
         float x0 = Cx(), gy = y + h; int f = G.player != null && G.player.Cx() < x0 ? -1 : 1;
         var look = Story.NpcLook(id);
-        var robe = H.Col(look.robe); var skin = H.Col(look.skin);
+        var robe = H.Col(look.robe).Lerp(H.Col("#0e0f10"), 0.55f); var skin = H.Col(look.skin).Lerp(H.Col("#e8e2d4"), 0.45f);
         float br = MathF.Sin(t * 1.6f) * 0.4f, sway = MathF.Sin(t * 0.9f) * 0.5f;
         float sh = gy - 18 + br, hy = gy - 21.5f + br;
         // shadow, then the long robe with a ragged hem

@@ -641,20 +641,17 @@ public static class Decor
     {
         if (r.Outdoor) return;
         var th = ThemeFor(r); var pal = TileArt.PAL[r.Region];
-        char At(int lx, int ly) => (lx < 0 || ly < 0 || lx >= r.Tw || ly >= r.Th) ? '#' : r.Live[ly * r.Tw + lx];
         bool Open(int lx, int ly) => !solidAt(lx, ly);   // windows sit inside the arches, so they count as open
         switch (th.arch)
         {
             case "arcade": Arcade(c, r, pal, solidAt, Open); break;
             case "timber": Timber(c, r, pal, solidAt, Open); break;
-            case "ribs": Ribs(c, r, pal, Open); break;
-            case "flesh": Flesh(c, r, pal, Open); break;
         }
     }
     // Each long floor run gets a row of pointed arches with columns between them, as tall as the hall allows.
     static void Arcade(Canvas c, RoomDef r, TileArt.Pal pal, Func<int, int, bool> solidAt, Func<int, int, bool> open)
     {
-        var dark = Mul(pal.back, 0.5f); var light = Mul(pal.stone, 0.95f); var mid = Mul(pal.stone, 0.75f);
+        var light = Mul(pal.stone, 0.95f); var mid = Mul(pal.stone, 0.75f);
         for (int ly = 2; ly < r.Th - 1; ly++)
         {
             int lx = 1;
@@ -675,9 +672,6 @@ public static class Decor
                     if (hmin < 5) continue;
                     float archH = Math.Min(hmin - 1, 9) * TS, top = fy - archH;
                     float inset = 5, cx = (x0 + x1) / 2, spring = top + (x1 - x0) * 0.42f;
-                    // recess
-                    c.Fill = new Color(dark.R, dark.G, dark.B, 0.55f);
-                    c.BeginPath(); c.MoveTo(x0 + inset, fy); c.LineTo(x0 + inset, spring); c.QuadraticCurveTo(x0 + inset, top + 4, cx, top); c.QuadraticCurveTo(x1 - inset, top + 4, x1 - inset, spring); c.LineTo(x1 - inset, fy); c.ClosePath(); c.FillPath();
                     // moulding around the arch
                     c.Stroke = light; c.LineWidth = 1.6f;
                     c.BeginPath(); c.MoveTo(x0 + inset - 1, spring); c.QuadraticCurveTo(x0 + inset - 1, top + 3, cx, top - 1.5f); c.QuadraticCurveTo(x1 - inset + 1, top + 3, x1 - inset + 1, spring); c.StrokePath();
@@ -685,14 +679,6 @@ public static class Decor
                     c.BeginPath(); c.MoveTo(x0 + inset + 1, spring); c.QuadraticCurveTo(x0 + inset + 1, top + 5, cx, top + 1.5f); c.QuadraticCurveTo(x1 - inset - 1, top + 5, x1 - inset - 1, spring); c.StrokePath();
                     // keystone
                     c.Fill = light; c.FillRect(cx - 2, top - 3, 4, 4);
-                    // a slit window in tall bays, a moonlit lancet
-                    if (archH >= 7 * TS)
-                    {
-                        float wy = top + 14, wh = archH * 0.35f;
-                        c.FillRectGradV(cx - 2.5f, wy, 5, wh, new Color(0.25f, 0.32f, 0.42f, 0.8f), new Color(0.12f, 0.16f, 0.22f, 0.8f));
-                        c.Fill = new Color(0.25f, 0.32f, 0.42f, 0.8f); c.BeginPath(); c.Arc(cx, wy, 2.5f, H.PI, H.PI * 2); c.FillPath();
-                        c.Fill = new Color(0, 0, 0, 0.6f); c.FillRect(cx - 0.4f, wy - 2, 0.8f, wh + 2);
-                    }
                     // columns at the bay edges
                     foreach (float colx in new[] { x0, x1 })
                     {
@@ -706,31 +692,6 @@ public static class Decor
             }
         }
     }
-    // Damp and age on the back walls: broad stains, streaks running down from every ceiling and ledge,
-    // a few patches of brighter stone where the facing has fallen away.
-    public static void PaintWallWear(Canvas c, RoomDef r, Func<int, int, bool> solidAt)
-    {
-        if (r.Outdoor) return;
-        var pal = TileArt.PAL[r.Region];
-        for (int i = 0; i < r.Tw * r.Th / 14; i++)
-        {
-            float x = r.Px + TileArt.Hash(i, 41) * r.Pw, y = r.Py + TileArt.Hash(i, 43) * r.Ph, s = 20 + TileArt.Hash(i, 47) * 60;
-            if (TileArt.Hash(i, 53) < 0.7f) c.Glow(x, y, s, s * (0.6f + TileArt.Hash(i, 59) * 0.8f), new Color(0, 0, 0, 0.22f));
-            else c.Glow(x, y, s * 0.6f, s * 0.4f, Mul(pal.back, 1.9f, 0.18f));
-        }
-        for (int ly = 1; ly < r.Th; ly++)
-            for (int lx = 0; lx < r.Tw; lx++)
-            {
-                if (solidAt(lx, ly) || !solidAt(lx, ly - 1)) continue;
-                float h = TileArt.Hash(r.Ox + lx, r.Oy + ly * 7);
-                if (h < 0.45f) continue;
-                float x = r.Px + lx * TS + h * 12, y = r.Py + ly * TS, len = 14 + h * 50;
-                c.FillRectGradV(x, y, 2 + h * 3, len, new Color(0, 0, 0, 0.3f), new Color(0, 0, 0, 0));
-                if (r.Region == "saltworks") c.FillRectGradV(x + 1, y, 1, len * 0.6f, new Color(0.9f, 0.9f, 0.92f, 0.12f), new Color(0.9f, 0.9f, 0.92f, 0));
-                if (r.Region is "cloister" or "choir") c.FillRectGradV(x + 1, y, 1.5f, len * 0.4f, new Color(0.2f, 0.35f, 0.2f, 0.25f), new Color(0.2f, 0.35f, 0.2f, 0));
-            }
-    }
-
     // The Saltworks: posts, cross braces and beams, salt-stained.
     static void Timber(Canvas c, RoomDef r, TileArt.Pal pal, Func<int, int, bool> solidAt, Func<int, int, bool> open)
     {
@@ -764,104 +725,6 @@ public static class Decor
             }
         }
     }
-    // The Ribvault and the Skull: the giant's bones curve through the back wall.
-    static void Ribs(Canvas c, RoomDef r, TileArt.Pal pal, Func<int, int, bool> open)
-    {
-        var bone = C("#5e5444", 0.85f); var boneHi = C("#8a7c64", 0.7f);
-        for (float x = r.Px + 40; x < r.Px + r.Pw - 20; x += 110)
-        {
-            float h = MathF.Min(r.Ph - 30, 300), y0 = r.Py + r.Ph - 10, y1 = y0 - h, bend = 46;
-            c.Stroke = new Color(0, 0, 0, 0.35f); c.LineWidth = 12;
-            c.BeginPath(); c.MoveTo(x + 3, y0); c.QuadraticCurveTo(x - bend + 3, (y0 + y1) / 2, x + 40, y1); c.StrokePath();
-            c.Stroke = bone; c.LineWidth = 9;
-            c.BeginPath(); c.MoveTo(x, y0); c.QuadraticCurveTo(x - bend, (y0 + y1) / 2, x + 37, y1); c.StrokePath();
-            c.Stroke = boneHi; c.LineWidth = 2.5f;
-            c.BeginPath(); c.MoveTo(x - 3, y0); c.QuadraticCurveTo(x - bend - 3, (y0 + y1) / 2, x + 34, y1 - 2); c.StrokePath();
-        }
-    }
-    // The Gullet: ridged, wet, faintly alive.
-    static void Flesh(Canvas c, RoomDef r, TileArt.Pal pal, Func<int, int, bool> open)
-    {
-        for (float x = r.Px + 10; x < r.Px + r.Pw; x += 34)
-        {
-            c.Stroke = C("#2a1a1e", 0.6f); c.LineWidth = 7;
-            c.BeginPath(); c.MoveTo(x, r.Py); for (float y = 0; y <= r.Ph; y += 24) c.LineTo(x + MathF.Sin(y * 0.03f + x) * 8, r.Py + y); c.StrokePath();
-            c.Stroke = C("#4a2a2e", 0.35f); c.LineWidth = 2;
-            c.BeginPath(); c.MoveTo(x - 2, r.Py); for (float y = 0; y <= r.Ph; y += 24) c.LineTo(x - 2 + MathF.Sin(y * 0.03f + x) * 8, r.Py + y); c.StrokePath();
-        }
-        c.Stroke = C("#5a2a30", 0.3f); c.LineWidth = 0.8f;
-        for (int i = 0; i < 24; i++)
-        {
-            float vx = r.Px + TileArt.Hash(i, 3) * r.Pw, vy = r.Py + TileArt.Hash(i, 9) * r.Ph;
-            c.BeginPath(); c.MoveTo(vx, vy); c.QuadraticCurveTo(vx + 10, vy + 6, vx + 18, vy + 2); c.QuadraticCurveTo(vx + 24, vy, vx + 30, vy + 8); c.StrokePath();
-        }
-    }
-
-    // ---- details on the masonry itself: tide band, moss, grass, salt, cracks -------------------------------
-    public static void PaintSolidDetail(Canvas c, RoomDef r, Func<int, int, bool> solidAt)
-    {
-        char At(int lx, int ly) => (lx < 0 || ly < 0 || lx >= r.Tw || ly >= r.Th) ? '#' : r.Live[ly * r.Tw + lx];
-        bool tidal = r.Row == 4 && r.FixedWater == null;
-        float hiLine = (Tide.SEA_HIGH - Tide.spring) * TS, loLine = (Tide.SEA_LOW - Tide.spring) * TS;
-        string reg = r.Region;
-        for (int ly = 0; ly < r.Th; ly++)
-            for (int lx = 0; lx < r.Tw; lx++)
-            {
-                char ch = At(lx, ly);
-                if (ch is not ('#' or 'G' or 'M')) continue;
-                bool up = !solidAt(lx, ly - 1), down = !solidAt(lx, ly + 1), left = !solidAt(lx - 1, ly), right = !solidAt(lx + 1, ly);
-                if (!(up || down || left || right)) continue;
-                float x = r.Px + lx * TS, y = r.Py + ly * TS; int tx = r.Ox + lx, ty = r.Oy + ly;
-                float h = TileArt.Hash(tx * 3, ty * 5);
-                // the tide band: everything the sea covers at high water is darker, greener, crusted
-                if (tidal && y + TS > hiLine)
-                {
-                    float wet = Math.Clamp((y + TS - hiLine) / TS, 0, 1);
-                    c.Fill = new Color(0.02f, 0.06f, 0.06f, 0.32f * wet); c.FillRect(x, y, TS, TS);
-                    if (y < hiLine + 1 && y + TS > hiLine) { c.Fill = new Color(0.85f, 0.88f, 0.86f, 0.22f); c.FillRect(x, hiLine - 0.5f, TS, 1); }
-                    if (h > 0.45f && (left || right || up))
-                        for (int i = 0; i < 3; i++)
-                        {
-                            float bx = x + Hsh(h, i) * 14 + 1, by = y + Hsh(h, i + 5) * 14 + 1;
-                            c.Fill = C("#a8a49a", 0.85f); c.FillCircle(bx, by, 1.2f); c.Fill = C("#3a3832", 0.9f); c.FillCircle(bx, by, 0.45f);
-                        }
-                    if (y + TS > loLine && h > 0.3f) { c.Fill = C("#2e5a3a", 0.55f); c.FillRect(x + h * 8, y + 2, 5, 1.2f); c.FillRect(x + Hsh(h, 2) * 12, y + 9, 3, 1); }
-                }
-                // tops
-                if (up)
-                {
-                    if (r.Outdoor && !(tidal && y >= loLine))
-                    {
-                        // sea grass and thrift on the rocks
-                        for (int i = 0; i < 5; i++)
-                        {
-                            float gx = x + 1 + i * 3 + Hsh(h, i) * 2, gh = 2 + Hsh(h, i + 4) * 4;
-                            c.Stroke = i % 2 == 0 ? C("#4a6a3a", 0.95f) : C("#6a7a44", 0.9f); c.LineWidth = 0.8f;
-                            c.Line(gx, y + 0.5f, gx + (Hsh(h, i + 9) - 0.5f) * 2, y - gh);
-                        }
-                        if (h > 0.82f) { c.Fill = C("#d890a8"); c.FillCircle(x + 6 + h * 4, y - 3.5f, 1); c.FillCircle(x + 8 + h * 4, y - 2.8f, 0.8f); }
-                    }
-                    else if (reg == "cloister" || reg == "gullet") { c.Fill = reg == "gullet" ? C("#3a2a2e", 0.7f) : C("#3e5a36", 0.75f); c.FillRect(x, y - 0.5f, TS, 1.6f); if (h > 0.5f) { c.FillRect(x + h * 10, y + 1, 4, 1.4f); } }
-                    else if (reg == "saltworks" && h > 0.35f) { c.Fill = C("#e6e6ea", 0.6f); c.FillRect(x + h * 6, y - 1, 6, 1.4f); c.FillRect(x + h * 6 + 2, y - 2, 2, 1); }
-                    else if (h > 0.6f && !r.Outdoor) { c.Fill = Mul(TileArt.PAL[reg].stone, 0.9f); c.FillRect(x + h * 12, y - 1.5f, 2, 1.5f); c.FillRect(x + h * 12 + 3, y - 1, 1.2f, 1); }
-                }
-                // undersides drip moss in the damp regions
-                if (down && (reg is "cloister" or "choir" or "gullet" || (r.Outdoor && h > 0.4f)))
-                {
-                    c.Fill = reg == "gullet" ? C("#3a222a", 0.7f) : C("#2e4a30", 0.7f);
-                    for (int i = 0; i < 3; i++) { float mx = x + 2 + i * 5 + Hsh(h, i) * 2, ml = 1.5f + Hsh(h, i + 3) * 3.5f; c.FillRect(mx, y + TS, 1.2f, ml); }
-                }
-                // cracks and missing stones on exposed faces
-                if ((left || right) && h > 0.86f)
-                {
-                    c.Stroke = new Color(0, 0, 0, 0.45f); c.LineWidth = 0.6f;
-                    float sx = left ? x + 1 : x + TS - 1;
-                    c.BeginPath(); c.MoveTo(sx, y + 3); c.LineTo(sx + (left ? 4 : -4), y + 7); c.LineTo(sx + (left ? 3 : -3), y + 12); c.StrokePath();
-                }
-                if (up && h < 0.08f) { c.Fill = new Color(0, 0, 0, 0.45f); c.FillRect(x + 4, y, 6, 3); }
-            }
-    }
-
     // ---- moving and burning things, drawn each frame ------------------------------------------------------
     public static void PaintDynamic(Canvas c, List<DecorItem> items, float t, Rect2 view)
     {

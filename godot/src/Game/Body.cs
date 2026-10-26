@@ -423,12 +423,20 @@ public class Body : Ent
     // The drowned: a sodden robe with a torn hem, a rope cinch, a deep hood over a bloated face, salt
     // crusted on the cloth and weed trailing from the shoulders. The robe follows the skeleton, so it
     // hangs when they stand, drags when they crawl and lies flat when they are down.
+    static readonly Dictionary<(string, float), string> shades = new();
+    protected static string Shade(string hex, float k)
+    {
+        if (!shades.TryGetValue((hex, k), out var s)) shades[(hex, k)] = s = "#" + H.Col(hex).Lerp(H.Col("#0e0f10"), k).ToHtml(false);
+        return s;
+    }
     protected void DrawHuman(Canvas c, Palette pal)
     {
         var j = Skel();
         int f = facing;
-        string robe = pal.robe, skin = pal.skin, dark = pal.dark ?? "#1a1d1e";
+        // as Hollow Knight treats its crowds: dark bodies that keep a hint of their colour, pale masks
+        string robe = Shade(pal.robe, 0.6f), skin = Shade(pal.skin, 0.55f), dark = Shade(pal.dark ?? "#1a1d1e", 0.4f);
         var robeC = H.Col(robe); var skinC = H.Col(skin);
+        var maskC = H.Col(pal.skin).Lerp(H.Col("#e4ded0"), 0.62f);
         var sl = j["shoulderL"]; var sr = j["shoulderR"]; var hip = j["hip"]; var head = j["head"]; var neck = j["neck"];
         var sh = (sl + sr) / 2;
         float seed = (key?.Length ?? 3) * 0.37f + x * 0.013f;
@@ -512,9 +520,10 @@ public class Body : Ent
         c.Fill = robeC; c.FillCircle(j["elbowL"].X, j["elbowL"].Y, 1.6f);
 
         // the head: grey and swollen, eye hollows, the jaw slack
-        c.Fill = skinC; c.FillCircle(head.X, head.Y, 3.3f);
+        c.Fill = maskC; c.FillCircle(head.X, head.Y, 3.3f);
         c.Fill = new Color(0, 0, 0, 0.18f); c.BeginPath(); c.Arc(head.X, head.Y, 3.3f, H.PI * 0.1f, H.PI * 0.9f); c.FillPath();
-        c.Fill = new Color(0.05f, 0.06f, 0.07f, 0.75f); c.BeginPath(); c.Ellipse(head.X + f * 1.5f, head.Y - 0.4f, 0.9f, 1.1f, 0, 0, H.PI * 2); c.FillPath();
+        c.Fill = new Color(0.03f, 0.03f, 0.04f, 0.92f); c.BeginPath(); c.Ellipse(head.X + f * 1.5f, head.Y - 0.4f, 1.1f, 1.4f, 0, 0, H.PI * 2); c.FillPath();
+        c.BeginPath(); c.Ellipse(head.X - f * 0.4f, head.Y - 0.6f, 0.8f, 1.1f, 0, 0, H.PI * 2); c.FillPath();
         c.FillRect(head.X + f * 1.2f - 0.6f, head.Y + 1.6f, 1.6f, 0.6f);
         bool hostile = mode is "hunt" or "windup" or "attack" or "grab" or "inhale";
         if (hostile && !corpse) { c.Fill = new Color(0.7f, 0.95f, 1f, 0.9f); c.FillCircle(head.X + f * 1.6f, head.Y - 0.4f, 0.45f); c.Glow(head.X + f * 1.6f, head.Y - 0.4f, 2.5f, new Color(0.6f, 0.9f, 1f, 0.5f)); }

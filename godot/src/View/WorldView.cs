@@ -16,7 +16,9 @@ public partial class DrawLayer : Node2D
     public override void _Draw()
     {
         long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
-        Paint?.Invoke(cv.Begin(this));
+        var c = cv.Begin(this, true);
+        Paint?.Invoke(c);
+        c.Flush();
         double ms = (System.Diagnostics.Stopwatch.GetTimestamp() - t0) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
         DrawMs += ms; ByLayer[Name] = ByLayer.GetValueOrDefault(Name) + ms;
     }
@@ -29,11 +31,18 @@ public partial class WorldView : Node2D
 
     CanvasModulate modulate;
     DrawLayer back, deco, entities, water, waterLines, solid, dyn, fxShaded, fxGlow, fxText, sky, rain, overlay, hud;
-    // Static room art is baked once per room into offscreen textures and drawn as single lit quads.
-    SubViewport backBake, solidBake;
-    DrawLayer backArt, solidArt;
-    int bakeWait;
+    DrawLayer far, midL, fore, foreMotes;
+    // Static room art is baked once per room into offscreen textures, in the palette shader's encoding,
+    // and drawn as single quads: the far and mid depths on their own parallax canvases, the back wall and
+    // rock in the lit world, the out-of-focus foreground over everything.
+    SubViewport backBake, solidBake, farBake, midBake, foreBake;
+    DrawLayer backArt, solidArt, farArt, midArt, foreArt;
+    ShaderMaterial farMat, midMat, backMat, solidMat, decoMat, dynMat, foreMat;
+    Rect2 farArea, midArea, foreArea;
+    int bakeWait, bakes;
     const float BAKE = 2;   // the bakes hold twice the pixels so props and edges stay crisp when the view is scaled up
+    const float FAR_F = 0.3f, MID_F = 0.62f, FORE_F = 1.12f;   // parallax: how fast each depth moves with the camera
+    const float AMBIENT = 0.62f;   // the lit world's darkness; palettes are authored as seen with no lamp near
     List<DecorItem> decor = new();
     static readonly Dictionary<string, List<DecorItem>> decorCache = new();
     Node2D occluders, lightRoot;
@@ -48,7 +57,6 @@ public partial class WorldView : Node2D
     // per-room cache
     RoomDef cached;
     bool dirty = true;
-    int[] dist = Array.Empty<int>();
     readonly List<(int x, int y)> dynCells = new(), windows = new(), ceilings = new(), tops = new();
     readonly List<int> pillars = new();
 
@@ -71,20 +79,28 @@ public partial class WorldView : Node2D
         AddChild(skyLayer);
         sky = new DrawLayer { Paint = PaintSky };
         skyLayer.AddChild(sky);
+        // the depths: their own canvases, so no lamp reaches them, moving slower than the world
+        farMat = Palettes.Material(); midMat = Palettes.Material(); foreMat = Palettes.Material(1.6f, true, 0.96f);
+        backMat = Palettes.Material(); solidMat = Palettes.Material(); decoMat = Palettes.Material(0, false); dynMat = Palettes.Material(0, false);
+        farBake = MakeBake(out farArt, c => Encoded(c, cc => Strata.PaintFar(cc, G.room, farArea)));
+        midBake = MakeBake(out midArt, c => Encoded(c, cc => Strata.PaintMid(cc, G.room, midArea)));
+        foreBake = MakeBake(out foreArt, c => Encoded(c, cc => Strata.PaintFore(cc, G.room, foreArea, (x, y) => Terrain.IsMass(At(G.room, x, y)))));
+        far = DepthLayer(-8, farBake, () => farArea, FAR_F, farMat);
+        midL = DepthLayer(-7, midBake, () => midArea, MID_F, midMat);
 
         modulate = new CanvasModulate { Color = ambient };
         AddChild(modulate);
         backBake = MakeBake(out backArt, PaintBack);
         solidBake = MakeBake(out solidArt, PaintSolid);
-        back = Add(new DrawLayer { Paint = c => DrawBake(c, backBake), TextureFilter = TextureFilterEnum.Linear });
-        deco = Add(new DrawLayer { Paint = c => Decor.PaintDynamic(c, decor, G.Now, ViewRect()) });
+        back = Add(new DrawLayer { Paint = c => DrawBake(c, backBake), TextureFilter = TextureFilterEnum.Linear, Material = backMat });
+        deco = Add(new DrawLayer { Paint = c => { c.Encode = true; c.EncGain = 1.5f; Decor.PaintDynamic(c, decor, G.Now, ViewRect()); }, Material = decoMat });
         entities = Add(new DrawLayer { Paint = PaintEntities });
         water = Add(new DrawLayer { Paint = PaintWater });
         waterMat = new ShaderMaterial { Shader = GD.Load<Shader>("res://shaders/water.gdshader") };
         water.Material = waterMat;
         waterLines = Add(new DrawLayer { Paint = PaintWaterLines });
-        solid = Add(new DrawLayer { Paint = c => DrawBake(c, solidBake), TextureFilter = TextureFilterEnum.Linear });
-        dyn = Add(new DrawLayer { Paint = PaintDynamic });
+        solid = Add(new DrawLayer { Paint = c => DrawBake(c, solidBake), TextureFilter = TextureFilterEnum.Linear, Material = solidMat });
+        dyn = Add(new DrawLayer { Paint = c => { c.Encode = true; c.EncGain = 1.0f; PaintDynamic(c); }, Material = dynMat });
         fxShaded = Add(new DrawLayer { Paint = PaintFxShaded });
         fxGlow = Add(new DrawLayer { Paint = PaintFxGlow, Material = new CanvasItemMaterial { BlendMode = CanvasItemMaterial.BlendModeEnum.Add, LightMode = CanvasItemMaterial.LightModeEnum.Unshaded } });
         fxText = Add(new DrawLayer { Paint = PaintFxText, Material = new CanvasItemMaterial { LightMode = CanvasItemMaterial.LightModeEnum.Unshaded } });
@@ -98,6 +114,11 @@ public partial class WorldView : Node2D
 
         camera = new Camera2D { AnchorMode = Camera2D.AnchorModeEnum.FixedTopLeft, Enabled = true };
         AddChild(camera);
+
+        // the foreground, out of focus and in front of everything in the world
+        fore = DepthLayer(1, foreBake, () => foreArea, FORE_F, foreMat);
+        foreMotes = new DrawLayer { Paint = PaintForeMotes };
+        fore.GetParent().AddChild(foreMotes);
 
         // rain, glimpses and the finishing pass sit above the world, below the HUD
         var postLayer = new CanvasLayer { Layer = 5 };
@@ -119,11 +140,31 @@ public partial class WorldView : Node2D
         G.RoomChanged += () => { dirty = true; roomFade = 1; };
     }
     DrawLayer Add(DrawLayer d) { AddChild(d); return d; }
+    static void Encoded(Canvas c, Action<Canvas> paint) { if (G.room == null) return; c.Encode = true; paint(c); }
+    // A canvas that follows the camera, holding one baked depth drawn with parallax.
+    DrawLayer DepthLayer(int layer, SubViewport vp, Func<Rect2> area, float f, ShaderMaterial mat)
+    {
+        var cl = new CanvasLayer { Layer = layer, FollowViewportEnabled = true };
+        AddChild(cl);
+        var d = new DrawLayer { TextureFilter = TextureFilterEnum.Linear, Material = mat };
+        d.Paint = c =>
+        {
+            var r = G.room;
+            if (r == null || cached != r || bakeWait > 0) return;
+            var a = area();
+            var o = (G.cam - Strata.CamCentre(r)) * (1 - f);
+            c.Fill = Colors.White;
+            c.Texture(vp.GetTexture(), a.Position.X + o.X, a.Position.Y + o.Y, a.Size.X, a.Size.Y);
+        };
+        cl.AddChild(d);
+        return d;
+    }
     SubViewport MakeBake(out DrawLayer art, Action<Canvas> paint)
     {
+        bakes++;
         var vp = new SubViewport { TransparentBg = true, Disable3D = true, RenderTargetUpdateMode = SubViewport.UpdateMode.Disabled, CanvasItemDefaultTextureFilter = Viewport.DefaultCanvasItemTextureFilter.Linear };
         AddChild(vp);
-        art = new DrawLayer { Paint = paint };
+        art = new DrawLayer { Paint = paint, Name = "bake" + bakes };
         vp.AddChild(art);
         return vp;
     }
@@ -145,17 +186,6 @@ public partial class WorldView : Node2D
     {
         var r = G.room;
         cached = r; dirty = false;
-        dist = new int[r.Tw * r.Th];
-        for (int ly = 0; ly < r.Th; ly++) for (int lx = 0; lx < r.Tw; lx++)
-            {
-                if (SolidAt(r, lx, ly)) { dist[ly * r.Tw + lx] = 0; continue; }
-                int d = 9;
-                for (int rad = 1; rad <= 4 && d == 9; rad++)
-                    for (int dy = -rad; dy <= rad && d == 9; dy++)
-                        for (int dx = -rad; dx <= rad; dx++)
-                            if ((Math.Abs(dx) == rad || Math.Abs(dy) == rad) && SolidAt(r, lx + dx, ly + dy)) { d = rad; break; }
-                dist[ly * r.Tw + lx] = d;
-            }
         dynCells.Clear(); windows.Clear(); ceilings.Clear(); tops.Clear(); pillars.Clear();
         var pset = new HashSet<int>();
         for (int ly = 0; ly < r.Th; ly++) for (int lx = 0; lx < r.Tw; lx++)
@@ -173,14 +203,14 @@ public partial class WorldView : Node2D
         // set dressing is decided once per room, so it does not shuffle when a door opens or a pickup goes
         if (!decorCache.TryGetValue(r.Id, out decor))
             decorCache[r.Id] = decor = Decor.Build(r, (lx, ly) => SolidAt(r, lx, ly), G.ents);
-        var pal = TileArt.PAL[r.Region];
-        ambient = r.Outdoor ? new Color(0.54f, 0.58f, 0.68f) : (r.BellRoom ? pal.ambient * 1.55f : pal.ambient * 1.25f);
-        ambient.A = 1;
-        foreach (var (vp, art) in new[] { (backBake, backArt), (solidBake, solidArt) })
+        ambient = new Color(AMBIENT, AMBIENT, AMBIENT);
+        farArea = Strata.Area(r, FAR_F); midArea = Strata.Area(r, MID_F); foreArea = Strata.Area(r, FORE_F);
+        var room = new Rect2(r.Px, r.Py, r.Pw, r.Ph);
+        foreach (var (vp, art, area, scale) in new[] { (backBake, backArt, room, BAKE), (solidBake, solidArt, room, BAKE), (farBake, farArt, farArea, 1.5f), (midBake, midArt, midArea, 1.5f), (foreBake, foreArt, foreArea, 1f) })
         {
-            vp.Size = new Vector2I((int)(r.Pw * BAKE), (int)(r.Ph * BAKE));
-            art.Scale = new Vector2(BAKE, BAKE);
-            art.Position = new Vector2(-r.Px * BAKE, -r.Py * BAKE);
+            vp.Size = new Vector2I((int)(area.Size.X * scale), (int)(area.Size.Y * scale));
+            art.Scale = new Vector2(scale, scale);
+            art.Position = -area.Position * scale;
             art.QueueRedraw();
             vp.RenderTargetUpdateMode = SubViewport.UpdateMode.Once;
         }
@@ -223,11 +253,28 @@ public partial class WorldView : Node2D
         var p = G.player;
         float sx = Settings.Shake ? G.shakeX : 0, sy = Settings.Shake ? G.shakeY : 0;
         camera.Position = G.cam + new Vector2(sx, sy);
-        modulate.Color = G.room.Outdoor ? ambient.Lerp(new Color(0.85f, 0.9f, 1f), lightningFlash * 0.6f) : ambient;
+        modulate.Color = G.room.Outdoor ? ambient.Lerp(new Color(1f, 1f, 1f), lightningFlash * 0.5f) : ambient;
         UpdateLights(p);
         UpdatePost(p, dt);
-        foreach (var l in new[] { sky, back, deco, entities, water, waterLines, solid, dyn, fxShaded, fxGlow, fxText, rain, overlay, hud }) l.QueueRedraw();
-        if (sky.Name != "sky") { sky.Name = "sky"; back.Name = "back"; deco.Name = "deco"; entities.Name = "entities"; water.Name = "water"; waterLines.Name = "waterLines"; solid.Name = "solid"; dyn.Name = "dyn"; fxShaded.Name = "fxShaded"; fxGlow.Name = "fxGlow"; fxText.Name = "fxText"; rain.Name = "rain"; overlay.Name = "overlay"; hud.Name = "hud"; }
+        UpdatePalettes(dt);
+        foreach (var l in new[] { sky, far, midL, back, deco, entities, water, waterLines, solid, dyn, fxShaded, fxGlow, fxText, fore, foreMotes, rain, overlay, hud }) l.QueueRedraw();
+        if (sky.Name != "sky") { sky.Name = "sky"; far.Name = "far"; midL.Name = "mid"; back.Name = "back"; deco.Name = "deco"; entities.Name = "entities"; water.Name = "water"; waterLines.Name = "waterLines"; solid.Name = "solid"; dyn.Name = "dyn"; fxShaded.Name = "fxShaded"; fxGlow.Name = "fxGlow"; fxText.Name = "fxText"; fore.Name = "fore"; foreMotes.Name = "foreMotes"; rain.Name = "rain"; overlay.Name = "overlay"; hud.Name = "hud"; }
+    }
+
+    // Colours every encoded layer from the region's palette, drifting with the tide.
+    float tideW;
+    void UpdatePalettes(float dt)
+    {
+        var r = G.room;
+        tideW = Palettes.TideW(dt);
+        float lit = 1 / AMBIENT;
+        Palettes.Apply(farMat, r, tideW, 0.5f, 0.3f, 0.03f);
+        Palettes.Apply(midMat, r, tideW, 0.34f, 0.35f, 0.025f);
+        Palettes.Apply(backMat, r, tideW, 0.12f, 0.25f, 0.015f, lit);
+        Palettes.Apply(decoMat, r, tideW, 0.08f, 0.2f, 0, lit);
+        Palettes.Apply(solidMat, r, tideW, 0, 0.12f, 0, lit);
+        Palettes.Apply(dynMat, r, tideW, 0, 0.1f, 0, lit);
+        Palettes.Apply(foreMat, r, tideW, 0, 0, 0);
     }
 
     void UpdateLights(Player p)
@@ -318,7 +365,9 @@ public partial class WorldView : Node2D
         var r = G.room; var cam = G.cam;
         if (r.Outdoor)
         {
-            while (drops.Count < 190) drops.Add(new Drop { x = H.Rand() * (VW + 120) - 60, y = H.Rand() * VH, v = 300 + H.Rand() * 160, l = 6 + H.Rand() * 8 });
+            int want0 = 120 + (int)(170 * tideW);
+            if (drops.Count > want0) drops.RemoveRange(want0, drops.Count - want0);
+            while (drops.Count < want0) drops.Add(new Drop { x = H.Rand() * (VW + 120) - 60, y = H.Rand() * VH, v = 300 + H.Rand() * 160, l = 6 + H.Rand() * 8 });
             foreach (var d in drops) { d.y += d.v * dt; d.x -= d.v * 0.28f * dt; if (d.y > VH || d.x < -40) { d.y = -10; d.x = H.Rand() * (VW + 120); } }
             var top = tops.Count > 0 && H.Rand() < dt * 40 ? PickVisible(tops) : null;
             if (top != null)
@@ -329,7 +378,7 @@ public partial class WorldView : Node2D
             lightningNext -= dt;
             if (lightningNext <= 0)
             {
-                lightningNext = 14 + H.Rand() * 22; lightningFlash = 1; lightningSecond = 0.18f;
+                lightningNext = (14 + H.Rand() * 22) * (1 - tideW * 0.6f); lightningFlash = 1; lightningSecond = 0.18f;
                 G.After(0.7f + H.Rand() * 1.2f, Snd.Rumble);
             }
         }
@@ -363,7 +412,7 @@ public partial class WorldView : Node2D
         var cam = G.cam; string reg = G.room.Region;
         float x = cam.X + H.Rand() * VW, y = cam.Y + H.Rand() * VH;
         float r = H.Rand();
-        var ceil = (reg is "wrackline" or "cloister" or "choir" or "gullet") && r < 0.12f ? PickVisible(ceilings) : null;
+        var ceil = (reg is "wrackline" or "cloister" or "choir" or "gullet") && r < 0.12f + 0.2f * tideW ? PickVisible(ceilings) : null;
         if (ceil != null) return new Mote { kind = "drip", x = ceil.Value.x * TS + 4 + H.Rand() * 8, y = ceil.Value.y * TS + 1, life = 4 };
         if (World.IsWater(x, y)) return new Mote { kind = "bubble", x = x, y = y, vy = -18, life = 3 + H.Rand() * 3, p = H.Rand() * 6 };
         if (reg == "saltworks" && r < 0.6f) return new Mote { kind = "salt", x = x, y = initial ? y : cam.Y - 5, vx = 4, vy = 9 + H.Rand() * 6, life = 12, p = H.Rand() * 6 };
@@ -378,8 +427,8 @@ public partial class WorldView : Node2D
         if (r == null) return;
         if (!r.Outdoor)
         {
-            var pal = TileArt.PAL[r.Region];
-            c.FillRectGradV(0, 0, VW, VH, pal.bg0, pal.bg1);
+            var fog = Palettes.For(r).fog;
+            c.FillRectGradV(0, 0, VW, VH, fog, fog * 0.8f);
             return;
         }
         Backdrop.Outdoor(c, cam, t, lightningFlash);
@@ -388,22 +437,18 @@ public partial class WorldView : Node2D
     void PaintBack(Canvas c)
     {
         var r = G.room; if (r == null || cached != r) return;
-
-        var pal = TileArt.PAL[r.Region];
-        for (int ly = 0; ly < r.Th; ly++) for (int lx = 0; lx < r.Tw; lx++)
-            {
-                char ch = r.Live[ly * r.Tw + lx];
-                if (!r.Outdoor && !TileArt.COVERS.Contains(ch) && ch != 'w') TileArt.BackTile(c, r.Px + lx * TS, r.Py + ly * TS, r.Ox + lx, r.Oy + ly, pal, r, dist.Length > 0 ? dist[ly * r.Tw + lx] : 4);
-            }
-        Decor.PaintWallWear(c, r, (lx, ly) => SolidAt(r, lx, ly));
+        c.Encode = true;
+        Strata.PaintBackWall(c, r, (lx, ly) => SolidAt(r, lx, ly));
+        c.EncGain = 1.5f;
         Decor.PaintArchitecture(c, r, (lx, ly) => SolidAt(r, lx, ly));
         for (int ly = 0; ly < r.Th; ly++) for (int lx = 0; lx < r.Tw; lx++)
             {
                 char ch = r.Live[ly * r.Tw + lx];
                 float x = r.Px + lx * TS, y = r.Py + ly * TS; int tx = r.Ox + lx, ty = r.Oy + ly;
-                if (ch == 'w') TileArt.WindowHole(c, x, y);
-                if (TileArt.DECOR.Contains(ch)) TileArt.Decor(c, ch, x, y, tx, ty);
+                if (ch == 'w') Window(c, x, y, tx, ty);
+                else if (TileArt.DECOR.Contains(ch)) TileArt.Decor(c, ch, x, y, tx, ty);
             }
+        c.EncGain = 1.4f;
         Decor.PaintBackProps(c, r, decor);
         // tide marks on pillars (static per room; drawn with the back wall)
         if (r.Row == 4 && r.FixedWater == null)
@@ -414,10 +459,18 @@ public partial class WorldView : Node2D
                 for (int i = 0; i < 4; i++)
                 {
                     float y = H.Lerp(lo, hi, i / 3f);
-                    c.Fill = H.Rgba(200, 170, 90, 0.55f); c.FillRect(tx * TS + 3, y - 0.5f, TS - 6, 1.2f);
-                    c.Fill = H.Rgba(200, 170, 90, 0.45f); c.FillText(new[] { "I", "II", "III", "IV" }[i], tx * TS + 4, y - 2);
+                    c.Fill = Canvas.VA(0.7f, 0.5f, 0.8f); c.FillRect(tx * TS + 3, y - 0.5f, TS - 6, 1.2f);
+                    c.Fill = Canvas.VA(0.7f, 0.5f, 0.7f); c.FillText(new[] { "I", "II", "III", "IV" }[i], tx * TS + 4, y - 2);
                 }
         }
+    }
+    // A stained-glass lancet in the back wall, lit from outside.
+    static void Window(Canvas c, float x, float y, int tx, int ty)
+    {
+        c.Fill = Canvas.Gl(0.4f, 0.9f); c.FillRect(x + 3, y, TS - 6, TS);
+        c.Fill = Canvas.VA(0.85f, 0.4f + TileArt.Hash(tx, ty) * 0.4f, 0.45f); c.FillRect(x + 3, y, TS - 6, TS);
+        c.Fill = Canvas.V(0.08f); c.FillRect(x + 7.2f, y, 1.6f, TS); c.FillRect(x + 3, y + 7, TS - 6, 1.4f);
+        c.FillRect(x + 2, y, 1.4f, TS); c.FillRect(x + TS - 3.4f, y, 1.4f, TS);
     }
 
     void PaintSolid(Canvas c)
@@ -425,13 +478,17 @@ public partial class WorldView : Node2D
         var r = G.room; if (r == null || cached != r) return;
         var pal = TileArt.PAL[r.Region];
         bool SA(int lx, int ly) => SolidAt(r, lx, ly);
+        c.Encode = true;
+        Terrain.Paint(c, r, (x, y) => At(r, x, y));
+        // timber and bone keep their own drawing, coloured by the palette like the rest
+        c.EncGain = 1.4f;
         for (int ly = 0; ly < r.Th; ly++) for (int lx = 0; lx < r.Tw; lx++)
             {
                 char ch = r.Live[ly * r.Tw + lx];
-                if (!TileArt.SOLIDS.Contains(ch)) continue;
+                if (!TileArt.SOLIDS.Contains(ch) || Terrain.IsMass(ch)) continue;
+                c.EncGain = ch == 'R' ? 1.4f : 0.95f;
                 TileArt.SolidTile(c, ch, r.Px + lx * TS, r.Py + ly * TS, r.Ox + lx, r.Oy + ly, r, pal, SA, lx, ly);
             }
-        Decor.PaintSolidDetail(c, r, SA);
     }
 
     void PaintDynamic(Canvas c)
@@ -498,8 +555,14 @@ public partial class WorldView : Node2D
         Flush();
         if (!float.IsFinite(top)) return;
         if (r.Brine) { waterMat.SetShaderParameter("top_col", H.Rgba(190, 205, 190, 0.38f)); waterMat.SetShaderParameter("deep_col", H.Rgba(110, 130, 115, 0.62f)); waterMat.SetShaderParameter("caustic_col", new Vector3(0.9f, 0.95f, 0.85f)); }
-        else if (r.Deep) { waterMat.SetShaderParameter("top_col", H.Rgba(25, 70, 90, 0.5f)); waterMat.SetShaderParameter("deep_col", H.Rgba(4, 16, 24, 0.82f)); waterMat.SetShaderParameter("caustic_col", new Vector3(0.45f, 0.7f, 0.85f)); }
-        else { waterMat.SetShaderParameter("top_col", H.Rgba(40, 95, 110, 0.38f)); waterMat.SetShaderParameter("deep_col", H.Rgba(8, 28, 40, 0.7f)); waterMat.SetShaderParameter("caustic_col", new Vector3(0.55f, 0.82f, 0.92f)); }
+        else
+        {
+            var pal = Palettes.For(r);
+            var wt = pal.waterTop.Lerp(pal.waterDeep, tideW * 0.3f); wt.A = r.Deep ? 0.5f : 0.4f;
+            var wd = pal.waterDeep; wd.A = r.Deep ? 0.85f : 0.72f;
+            waterMat.SetShaderParameter("top_col", wt); waterMat.SetShaderParameter("deep_col", wd);
+            waterMat.SetShaderParameter("caustic_col", new Vector3(pal.glow.R, pal.glow.G, pal.glow.B) * 0.75f);
+        }
         waterMat.SetShaderParameter("top_y", top);
     }
 
@@ -634,6 +697,21 @@ public partial class WorldView : Node2D
     {
         Narr.DrawWorld(c);
         foreach (var n in G.noiseRings) { c.Stroke = H.Rgba(200, 200, 180, n.t * 0.12f); c.LineWidth = 1; c.BeginPath(); c.Arc(n.x, n.y, n.r * (1 - n.t), 0, H.PI * 2); c.StrokePath(); }
+    }
+
+    // Soft specks drifting close to the lens, the way Hollow Knight fills its air.
+    readonly (float x, float y, float s, float p)[] foreSpecks = Enumerable.Range(0, 14).Select(i => (TileArt.Hash(i, 71) * 760, TileArt.Hash(i, 72) * 420, 1.5f + TileArt.Hash(i, 73) * 3, TileArt.Hash(i, 74) * 6)).ToArray();
+    void PaintForeMotes(Canvas c)
+    {
+        var r = G.room; if (r == null || r.Outdoor) return;
+        float t = G.Now; var cam = G.cam;
+        var glow = Palettes.For(r).glow;
+        foreach (var m in foreSpecks)
+        {
+            float x = ((m.x + t * 6 * (0.5f + m.p / 6) - cam.X * 1.3f) % 760 + 760) % 760 - 60 + cam.X;
+            float y = ((m.y - t * 3 - cam.Y * 1.3f + MathF.Sin(t * 0.4f + m.p) * 10) % 420 + 420) % 420 - 30 + cam.Y;
+            c.Glow(x, y, m.s * 2.4f, new Color(glow.R, glow.G, glow.B, 0.07f + 0.04f * MathF.Sin(t + m.p)));
+        }
     }
 
     void PaintRain(Canvas c)

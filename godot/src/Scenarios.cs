@@ -542,8 +542,10 @@ public static class Scenarios
         {
             foreach (var (room, x, y) in new[] { ("breakers", 20f, 12f), ("kilns", 20f, 16f), ("cloister", 20f, 16f), ("choir", 20f, 16f), ("abbot", 20f, 16f), ("ribshaft", 10f, 40f) })
             {
+                DrawLayer.ByLayer.Clear();
                 t.Place(room, x, y);
                 await t.Run(0.5f);
+                GD.Print($"PERF {room} bake: " + string.Join(", ", DrawLayer.ByLayer.Where(kv => kv.Key.StartsWith("bake")).Select(kv => $"{kv.Key} {kv.Value:0.0} ms")));
                 double proc = 0; double calls = 0; int n = 0; DrawLayer.DrawMs = 0; DrawLayer.ByLayer.Clear();
                 var sw = System.Diagnostics.Stopwatch.StartNew();
                 for (int i = 0; i < 60; i++)

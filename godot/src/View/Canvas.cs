@@ -19,10 +19,11 @@ public class Canvas
     List<Vector2> cur;
     bool transformDirty = true;
 
-    public Canvas Begin(CanvasItem item)
+    public Canvas Begin(CanvasItem item, bool batch = false)
     {
         ci = item; rid = item.GetCanvasItem();
-        stack.Clear(); path.Clear(); cur = null;
+        stack.Clear(); path.Clear(); cur = null; Encode = false; EncGain = 1; EncAccent = 1; Flash = 0;
+        Batch = batch; bv.Clear(); bc.Clear(); bi.Clear();
         s = new State { T = Transform2D.Identity, Fill = Colors.White, Stroke = Colors.White, LineWidth = 1, Alpha = 1, Font = new FontSpec { Size = 10 }, Align = 0 };
         transformDirty = true;
         return this;
@@ -46,10 +47,71 @@ public class Canvas
     public void Scale(float x, float y) { s.T = s.T * new Transform2D(new Vector2(x, 0), new Vector2(0, y), Vector2.Zero); transformDirty = true; }
     public void SetTransform(Transform2D t) { s.T = t; transformDirty = true; }
     public Transform2D GetTransform() => s.T;
-    void ApplyT() { if (transformDirty) { ci.DrawSetTransformMatrix(s.T); transformDirty = false; } }
+    // Anything drawn directly first sends whatever has been batched, so order is kept.
+    void ApplyT() { Flush(); if (transformDirty) { ci.DrawSetTransformMatrix(s.T); transformDirty = false; } }
+
+    // ---- batching --------------------------------------------------------------------------------
+    // With Batch on, fills and opaque strokes are transformed here and gathered into one triangle array,
+    // sent with Flush: thousands of small shapes cost one call into the engine instead of thousands.
+    public bool Batch;
+    readonly List<Vector2> bv = new(); readonly List<Color> bc = new(); readonly List<int> bi = new();
+    public void Flush()
+    {
+        if (bi.Count == 0) return;
+        ci.DrawSetTransformMatrix(Transform2D.Identity);
+        RenderingServer.CanvasItemAddTriangleArray(rid, bi.ToArray(), bv.ToArray(), bc.ToArray());
+        bv.Clear(); bc.Clear(); bi.Clear();
+        transformDirty = true;
+    }
+    void AddTris(IReadOnlyList<Vector2> pts, int[] idx, Color col)
+    {
+        int b = bv.Count;
+        for (int i = 0; i < pts.Count; i++) { bv.Add(s.T * pts[i]); bc.Add(col); }
+        foreach (int i in idx) bi.Add(b + i);
+    }
+    void AddTris(IReadOnlyList<Vector2> pts, int[] idx, IReadOnlyList<Color> cols)
+    {
+        int b = bv.Count;
+        for (int i = 0; i < pts.Count; i++) { bv.Add(s.T * pts[i]); bc.Add(cols[i]); }
+        foreach (int i in idx) bi.Add(b + i);
+    }
+    static readonly int[] QUAD = { 0, 1, 2, 0, 2, 3 };
+    void AddSegment(Vector2 a, Vector2 b, float w, Color col, bool joint)
+    {
+        var d = b - a; float len = d.Length();
+        if (len < 1e-5f) return;
+        var n = new Vector2(-d.Y, d.X) / len * (w / 2);
+        AddTris(new[] { a + n, b + n, b - n, a - n }, QUAD, col);
+        if (joint && w > 1.6f) AddDisc(b, w / 2, col);
+    }
+    void AddDisc(Vector2 c, float r, Color col)
+    {
+        int n = Math.Clamp((int)(r * 2.2f), 8, 28);
+        var pts = new Vector2[n];
+        for (int i = 0; i < n; i++) { float a = i * MathF.Tau / n; pts[i] = c + new Vector2(MathF.Cos(a), MathF.Sin(a)) * r; }
+        AddTris(pts, Fan(n), col);
+    }
     // Flash whitens everything drawn while it is set (bodies struck by a hit).
     public float Flash;
-    Color A(Color c) => Flash <= 0 ? new(c.R, c.G, c.B, c.A * s.Alpha) : new(H.Lerp(c.R, 1, Flash), H.Lerp(c.G, 1, Flash), H.Lerp(c.B, 1, Flash), c.A * s.Alpha);
+    // Encode turns colours into the palette shader's channels as they are drawn: value (luminance) in red,
+    // accent (how colourful) in green and glow (anything brighter than white) in blue. Layers drawn this
+    // way are coloured later from the region's palette, so the tide can recolour them without a redraw.
+    public bool Encode;
+    public float EncGain = 1, EncAccent = 1;
+    Color A(Color c)
+    {
+        if (Encode)
+        {
+            float mx = MathF.Max(c.R, MathF.Max(c.G, c.B)), mn = MathF.Min(c.R, MathF.Min(c.G, c.B));
+            float luma = 0.299f * c.R + 0.587f * c.G + 0.114f * c.B;
+            return new Color(Math.Clamp(luma * EncGain, 0, 1), Math.Clamp((MathF.Min(mx, 1) - MathF.Min(mn, 1)) * EncAccent, 0, 1), Math.Clamp(mx - 1, 0, 1), c.A * s.Alpha);
+        }
+        return Flash <= 0 ? new(c.R, c.G, c.B, c.A * s.Alpha) : new(H.Lerp(c.R, 1, Flash), H.Lerp(c.G, 1, Flash), H.Lerp(c.B, 1, Flash), c.A * s.Alpha);
+    }
+    // Colours for encoded layers: a plain value, a value carrying some of the region's accent, a glow.
+    public static Color V(float v, float a = 1) => new(v, v, v, a);
+    public static Color VA(float v, float accent, float a = 1) => new(v + 0.7f * accent, v - 0.3f * accent, v - 0.3f * accent, a);
+    public static Color Gl(float g, float a = 1) => new(1 + g, 1 + g, 1 + g, a);
 
     // ---- rects ---------------------------------------------------------------------------------
     public void FillRect(float x, float y, float w, float h)
@@ -57,24 +119,49 @@ public class Canvas
         if (w < 0) { x += w; w = -w; }
         if (h < 0) { y += h; h = -h; }
         if (w == 0 || h == 0) return;
+        if (Batch) { AddTris(new[] { new Vector2(x, y), new Vector2(x + w, y), new Vector2(x + w, y + h), new Vector2(x, y + h) }, QUAD, A(s.Fill)); return; }
         ApplyT(); ci.DrawRect(new Rect2(x, y, w, h), A(s.Fill));
     }
     public void FillRect(float x, float y, float w, float h, Color c) { var f = s.Fill; s.Fill = c; FillRect(x, y, w, h); s.Fill = f; }
     public void StrokeRect(float x, float y, float w, float h) { ApplyT(); ci.DrawRect(new Rect2(x, y, w, h), A(s.Stroke), false, s.LineWidth); }
-    public void FillCircle(float x, float y, float r) { ApplyT(); ci.DrawCircle(new Vector2(x, y), r, A(s.Fill)); }
+    public void FillCircle(float x, float y, float r)
+    {
+        if (Batch) { if (r > 0) AddDisc(new Vector2(x, y), r, A(s.Fill)); return; }
+        ApplyT(); ci.DrawCircle(new Vector2(x, y), r, A(s.Fill));
+    }
 
     // Vertical / horizontal gradient rectangles and soft radial glows.
     public void FillRectGradV(float x, float y, float w, float h, Color top, Color bottom)
     {
+        if (Batch) { AddTris(new[] { new Vector2(x, y), new Vector2(x + w, y), new Vector2(x + w, y + h), new Vector2(x, y + h) }, QUAD, new[] { A(top), A(top), A(bottom), A(bottom) }); return; }
         ApplyT();
         ci.DrawPolygon(new[] { new Vector2(x, y), new Vector2(x + w, y), new Vector2(x + w, y + h), new Vector2(x, y + h) }, new[] { A(top), A(top), A(bottom), A(bottom) });
     }
     public void FillRectGradH(float x, float y, float w, float h, Color left, Color right)
     {
+        if (Batch) { AddTris(new[] { new Vector2(x, y), new Vector2(x + w, y), new Vector2(x + w, y + h), new Vector2(x, y + h) }, QUAD, new[] { A(left), A(right), A(right), A(left) }); return; }
         ApplyT();
         ci.DrawPolygon(new[] { new Vector2(x, y), new Vector2(x + w, y), new Vector2(x + w, y + h), new Vector2(x, y + h) }, new[] { A(left), A(right), A(right), A(left) });
     }
-    public void FillPolyGrad(Vector2[] pts, Color[] cols) { ApplyT(); var c = new Color[cols.Length]; for (int i = 0; i < c.Length; i++) c[i] = A(cols[i]); ci.DrawPolygon(pts, c); }
+    // A polygon with a colour per vertex. Repeated points are dropped (generated outlines produce them)
+    // and anything the triangulator refuses is drawn as a fan.
+    public void FillPolyGrad(Vector2[] pts, Color[] cols)
+    {
+        if (!Batch) ApplyT();
+        var p = new List<Vector2>(pts.Length); var cl = new List<Color>(pts.Length);
+        for (int i = 0; i < pts.Length; i++)
+        {
+            if (p.Count > 0 && (pts[i] - p[^1]).LengthSquared() < 1e-6f) continue;
+            p.Add(pts[i]); cl.Add(A(cols[i]));
+        }
+        if (p.Count > 1 && (p[0] - p[^1]).LengthSquared() < 1e-6f) { p.RemoveAt(p.Count - 1); cl.RemoveAt(cl.Count - 1); }
+        if (p.Count < 3) return;
+        var arr = p.ToArray();
+        var idx = Convex(arr) ? Fan(arr.Length) : Geometry2D.TriangulatePolygon(arr);
+        if (idx.Length == 0) idx = Fan(arr.Length);
+        if (Batch) { AddTris(arr, idx, cl); return; }
+        RenderingServer.CanvasItemAddTriangleArray(rid, idx, arr, cl.ToArray());
+    }
     static Texture2D radial;
     public static Texture2D Radial
     {
@@ -141,7 +228,7 @@ public class Canvas
 
     public void FillPath()
     {
-        ApplyT();
+        if (!Batch) ApplyT();
         var col = A(s.Fill);
         foreach (var sp in path)
         {
@@ -153,6 +240,7 @@ public class Canvas
             // most shapes are convex (rects, discs, wedges): a fan needs no triangulation
             var idx = Convex(pts) ? Fan(n) : Geometry2D.TriangulatePolygon(pts);
             if (idx.Length == 0) idx = Fan(n);   // self-intersecting outline: fall back to a fan
+            if (Batch) { AddTris(pts, idx, col); continue; }
             if (!colorCache.TryGetValue(n, out var cols) || cols[0] != col) { cols = new Color[n]; Array.Fill(cols, col); colorCache[n] = cols; }
             RenderingServer.CanvasItemAddTriangleArray(rid, idx, pts, cols);
         }
@@ -184,8 +272,15 @@ public class Canvas
     readonly List<Vector2> segs = new();
     public void StrokePath()
     {
-        ApplyT();
         var col = A(s.Stroke);
+        // opaque strokes batch as quads with round joints; translucent ones would darken where quads overlap
+        if (Batch && col.A >= 0.95f)
+        {
+            foreach (var sp in path)
+                for (int i = 0; i + 1 < sp.Count; i++) AddSegment(sp[i], sp[i + 1], s.LineWidth, col, i + 2 < sp.Count);
+            return;
+        }
+        ApplyT();
         segs.Clear();
         foreach (var sp in path)
         {
@@ -195,7 +290,12 @@ public class Canvas
         }
         if (segs.Count > 0) ci.DrawMultiline(segs.ToArray(), col, s.LineWidth);
     }
-    public void Line(float x1, float y1, float x2, float y2) { ApplyT(); ci.DrawLine(new Vector2(x1, y1), new Vector2(x2, y2), A(s.Stroke), s.LineWidth, false); }
+    public void Line(float x1, float y1, float x2, float y2)
+    {
+        var col = A(s.Stroke);
+        if (Batch && col.A >= 0.95f) { AddSegment(new Vector2(x1, y1), new Vector2(x2, y2), s.LineWidth, col, false); return; }
+        ApplyT(); ci.DrawLine(new Vector2(x1, y1), new Vector2(x2, y2), col, s.LineWidth, false);
+    }
 
     // ---- text ------------------------------------------------------------------------------------
     // Bundled faces (SIL Open Font Licence, see fonts/): IM Fell English for words, its small caps for
