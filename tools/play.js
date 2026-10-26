@@ -16,7 +16,7 @@ async function boot() {
   await page.evaluate(() => localStorage.clear());
   await page.click('button[data-act="newgame"]');
   await sleep(100);
-  await page.keyboard.press('KeyE');
+  await page.keyboard.press('Escape');
   await sleep(100);
   return { browser, page };
 }
@@ -137,6 +137,8 @@ const scenarios = {
     await ev(page, () => { H.Game.player.hp = 2; H.Tide.setPhase('high', 30); });
     await page.click('button[data-act="rest"]');
     await sleep(150);
+    check('resting shows a dream', await ev(page, () => document.querySelector('#ui').dataset.kind === 'cinematic'));
+    await page.keyboard.press('Escape'); await sleep(100);
     const r = await ev(page, () => ({ hp: H.Game.player.hp, max: H.Game.player.maxHp, phase: H.Tide.phase(), save: !!localStorage.getItem('hollowmere_save'), resp: H.Game.respawn.room }));
     check('rest heals, saves, advances to Low', r.hp === r.max && r.phase === 'low' && r.save && r.resp === 'chapel', r);
     // Ansel talk
@@ -448,6 +450,8 @@ const scenarios = {
     await ev(page, () => { for (let i = 1; i <= 9; i++) H.Game.pages.add(i); });
     await page.keyboard.press('KeyE'); await sleep(80);
     await page.click('button[data-act="yes"]'); await sleep(100);
+    check('ending plays as a cinematic with fates', await ev(page, () => document.querySelector('#ui').dataset.kind === 'cinematic'));
+    await page.keyboard.press('Escape'); await sleep(150);
     const end = await ev(page, () => ({ kind: document.querySelector('#ui').dataset.kind, ended: H.Game.ended, text: document.querySelector('#ui').innerText.slice(0, 60) }));
     check('Keeper\'s Dark ending plays', end.kind === 'ending' && end.ended === 'dark', end);
     await page.screenshot({ path: require('path').join(OUT, 'play_ending.png') });
@@ -523,6 +527,39 @@ const scenarios = {
     await sleep(700);
     const s = await state(page);
     check('chain the chandelier rings to the gallery', s.ty <= 8 && s.tx >= 31, { rings, end: s });
+  },
+  async narrative(page) {
+    const n = await ev(page, () => Object.keys(H.LORE.carvings).length);
+    check('every room has a carving', n === 25, n);
+    // every carving lands on a floor cell in its room
+    const bad = await ev(page, () => {
+      const out = [];
+      for (const r of H.ROOMS) {
+        const specs = H.Narr.carvingSpecs(r, new Set());
+        if (!specs.length) out.push(r.id);
+      }
+      return out;
+    });
+    check('carvings find a floor spot', bad.length === 0, bad);
+    await place(page, 'seawall', 15, 16);
+    const c = await ev(page, () => { const e = H.Game.ents.find((e) => e.type === 'carving'); const p = H.Game.player; p.x = e.cx() - 5; p.y = e.y + 22 - p.h; return e.spec.id; });
+    await sleep(60); await page.keyboard.press('KeyE'); await sleep(200);
+    check('E reads a carving', await ev(page, () => document.querySelector('#ui').dataset.kind === 'inscription'));
+    await page.keyboard.press('KeyE'); await sleep(100);
+    check('carving marked read', await ev((page), (id) => H.Narr.isRead(id), c));
+    // whisper: focus the beam on the Tithe Hall corpse
+    await place(page, 'tithe', 7, 16);
+    const t = await ev(page, () => { const b = H.Game.ents.find((e) => e.corpse); return { x: b.cx(), y: b.cy() }; });
+    await aimAt(page, t.x, t.y);
+    await page.keyboard.down('KeyK'); await sleep(1200); await page.keyboard.up('KeyK');
+    check('the focused beam draws out a whisper', await ev(page, () => Object.keys(H.Game.narr.heard).length > 0));
+    // region epigraph shows once
+    check('region epigraph registered', await ev(page, () => !!H.Game.narr.regions.wrackline));
+    // thoughts
+    check('Maren thinks on the pier', await ev(page, () => { H.Game.enterRoom(H.ROOM.pier); return !!H.Game.narr.thoughts.pier; }));
+    // death text varies and saves keep narrative state
+    await ev(page, () => { H.Game.save(); });
+    check('narrative state saved', await ev(page, () => !!JSON.parse(localStorage.getItem('hollowmere_save')).narr.read));
   },
 };
 

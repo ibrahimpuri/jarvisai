@@ -76,6 +76,7 @@ H.Story = (() => {
       if (g.act >= 2 && g.encrustedType) hints.push(`The Brine is learning. The ones that come back now are braced at the ${g.encrustedType}, where you have been breaking them. It always leaves two knots open.`);
       if (p.grafts.size) hints.push('I can see the salt in you. If you want a graft cut out, use my bench. It costs a pip of your health, and only once.');
       if (!hints.length) hints.push('The lamp is in the skull of the Saint. Your mother is there, I think. Go carefully.');
+      const al = H.Narr.npcLore('ansel'); if (al) hints.push(al);
       say(hints);
       return;
     }
@@ -112,6 +113,7 @@ H.Story = (() => {
       if (q.teodor === 'captured' && g.act < 3) lines.push('Teodor is quiet today. Sometimes he hums.');
       if (W().flags.choirDrained && !q.cacheTold) { lines.push('You drained the Choir? Then my old salvage cache is lying in the open on the shrine floor. Take what is in it.'); q.cacheTold = true; }
       if (!lines.length) lines.push('Bring me scrap and Mere-ivory and I will make your tools nastier. That is what I am for.');
+      const ol = H.Narr.npcLore('odile'); if (ol) lines.push(ol);
       say(lines);
       return;
     }
@@ -133,7 +135,7 @@ H.Story = (() => {
         });
         return;
       }
-      say([g.act >= 3 ? 'The spring tide is here. When you reach the lamp, I will be there, if you want the hymn finished.' : 'Three gifts, and the Choir at your side, and you could finish the Saint\'s hymn yourself.']);
+      say([H.Narr.npcLore('hesper'), g.act >= 3 ? 'The spring tide is here. When you reach the lamp, I will be there, if you want the hymn finished.' : 'Three gifts, and the Choir at your side, and you could finish the Saint\'s hymn yourself.']);
       return;
     }
     if (id === 'agathe') {
@@ -259,7 +261,7 @@ H.Story = (() => {
     }
     g.ended = kind;
     try { localStorage.removeItem('hollowmere_save'); } catch (e) {}
-    H.UI.ending({ relight: 'Relight the Lamp', hymn: "The Saint's Hymn", dark: "Keeper's Dark" }[kind], text, g.statsSummary());
+    H.UI.ending({ relight: 'Relight the Lamp', hymn: "The Saint's Hymn", dark: "Keeper's Dark" }[kind], text, g.statsSummary(), H.Narr.fates(kind));
   }
 
   return { npcName, npcLook, npcPresent, talk, offerTables, collect, ending, survivors, choirFriendly, PAGES, TABLES };

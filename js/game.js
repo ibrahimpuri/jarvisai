@@ -77,13 +77,17 @@ H.Game = (() => {
       act: 1, quests: {}, stats: { knots: {}, byAct: { 1: {}, 2: {}, 3: {} }, deaths: 0, time: 0 },
       pages: new Set(), tables: new Set(), collected: {}, bellsLit: {}, reliquary: new H.Satchel.Bag(40),
       respawn: null, satchelDrop: null, swell: 0, valveT: 0, undertow: new H.UndertowSystem(), bossBar: null,
-      encrustedType: null, freeGraft: false, ended: null, tips: {}, mode: 'play',
+      encrustedType: null, freeGraft: false, ended: null, tips: {}, mode: 'play', narr: H.Narr.fresh(),
     });
+    H.Narr.reset();
     H.FX.parts = [];
     enterRoom(H.ROOM.reef, true);
     placeAtStart();
-    G.titleT = 3;
-    H.UI.say(null, 'Forty days ago the Hollowmere lighthouse went dark and ships began wrecking on its reef. You are Maren Hult, salvage diver, daughter of the last Keeper. Your skiff has just split on the wrecked brig Constance. Low tide. Night.', () => tip('move', 'A / D to move, Space to jump. Hold toward timber to wall-hang. Hold Q near an iron ring to swing.', 6));
+    G.titleT = 6;
+    H.UI.cinematic(H.LORE.opening.concat(H.LORE.openingAfter), () => {
+      H.Narr.think('start');
+      tip('move', 'A / D to move, Space to jump. Hold toward timber to wall-hang. Hold Q near an iron ring to swing.', 6);
+    });
   }
 
   function toTitle() {
@@ -103,6 +107,8 @@ H.Game = (() => {
       }
     });
     (room.ents2 || []).forEach((e) => out.push(Object.assign({}, e)));
+    const taken = new Set(out.map((s) => s.tx + ',' + s.ty));
+    out.push(...H.Narr.carvingSpecs(room, taken));
     for (const s of out) {
       s.x = room.px + s.tx * TS + 8;
       s.y = room.py + (s.ty + 1) * TS;
@@ -180,6 +186,8 @@ H.Game = (() => {
     roomEvents(room, firstVisit);
     G.sinceLoad = 0;
     if (firstVisit || prevRegion !== room.region) G.titleT = 2.5;
+    if (H.Narr.enterRegion(room.region)) G.titleT = 6;
+    H.Narr.onRoomEnter();
     markSeen();
   }
 
@@ -195,6 +203,8 @@ H.Game = (() => {
       if (H.Tide.phase() === 'low' && H.Tide.phaseRemaining() > 14) H.Tide.setPhase('low', H.Tide.len(0) - 12);
     }
     if (room.id === 'kilns' && f.basinFilling) f.basinCrossed = true;
+    const enterThought = { pier: 'pier', chapel: 'chapel', choir: 'choir', skullstair: 'skull', lamp: 'agathe' }[room.id];
+    if (enterThought) H.Narr.think(enterThought);
     if (room.id === 'chapel' && firstVisit) tip('bell', 'A Bell Room. Rekindle its lamp with the oil flask from the Constance (E at the bell).', 5);
     // Act III: the Brine breaches one Bell Room.
     if (G.act >= 3 && room.id === breachRoom() && !f.breachDone) {
@@ -258,6 +268,7 @@ H.Game = (() => {
       if (!G.tips.rising && G.room.row === 4) tip('rising', 'Rising tide: the water climbs room by room. Bodies it reaches will re-knot and stand at High.', 5);
     }
     if (ph === 'high') {
+      if (G.room.row === 4 && !G.room.fixedWater) H.Narr.think('firstHigh');
       for (const r of H.ROOMS) {
         const st = W().states[r.id];
         if (!st || r === G.room) continue;
@@ -358,6 +369,8 @@ H.Game = (() => {
     for (const [t, c] of Object.entries(counts)) if (t !== 'crown' && c > bn) { bn = c; best = t; }
     G.encrustedType = best;
     G.act = n;
+    if (n === 2) H.Narr.think('actTwo');
+    if (n === 3) H.Narr.think('actThree');
     if (n === 2) H.toast('Act II. The Undertow begins to hunt at High tide.' + (best ? ` New Brine bodies grow salt plates over the ${best}.` : ''), 6);
     if (n === 3) {
       H.Tide.spring = 2;
@@ -366,6 +379,7 @@ H.Game = (() => {
   }
 
   function onBodyDowned(b, src) {
+    if (!b.boss) H.Narr.think('firstDown');
     if (!G.tips.downed && !b.boss) tip('downed', 'Dropped. If water reaches it during the next Rising it stands again at High. Drag it clear (E) or burn it (X).', 6);
     addSwell(0.5);
     if (b.breach) { G.breachT = 0; W().flags.breachDone = true; G.quests.teodor = 'dead'; G.bossBar = null; H.toast('Teodor falls for the last time. Odile is safe.', 4); }
@@ -389,6 +403,7 @@ H.Game = (() => {
     for (const e of G.ents) if (e.type === 'gullet' && e.mode === 'hang') e.hear(G.player.cx(), G.player.cy(), 0, 999, 'scream');
     G.titheFlood = 0;
     H.toast('The crank\'s counterweight drops. The hall bell tolls overhead, and water pours up through the floor grates!', 5);
+    H.Narr.think('titheTrap');
     tip('escape', 'The way out is up: gaff to the chandelier rings (hold Q), swing to the gallery, climb to the window.', 6);
   }
   function onTagsTaken() {}
@@ -496,7 +511,9 @@ H.Game = (() => {
     let x = p.cx(), y = p.y + p.h;
     G.satchelDrop = { room: G.room.id, x, y, bag, tidal };
     H.Audio.toll();
-    setTimeout(() => H.UI.death(tidal ? 'You died in tidal water. Your satchel lies where you fell; the next Ebb will carry it to this region\'s Wrack Pool, marked on your map.' : 'Your satchel lies where you fell. Nothing is ever lost for good, but getting it back is its own small expedition.', respawn), 900);
+    const dt = H.Narr.deathText();
+    dt.detail = tidal ? 'You died in tidal water. Your satchel lies where you fell; the next Ebb will carry it to this region\'s Wrack Pool, marked on your map.' : 'Your satchel lies where you fell. Nothing is ever lost for good, but getting it back is its own small expedition.';
+    setTimeout(() => H.UI.death(dt, respawn), 900);
   }
   function respawn() {
     const p = G.player, r = G.respawn;
@@ -507,6 +524,7 @@ H.Game = (() => {
     p.x = r.x; p.y = r.y;
     snapCamera();
     G.breachT = 0;
+    if (G.stats.deaths === 1) setTimeout(() => H.Narr.think('firstDeath'), 600);
   }
   function recoverSatchel(obj) {
     const p = G.player, sd = G.satchelDrop;
@@ -532,7 +550,7 @@ H.Game = (() => {
     save();
     H.Audio.roomBell();
     G.flash = 0;
-    H.toast('You rest by the bell. The tide turns all the way round to Low.', 3);
+    H.UI.cinematic([H.Narr.nextDream()], () => H.toast('You wake by the bell. The tide has turned all the way round to Low.', 3));
   }
 
   // ------------------------------------------------------------------ save / load
@@ -545,7 +563,7 @@ H.Game = (() => {
       act: G.act, quests: G.quests, stats: G.stats, pages: [...G.pages], tables: [...G.tables], collected: G.collected,
       bellsLit: G.bellsLit, reliquary: G.reliquary.toJSON(), respawn: G.respawn,
       satchelDrop: G.satchelDrop ? Object.assign({}, G.satchelDrop, { bag: G.satchelDrop.bag.toJSON() }) : null,
-      difficulty: G.difficulty, encrustedType: G.encrustedType, freeGraft: G.freeGraft, tips: G.tips, undertowDead: G.undertow.dead,
+      difficulty: G.difficulty, encrustedType: G.encrustedType, freeGraft: G.freeGraft, tips: G.tips, undertowDead: G.undertow.dead, narr: G.narr,
     };
     try { localStorage.setItem(SAVE_KEY, JSON.stringify(data)); } catch (e) { H.toast('Could not save (storage unavailable).'); }
   }
@@ -561,10 +579,11 @@ H.Game = (() => {
       act: d.act, quests: d.quests, stats: d.stats, pages: new Set(d.pages), tables: new Set(d.tables), collected: d.collected,
       bellsLit: d.bellsLit, reliquary: H.Satchel.Bag.from(d.reliquary), respawn: d.respawn,
       satchelDrop: d.satchelDrop ? Object.assign({}, d.satchelDrop, { bag: H.Satchel.Bag.from(d.satchelDrop.bag) }) : null,
-      difficulty: d.difficulty, encrustedType: d.encrustedType, freeGraft: d.freeGraft, tips: d.tips || {},
+      difficulty: d.difficulty, encrustedType: d.encrustedType, freeGraft: d.freeGraft, tips: d.tips || {}, narr: Object.assign(H.Narr.fresh(), d.narr || {}),
       undertow: new H.UndertowSystem(), mode: 'play', ended: null, swell: 0, valveT: 0,
     });
     G.undertow.dead = d.undertowDead;
+    H.Narr.reset();
     G.player.hp = G.player.maxHp;
     enterRoom(H.ROOM[G.respawn.room], true);
     G.player.x = G.respawn.x; G.player.y = G.respawn.y;
@@ -608,6 +627,7 @@ H.Game = (() => {
       else { G.god = !G.god; H.toast('DEBUG: invulnerable ' + (G.god ? 'on' : 'off')); }
     }
     G.stats.time += dt;
+    G.frameDt = dt;
     G.sinceLoad += dt;
     H.Tide.update(dt);
     const p = G.player;
@@ -677,6 +697,7 @@ H.Game = (() => {
     G.enemyShots = G.enemyShots.filter((s) => s.life > 0);
     H.Fire.update(dt);
     H.FX.update(dt);
+    H.Narr.updateWhispers(dt);
     G.undertow.update(dt);
 
     // Tutorial: the sailor's knots glint under the focused beam, then go dark.
@@ -687,6 +708,7 @@ H.Game = (() => {
     if (G.room.id === 'reef' && !G.tips.focus && G.stats.time > 8) tip('focus', 'Hold right mouse for a focused beam: it makes knots glint, but burns double oil.', 6);
     if (G.room.id === 'pier' && !G.tips.shoot) {
       const s = G.ents.find((e) => e.key === 'first_shucker');
+      if (s && s.mode !== 'dormant') H.Narr.think('firstStand');
       if (s && s.mode !== 'dormant') tip('shoot', 'Torso shots spark off. Shoot the knees (left click), then finish it with the gaff (F) at the Crown.', 7);
     }
     // Undertow glimpse at the Tithe window.
@@ -695,6 +717,7 @@ H.Game = (() => {
       H.Audio.buoy(0.9, 0.7); shake(6);
       if (G.titheFlood !== undefined) G.titheFlood = Math.max(G.titheFlood, 25);
       const st = W().state('tithe'); if (st.flood !== undefined) st.flood -= 1;
+      setTimeout(() => H.Narr.think('glimpse'), 4500);
       H.toast('At the window, the stained glass darkens. Something vast slides past outside with the slow clang of a buoy bell. It does not fight yet.', 7);
     }
     if (G.glimpseT > 0) G.glimpseT -= dt;

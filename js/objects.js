@@ -96,6 +96,23 @@
     }
   }
 
+  // Words cut into the island: read with E, shown as an inscription.
+  class Carving extends Obj {
+    constructor(spec, room) { super(spec, room); this.w = 14; this.h = 18; this.x = spec.x - 7; this.y = spec.y - 22; }
+    prompt() { return 'E  Read the carving'; }
+    interact() { H.Narr.markRead(this.spec.id); H.UI.inscription(this.spec.title, this.spec.text); }
+    light() { return H.Narr.isRead(this.spec.id) ? null : { x: this.cx(), y: this.cy(), r: 26, i: 0.35, color: '200,220,230' }; }
+    draw(c) {
+      const read = H.Narr.isRead(this.spec.id);
+      const pulse = read ? 0 : (Math.sin(this.t * 2) + 1) * 0.5;
+      c.fillStyle = '#2b3236'; c.fillRect(this.x, this.y, this.w, this.h);
+      c.fillStyle = '#3c454a'; c.fillRect(this.x + 1, this.y + 1, this.w - 2, 2);
+      c.fillStyle = 'rgba(0,0,0,0.35)'; c.fillRect(this.x + this.w - 2, this.y + 2, 2, this.h - 2);
+      c.fillStyle = read ? 'rgba(150,165,170,0.45)' : `rgba(190,225,240,${0.45 + pulse * 0.4})`;
+      for (let i = 0; i < 5; i++) { const w = 8 - ((i * 3) % 4); c.fillRect(this.x + 3, this.y + 5 + i * 2.6, w, 1); }
+    }
+  }
+
   class Sign extends Obj {
     prompt() { return 'E  Read'; }
     interact() { H.UI.say(null, this.spec.text); }
@@ -576,7 +593,7 @@
   }
 
   H.ObjTypes = {
-    chest: Chest, pickup: Pickup, sign: Sign, bell: Bell, reliquary: Reliquary, bench: Bench, npc: NPC,
+    chest: Chest, pickup: Pickup, sign: Sign, carving: Carving, bell: Bell, reliquary: Reliquary, bench: Bench, npc: NPC,
     socket: Socket, crank: Crank, barrel: Barrel, pews: Pews, lever: Lever, barge: Barge, floater: Floater, lift: Lift,
     prism: Prism, crystal: Crystal, tunedbell: TunedBell, valve: Valve, sluice: Sluice, font: Font, bowl: Bowl,
     stitch: Collectible, seal: Collectible, page: Collectible, table: Collectible, ability: Collectible, weapon: Collectible,

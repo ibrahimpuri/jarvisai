@@ -10,7 +10,7 @@ const root = path.join(__dirname, '..');
 const ctx = { console, performance: { now: () => 0 } };
 ctx.window = ctx;
 vm.createContext(ctx);
-for (const f of ['js/util.js', 'js/data/items.js', 'js/data/rooms.js', 'js/tide.js', 'js/world.js']) {
+for (const f of ['js/util.js', 'js/data/items.js', 'js/data/rooms.js', 'js/data/lore.js', 'js/tide.js', 'js/world.js', 'js/narrative.js']) {
   vm.runInContext(fs.readFileSync(path.join(root, f), 'utf8'), ctx, { filename: f });
 }
 const H = ctx.H, W = H.World, T = H.Tide;
@@ -271,6 +271,16 @@ function trapCheck(name, abil, flags, prep) {
   return n;
 }
 if (!dump) {
+  // Every carving must stand somewhere the player can reach with every tool.
+  W.reset(); W.state('saltgate').pool = { basin: 7 }; W.state('choir').choirLevel = 3;
+  { const r = H.ROOM.priors; for (let y = 17; y < 23; y++) W.setChar(r.ox + 21, r.oy + y, 'H'); }
+  { const c = H.ROOM.choir; for (let y = 0; y < 23; y++) for (const x of [4, 32]) if (W.charAt(c.ox + x, c.oy + y) === 'C') W.setChar(c.ox + x, c.oy + y, ' '); }
+  { const r = H.ROOM.prisms; for (let y = 0; y < r.th; y++) for (let x = 0; x < r.tw; x++) if (W.charAt(r.ox + x, r.oy + y) === 'S') W.setChar(r.ox + x, r.oy + y, ' '); }
+  const allSeen = analyse(['swing', 'boots', 'jet', 'tidekey', 'seal', 'lens'], { seawallOpen: true, basinFilling: true, basinCrossed: true, priorWedged: true, liftDropped: true, skullOpen: true });
+  const unreached = [];
+  for (const r of H.ROOMS) for (const c of H.Narr.carvingSpecs(r, new Set())) if (!near(allSeen, { x: r.ox + c.tx, y: r.oy + c.ty }, 1)) unreached.push(r.id + ' ' + c.tx + ',' + c.ty);
+  console.log((unreached.length ? 'FAIL' : 'ok  ') + ' carvings reachable: ' + (unreached.length ? unreached.join('; ') : 'all ' + Object.keys(H.LORE.carvings).length));
+  if (unreached.length) fails++;
   fails += trapCheck('traps, early game', ['swing'], { seawallOpen: true }) ? 1 : 0;
   fails += trapCheck('traps, barge solved (Act I)', ['swing'], { seawallOpen: true, basinFilling: true, basinCrossed: true }, () => { W.state('saltgate').pool = { basin: 7 }; }) ? 1 : 0;
   fails += trapCheck('traps, boots (Act II start)', ['swing', 'boots'], { seawallOpen: true, basinFilling: true, basinCrossed: true, abbotDead: true }, () => { W.state('saltgate').pool = { basin: 7 }; }) ? 1 : 0;

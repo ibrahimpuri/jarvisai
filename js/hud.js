@@ -88,29 +88,44 @@ H.HUD = (() => {
     c.fillStyle = '#e8dcb8'; c.fillText(text, x + 7, y + 10);
   }
 
-  function toasts(c, dt) {
-    c.font = '8px monospace'; c.textAlign = 'center';
-    let y = 60;
+  // Notifications: a wrapped column under the HUD, leaving the centre for titles and story text.
+  function toasts(c) {
+    c.font = '7px monospace'; c.textAlign = 'left';
+    const maxW = 236;
+    let y = 62;
     for (const t of H.toasts) {
       const a = Math.min(1, t.t, (t.max - t.t) * 4 + 0.2);
-      const w = Math.min(H.VIEW_W - 40, c.measureText(t.text).width + 16);
-      c.fillStyle = `rgba(10,12,14,${0.65 * a})`; c.fillRect(H.VIEW_W / 2 - w / 2, y - 9, w, 13);
-      c.fillStyle = `rgba(232,220,184,${a})`; c.fillText(t.text, H.VIEW_W / 2, y);
-      y += 15;
+      const words = t.text.split(' '); const lines = []; let line = '';
+      for (const w of words) { const s = line ? line + ' ' + w : w; if (c.measureText(s).width > maxW && line) { lines.push(line); line = w; } else line = s; }
+      if (line) lines.push(line);
+      const h = lines.length * 9 + 5;
+      c.fillStyle = `rgba(8,10,12,${0.6 * a})`; c.fillRect(8, y - 8, maxW + 10, h);
+      c.fillStyle = `rgba(200,170,100,${0.7 * a})`; c.fillRect(8, y - 8, 1.5, h);
+      c.fillStyle = `rgba(232,220,184,${a})`;
+      lines.forEach((ln, i) => c.fillText(ln, 13, y + i * 9));
+      y += h + 3;
     }
-    c.textAlign = 'left';
   }
 
   function roomTitle(c) {
     const G = H.Game;
-    if (G.titleT <= 0) return;
-    const a = Math.min(1, G.titleT);
-    c.textAlign = 'center';
-    c.font = '14px Georgia, serif'; c.fillStyle = `rgba(232,220,184,${a})`;
-    c.fillText(G.room.name, H.VIEW_W / 2, 110);
-    c.font = '8px monospace'; c.fillStyle = `rgba(160,150,130,${a})`;
-    c.fillText(H.REGIONS[G.room.region].name.toUpperCase() + (G.room.bellRoom ? '  ·  BELL ROOM' : ''), H.VIEW_W / 2, 124);
-    c.textAlign = 'left';
+    const dt = G.frameDt || 1 / 60;
+    if (G.titleT > 0) {
+      const a = Math.min(1, G.titleT, (6 - G.titleT) * 2 + 0.3);
+      const cx = H.VIEW_W / 2;
+      c.textAlign = 'center';
+      c.font = '15px Georgia, serif';
+      c.fillStyle = `rgba(0,0,0,${0.5 * a})`; c.fillText(G.room.name, cx + 1, 97);
+      c.fillStyle = `rgba(236,224,190,${a})`; c.fillText(G.room.name, cx, 96);
+      const w = c.measureText(G.room.name).width / 2 + 18;
+      c.fillStyle = `rgba(200,170,100,${0.5 * a})`;
+      c.fillRect(cx - w - 40, 92, 40, 1); c.fillRect(cx + w, 92, 40, 1);
+      c.font = '7px monospace'; c.fillStyle = `rgba(170,158,135,${a})`;
+      c.fillText(H.REGIONS[G.room.region].name.toUpperCase().split('').join(' ') + (G.room.bellRoom ? '   ·   B E L L   R O O M' : ''), cx, 110);
+      c.textAlign = 'left';
+    }
+    H.Narr.drawEpigraph(c, dt, 126);
+    H.Narr.drawHUD(c, dt);
   }
 
   function bossBar(c) {

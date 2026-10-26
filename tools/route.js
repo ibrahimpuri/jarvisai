@@ -164,7 +164,7 @@ const _ef = H.Input.endFrame; H.Input.endFrame = () => { _ef(); AP.tick(); };
     page.on('pageerror', (e) => errors.push(e.message));
     await page.goto('file://' + path.join(__dirname, '..', 'index.html'));
     await sleep(300);
-    await page.click('button[data-act="newgame"]'); await sleep(100); await page.keyboard.press('KeyE'); await sleep(50);
+    await page.click('button[data-act="newgame"]'); await sleep(100); await page.keyboard.press('Escape'); await sleep(50);
     await page.evaluate(AUTOPILOT);
     await page.evaluate(([rt, steps]) => {
       const G = H.Game, p = G.player;

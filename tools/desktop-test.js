@@ -39,7 +39,7 @@ async function launch() {
   check('fullscreen toggles off', !(await win.evaluate(() => window.hollowmereDesktop.isFullscreen())));
   // play a little, then save at the chapel bell
   await win.click('button[data-act="newgame"]'); await sleep(200);
-  await win.keyboard.press('KeyE'); await sleep(200);
+  await win.keyboard.press('Escape'); await sleep(200);
   await win.keyboard.down('KeyA'); await sleep(1500); await win.keyboard.up('KeyA');
   const st = await win.evaluate(() => ({ room: H.Game.room.id, x: Math.round(H.Game.player.x) }));
   check('game runs and takes input', st.room === 'reef' || st.room === 'pier', st);

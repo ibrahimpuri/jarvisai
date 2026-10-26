@@ -15,6 +15,13 @@ H.UI = (() => {
     window.addEventListener('keydown', (e) => {
       if (!isOpen()) return;
       if (dlg && (e.code === 'KeyE' || e.code === 'Space' || e.code === 'Enter')) { e.preventDefault(); advance(); return; }
+      if (cine) {
+        e.preventDefault();
+        if (e.code === 'Escape') finishCine();
+        else if (e.code === 'KeyE' || e.code === 'Space' || e.code === 'Enter') nextCine();
+        return;
+      }
+      if (root.dataset.kind === 'inscription' && (e.code === 'KeyE' || e.code === 'Space' || e.code === 'Enter' || e.code === 'Escape')) { e.preventDefault(); close(); return; }
       if (e.code === 'Escape' || ((e.code === 'Tab' || e.code === 'KeyM') && root.dataset.kind === 'map') || (e.code === 'KeyI' && root.dataset.kind === 'satchel')) {
         e.preventDefault();
         if (root.dataset.kind === 'title' || root.dataset.kind === 'ending' || root.dataset.kind === 'death') return;
@@ -33,6 +40,7 @@ H.UI = (() => {
   }
   function close() {
     root.classList.add('hidden'); root.innerHTML = ''; root.dataset.kind = ''; dlg = null;
+    if (cine) { clearTimeout(cine.timer); const d = cine.done; cine = null; if (d) setTimeout(d, 0); }
     H.Input.clear();
     const cb = stack.pop(); stack = []; if (cb) cb();
   }
@@ -328,6 +336,7 @@ H.UI = (() => {
         if (g.freeGraft) g.freeGraft = false; else p.bag.remove('ivory', 1);
         H.Audio.crack(); H.Audio.bell(220, 0.4); G().flash = 0.2;
         if (ds.g === 'lung') p.breath = 30;
+        setTimeout(() => H.Narr.think('firstGraft'), 400);
         H.toast(`The ${H.GRAFTS[ds.g].name} takes root. Salt crawls under your skin.`);
       });
     };
@@ -339,15 +348,58 @@ H.UI = (() => {
   }
 
   // ---- end screens -----------------------------------------------------------------------------
-  function ending(title, paras, stats) {
-    actions.title = () => { close(); H.Game.toTitle(); };
-    show(`<div class="panel narrow ending"><h1 style="font-size:26px">${esc(title)}</h1>${paras.map((t) => `<p>${esc(t)}</p>`).join('')}
-      <p class="small muted">${esc(stats)}</p><div class="btns center"><button data-act="title" class="primary">Return to title</button></div></div>`, 'ending');
+  // The ending plays as a cinematic (the ending, then what became of everyone), then a summary.
+  function ending(title, paras, stats, fates) {
+    const panel = () => {
+      actions.title = () => { close(); H.Game.toTitle(); };
+      show(`<div class="panel narrow ending"><h1 style="font-size:26px">${esc(title)}</h1>${paras.map((t) => `<p>${esc(t)}</p>`).join('')}
+        ${fates && fates.length ? `<h3>Afterwards</h3>${fates.map((t) => `<p class="small">${esc(t)}</p>`).join('')}` : ''}
+        <p class="small muted">${esc(stats)}</p><div class="btns center"><button data-act="title" class="primary">Return to title</button></div></div>`, 'ending');
+    };
+    cinematic([title].concat(paras, fates || []), panel, { first: 'title' });
   }
-  function death(text, onWake) {
+  function death(info, onWake) {
     actions.wake = () => { close(); onWake(); };
-    show(`<div class="panel narrow"><h2>The water takes you</h2><p>${esc(text)}</p><div class="btns center"><button data-act="wake" class="primary">Wake at the bell</button></div></div>`, 'death');
+    show(`<div class="panel narrow death"><h2>${esc(info.title)}</h2><p class="lore">${esc(info.line)}</p><p class="small muted">${esc(info.detail)}</p>
+      <div class="btns center"><button data-act="wake" class="primary">Wake at the bell</button></div></div>`, 'death');
   }
 
-  return { init, isOpen, close, say, dialogue, confirm, title, controls, pause, bellMenu, reliquary, bench, satchel, map, sluiceMenu, fontMenu, ending, death };
+  // Words cut into the island, shown like an inscription.
+  function inscription(title, text) {
+    show(`<div class="inscription"><div class="ititle">${esc(title)}</div><div class="itext">${esc(text)}</div><div class="more">E  close</div></div>`, 'inscription');
+    root.querySelector('.inscription').addEventListener('click', () => close());
+  }
+
+  // Black-screen text, one line at a time. E / Space / click advances, Esc skips.
+  let cine = null;
+  function cinematic(lines, done, opts = {}) {
+    cine = { lines: lines.filter(Boolean), i: -1, done, opts, timer: null };
+    show('<div class="cinematic"><div class="cline"></div><div class="cskip">E  continue    Esc  skip</div></div>', 'cinematic');
+    root.querySelector('.cinematic').addEventListener('click', () => nextCine());
+    nextCine();
+  }
+  function nextCine() {
+    if (!cine) return;
+    clearTimeout(cine.timer);
+    cine.i++;
+    if (cine.i >= cine.lines.length) { finishCine(); return; }
+    const el = root.querySelector('.cline');
+    const text = cine.lines[cine.i];
+    el.classList.remove('show');
+    el.classList.toggle('big', cine.opts.first === 'title' && cine.i === 0);
+    void el.offsetWidth;
+    el.textContent = text;
+    el.classList.add('show');
+    cine.timer = setTimeout(nextCine, 2600 + text.length * 45);
+  }
+  function finishCine() {
+    if (!cine) return;
+    clearTimeout(cine.timer);
+    const done = cine.done;
+    cine = null;
+    close();
+    if (done) done();
+  }
+
+  return { init, isOpen, close, say, dialogue, confirm, title, controls, pause, bellMenu, reliquary, bench, satchel, map, sluiceMenu, fontMenu, ending, death, inscription, cinematic, get cinematicOpen() { return !!cine; } };
 })();

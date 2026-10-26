@@ -14,7 +14,7 @@ const only = process.argv.slice(3);
   await page.waitForTimeout(500);
   await page.click('button[data-act="newgame"]');
   await page.waitForTimeout(200);
-  await page.keyboard.press('KeyE');
+  await page.keyboard.press('Escape');
   await page.mouse.move(1100, 360);
   const ids = only.length ? only : await page.evaluate(() => H.ROOMS.map((r) => r.id));
   for (const id of ids) {

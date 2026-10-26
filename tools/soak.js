@@ -13,7 +13,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await page.goto('file://' + path.join(__dirname, '..', 'index.html'));
   await sleep(300);
   await page.click('button[data-act="newgame"]'); await sleep(100);
-  await page.keyboard.press('KeyE');
+  await page.keyboard.press('Escape');
   const rooms = await page.evaluate(() => H.ROOMS.map((r) => r.id));
   const keys = ['KeyA', 'KeyD', 'KeyW', 'KeyS', 'Space', 'KeyF', 'KeyC', 'KeyQ', 'KeyT', 'KeyR', 'KeyX', 'KeyZ', 'Digit1', 'Digit2', 'Digit3', 'Digit4', 'KeyV', 'KeyB'];
   let i = 0;

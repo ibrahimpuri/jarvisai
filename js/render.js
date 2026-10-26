@@ -310,6 +310,7 @@ H.Render = (() => {
     // particles
     for (const q of H.FX.parts) { c.globalAlpha = Math.max(0, q.life / q.max); c.fillStyle = q.color; c.fillRect(q.x - q.size / 2, q.y - q.size / 2, q.size, q.size); }
     c.globalAlpha = 1;
+    H.Narr.drawWorld(c);
     // noise rings (subtle, helps read the sound system)
     for (const n of G.noiseRings) { c.strokeStyle = `rgba(200,200,180,${n.t * 0.12})`; c.lineWidth = 1; c.beginPath(); c.arc(n.x, n.y, n.r * (1 - n.t), 0, Math.PI * 2); c.stroke(); }
     // focused beam

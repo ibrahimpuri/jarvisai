@@ -182,6 +182,7 @@
         H.Audio.crack(pan);
         H.FX.salt(p.x, p.y, 16);
         G().stats.knots[k.type] = (G().stats.knots[k.type] || 0) + 1;
+        H.Narr.think('firstKnot');
         const ba = G().stats.byAct[G().act] || (G().stats.byAct[G().act] = {}); ba[k.type] = (ba[k.type] || 0) + 1;
         this.onKnotBroken(k, src);
       } else {

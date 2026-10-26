@@ -15,7 +15,7 @@ const out = process.argv[2] || '.';
   await page.screenshot({ path: path.join(out, 'title.png') });
   await page.click('button[data-act="newgame"]');
   await page.waitForTimeout(300);
-  await page.keyboard.press('KeyE');
+  await page.keyboard.press('Escape');
   await page.waitForTimeout(500);
   await page.screenshot({ path: path.join(out, 'start.png') });
   await page.keyboard.down('KeyA'); await page.waitForTimeout(1500); await page.keyboard.up('KeyA');
