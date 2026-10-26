@@ -18,7 +18,8 @@ public static class Backdrop
 
     static Color C(string hex, float a = 1) { var c = H.Col(hex); c.A = a; return c; }
 
-    public static void Outdoor(Canvas c, Vector2 cam, float t, float flash)
+    // shift slides the island and the stacks sideways, for compositions like the title screen
+    public static void Outdoor(Canvas c, Vector2 cam, float t, float flash, float shift = 0)
     {
         float dx = cam.X - REFX, dy = cam.Y - REFY;
         float horizon = 238 - dy * 0.08f;
@@ -63,7 +64,7 @@ public static class Backdrop
         }
 
         // ---- the island, far off: skull, lighthouse, plateau and abbey ----
-        float ix = -dx * 0.06f, iy = horizon - 238;
+        float ix = -dx * 0.06f + shift, iy = horizon - 238;
         var far = C("#0a1016"); var rim = new Color(0.32f, 0.4f, 0.48f, 0.55f + flash * 0.4f);
         Vector2 P(float x, float y) => new(x + ix, y + iy);
         var island = new[]
@@ -130,7 +131,7 @@ public static class Backdrop
         }
 
         // ---- sea stacks, nearer ----
-        float stx = -dx * 0.14f, sty = iy * 1.4f;
+        float stx = -dx * 0.14f + shift * 1.4f, sty = iy * 1.4f;
         foreach (var (bx, w, h, seed) in new[] { (430f, 34f, 40f, 1), (500f, 16f, 26f, 2), (650f, 46f, 58f, 3), (775f, 28f, 36f, 4) })
         {
             float x0 = bx + stx, top = horizon + 6 - h + sty, bot = horizon + 10 + sty;

@@ -95,7 +95,7 @@ public class Player : Mover
         if (G.difficulty == "drowned" && n >= 1 && H.Rand() < 0.15f) n += 1;
         hp -= n;
         invulnT = 0.9f;
-        Snd.Hurt(); G.Shake(3); G.flash = 0.25f;
+        Snd.Hurt(); G.Shake(3); G.flash = 0.25f; G.HitStop(0.07f);
         FX.Blood(Cx(), Cy(), 6);
         // A hit cancels the remainder of a poultice; interrupts a Stitch Kit.
         if (healT > 0) { if (healKind == "stitch") H.ToastMsg("Stitching interrupted. The kit is kept."); healT = 0; }
@@ -402,6 +402,7 @@ public class Player : Mover
         {
             Noise.Emit(Cx(), y + h, NoiseScale() * 3, "land");
             Snd.Step(OnMetal(), 0.18f);
+            FX.Dust(Cx(), y + h, vyBefore > 450 ? 9 : 5);
             if (boots && !HasFitting("soles")) Stomp();
         }
         // footsteps
@@ -414,6 +415,7 @@ public class Player : Mover
                 float m = (sneak ? 2 : 6) * NoiseScale();
                 Noise.Emit(Cx(), y + h, m, "step");
                 Snd.Step(OnMetal(), sneak ? 0.04f : 0.1f);
+                if (!sneak && MathF.Abs(vx) > 140) FX.Dust(Cx() - facing * 2, y + h, 1, -facing);
             }
         }
     }
@@ -562,6 +564,7 @@ public class Player : Mover
         dashT = inAir || water ? 0.22f : 0.15f;
         dashInv = 0.2f;
         dashCool = 0.5f;
+        if (!inAir && !water) FX.Dust(Cx(), y + h, 6, -dx);
         Snd.Jump();
     }
     void Stomp()

@@ -69,12 +69,38 @@ public class Barrel : Obj
     }
     public override void Draw(Canvas c)
     {
-        if (done) { c.FillStyle = "#2a2018"; c.FillRect(x, y + h - 4, w + 4, 4); return; }
-        c.FillStyle = "#6a4a2a"; c.FillRect(x, y, w, h);
-        c.Fill = H.Rgba(255, 220, 160, 0.12f); c.FillRect(x + 2, y, 2, h);
-        c.Fill = H.Rgba(0, 0, 0, 0.25f); c.FillRect(x + w - 3, y, 3, h);
-        c.FillStyle = "#3a3a3a"; c.FillRect(x, y + 3, w, 1.5f); c.FillRect(x, y + h - 4, w, 1.5f);
+        float cx = Cx(), by = y + h;
+        if (done)
+        {
+            // staves burst outward, a scorch on the stone
+            c.Fill = H.Rgba(0, 0, 0, 0.45f); c.BeginPath(); c.Ellipse(cx, by - 0.5f, 10, 1.6f, 0, 0, H.PI * 2); c.FillPath();
+            c.FillStyle = "#2a2018";
+            c.Poly(new[] { new Vector2(cx - 9, by), new Vector2(cx - 7, by - 3), new Vector2(cx - 5, by) });
+            c.Poly(new[] { new Vector2(cx + 3, by), new Vector2(cx + 6, by - 2.5f), new Vector2(cx + 8, by) });
+            c.FillRect(cx - 3, by - 1.4f, 5, 1.4f);
+            return;
+        }
+        // an oil barrel: bulging staves, iron hoops, a dribble from the bung
+        c.Fill = H.Rgba(0, 0, 0, 0.35f); c.BeginPath(); c.Ellipse(cx, by, 7.5f, 1.3f, 0, 0, H.PI * 2); c.FillPath();
+        c.FillStyle = "#5e4226";
+        c.BeginPath(); c.MoveTo(x + 1, by); c.QuadraticCurveTo(x - 1, y + h / 2, x + 1, y + 0.5f); c.LineTo(x + w - 1, y + 0.5f); c.QuadraticCurveTo(x + w + 1, y + h / 2, x + w - 1, by); c.ClosePath(); c.FillPath();
+        c.Fill = H.Rgba(0, 0, 0, 0.22f); for (int i = 1; i < 4; i++) c.FillRect(x + i * w / 4f, y + 1, 0.5f, h - 1.5f);
+        c.Fill = H.Rgba(255, 220, 160, 0.14f); c.FillRect(x + 2.5f, y + 1, 1.6f, h - 2);
+        c.Fill = H.Rgba(0, 0, 0, 0.3f); c.FillRect(x + w - 3.4f, y + 1, 2.4f, h - 2);
+        c.FillStyle = "#2e2c2a"; c.FillRect(x - 0.4f, y + 2.4f, w + 0.8f, 1.4f); c.FillRect(x - 0.6f, y + h / 2 - 0.6f, w + 1.2f, 1.2f); c.FillRect(x - 0.4f, by - 3.6f, w + 0.8f, 1.4f);
+        c.Fill = H.Rgba(255, 255, 255, 0.12f); c.FillRect(x, y + 2.4f, w, 0.4f);
+        c.FillStyle = "#4a3420"; c.BeginPath(); c.Ellipse(cx, y + 0.8f, w / 2 - 0.6f, 1.2f, 0, 0, H.PI * 2); c.FillPath();
+        c.FillStyle = "#1a1410"; c.FillCircle(cx + 1.5f, y + 0.8f, 0.8f);
+        // a painted warning, faded
+        c.Fill = H.Rgba(200, 60, 40, 0.55f); c.Poly(new[] { new Vector2(cx, y + 5), new Vector2(cx + 2.4f, y + 9), new Vector2(cx - 2.4f, y + 9) });
+        c.Fill = H.Rgba(30, 20, 10, 0.8f); c.FillRect(cx - 0.3f, y + 6.2f, 0.6f, 1.6f);
+        // oil seeping
+        float dr = (t * 0.6f) % 1;
+        c.Fill = H.Rgba(40, 30, 20, 0.85f); c.FillRect(x + w - 2.2f, y + 4, 0.8f, 3 + dr * 4);
+        c.BeginPath(); c.Ellipse(x + w + 1, by - 0.3f, 3, 0.7f, 0, 0, H.PI * 2); c.FillPath();
+        c.Fill = H.Rgba(160, 140, 220, 0.25f); c.FillRect(x + w, by - 0.6f, 2, 0.3f);
     }
+
 }
 public class Pews : Obj
 {
@@ -409,15 +435,49 @@ public class Collectible : Obj
         if (done) return;
         float x0 = Cx(), y0 = Cy() + MathF.Sin(t * 2.5f) * 1.5f;
         string tt = type;
-        if (tt == "stitch") { c.FillStyle = "#e06060"; c.BeginPath(); c.Arc(x0 - 2, y0 - 1, 2.5f, 0, H.PI * 2); c.FillPath(); c.BeginPath(); c.Arc(x0 + 2, y0 - 1, 2.5f, 0, H.PI * 2); c.FillPath(); c.BeginPath(); c.MoveTo(x0 - 4.5f, y0); c.LineTo(x0, y0 + 5); c.LineTo(x0 + 4.5f, y0); c.FillPath(); }
-        else if (tt == "seal") { c.FillStyle = "#c8a050"; c.BeginPath(); c.Arc(x0, y0, 4, 0, H.PI * 2); c.FillPath(); c.FillStyle = "#8a6a30"; c.BeginPath(); c.Arc(x0, y0, 2, 0, H.PI * 2); c.FillPath(); }
-        else if (tt == "page" || tt == "table") { c.FillStyle = tt == "page" ? "#f0e6cc" : "#d8e6f0"; c.FillRect(x0 - 3, y0 - 4, 6, 8); c.FillStyle = "#6a5a4a"; c.FillRect(x0 - 2, y0 - 2, 4, 0.8f); c.FillRect(x0 - 2, y0, 4, 0.8f); }
+        c.Glow(x0, y0, 12, tt is "page" or "table" ? H.Rgba(255, 240, 200, 0.18f) : H.Rgba(255, 210, 120, 0.22f));
+        if (tt == "stitch")
+        {
+            // a Keeper's Stitch: a red heart of knotted thread
+            c.FillStyle = "#c04848"; c.BeginPath(); c.Arc(x0 - 2, y0 - 1, 2.5f, 0, H.PI * 2); c.FillPath(); c.BeginPath(); c.Arc(x0 + 2, y0 - 1, 2.5f, 0, H.PI * 2); c.FillPath(); c.BeginPath(); c.MoveTo(x0 - 4.5f, y0); c.LineTo(x0, y0 + 5); c.LineTo(x0 + 4.5f, y0); c.FillPath();
+            c.Fill = H.Rgba(255, 200, 200, 0.5f); c.FillCircle(x0 - 2.6f, y0 - 1.8f, 0.9f);
+            c.Stroke = H.Col("#f0d0a0"); c.LineWidth = 0.5f; c.Line(x0 - 3, y0 + 1, x0 + 3, y0 - 1); c.Line(x0 - 3, y0 - 1, x0 + 3, y0 + 1);
+        }
+        else if (tt == "seal")
+        {
+            c.FillStyle = "#8a6a30"; c.FillCircle(x0, y0, 4.4f);
+            c.FillStyle = "#c8a050"; c.FillCircle(x0, y0, 3.6f);
+            c.FillStyle = "#8a6a30"; for (int i = 0; i < 6; i++) { float a = i * H.PI / 3 + t * 0.5f; c.FillCircle(x0 + MathF.Cos(a) * 2.8f, y0 + MathF.Sin(a) * 2.8f, 0.45f); }
+            c.FillStyle = "#3a2a14"; c.FillCircle(x0, y0, 1.4f);
+            c.Fill = H.Rgba(255, 240, 200, 0.6f); c.FillRect(x0 - 2, y0 - 2.6f, 1.6f, 0.6f);
+        }
+        else if (tt == "page" || tt == "table")
+        {
+            // a loose leaf, curling, with lines of a cramped hand
+            c.Save(); c.Translate(x0, y0); c.Rotate(MathF.Sin(t * 1.3f) * 0.12f);
+            c.FillStyle = tt == "page" ? "#e8dcc0" : "#d0dde6";
+            c.Poly(new[] { new Vector2(-3.5f, -4.5f), new Vector2(3, -4.5f), new Vector2(3.6f, 4), new Vector2(-3, 4.5f) });
+            c.Fill = H.Rgba(0, 0, 0, 0.15f); c.Poly(new[] { new Vector2(1.5f, 4.2f), new Vector2(3.6f, 4), new Vector2(3.3f, 1.5f) });
+            c.FillStyle = "#5a4a3a"; for (int i = 0; i < 4; i++) c.FillRect(-2.4f, -3 + i * 1.8f, i == 3 ? 3 : 4.8f, 0.5f);
+            if (tt == "table") { c.Stroke = H.Col("#3a5a7a"); c.LineWidth = 0.5f; c.BeginPath(); c.MoveTo(-2.4f, 2.5f); c.QuadraticCurveTo(-1, 0.5f, 0.4f, 2.5f); c.QuadraticCurveTo(1.6f, 4.2f, 2.8f, 2.5f); c.StrokePath(); }
+            c.Restore();
+        }
         else if (tt == "ability" || tt == "weapon")
         {
-            c.Fill = H.Rgba(255, 220, 140, 0.25f); c.BeginPath(); c.Arc(x0, y0, 7, 0, H.PI * 2); c.FillPath();
-            c.FillStyle = "#e0c070"; c.Save(); c.Translate(x0, y0); c.Rotate(t); c.FillRect(-3, -3, 6, 6); c.Restore();
+            // a relic on a slow turn, rays behind it
+            for (int i = 0; i < 8; i++)
+            {
+                float a = i * H.PI / 4 + t * 0.4f;
+                c.Fill = H.Rgba(255, 220, 140, 0.12f);
+                c.Poly(new[] { new Vector2(x0, y0), new Vector2(x0 + MathF.Cos(a - 0.12f) * 12, y0 + MathF.Sin(a - 0.12f) * 12), new Vector2(x0 + MathF.Cos(a + 0.12f) * 12, y0 + MathF.Sin(a + 0.12f) * 12) });
+            }
+            string id = spec.S("id");
+            if (id != null && Icons.Has(id)) Icons.Draw(c, id, x0, y0, 11);
+            else { c.FillStyle = "#e0c070"; c.Save(); c.Translate(x0, y0); c.Rotate(t); c.FillRect(-3, -3, 6, 6); c.Restore(); }
+            c.Glow(x0, y0, 5, H.Rgba(255, 230, 170, 0.35f));
         }
     }
+
 }
 
 public class WrackPool : Obj

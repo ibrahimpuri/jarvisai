@@ -72,6 +72,7 @@ public class Body : Ent
         // Make sure we do not end up inside a wall.
         for (int i = 0; i < 8 && Phys.BoxSolid(x, y, w, h); i++) x += (i % 2 == 1 ? -1 : 1) * (i + 1) * 2;
     }
+    public float hitFlash;          // white flash when struck
     public Dictionary<string, Vector2> Skel() => _skel ??= Skeleton();
     static Vector2 V(float x, float y) => new(x, y);
     public virtual Dictionary<string, Vector2> Skeleton()
@@ -210,6 +211,8 @@ public class Body : Ent
         // A knot flaring during a wind-up is brittle.
         if (k.flare > 0 && src == "rivet") dmg *= 2;
         k.hp -= dmg;
+        hitFlash = 0.11f;
+        if (src is "rivet" or "gaff" or "harpoon" or "saw" or "stomp" or "bolt" or "sling") G.HitStop(0.025f);
         if (src is "rivet" or "gaff" or "harpoon" or "saw" or "stomp") Hints.Did(src == "gaff" ? "gaffknot" : "knot");
         if (src == "gaff") Hints.Did("knot");
         FX.Salt(kp.X, kp.Y, 5);
@@ -217,7 +220,7 @@ public class Body : Ent
         if (k.hp <= 0)
         {
             k.broken = true; k.hp = 0;
-            Snd.Crack(pan);
+            Snd.Crack(pan); G.HitStop(0.06f); G.Shake(1.5f);
             FX.Salt(kp.X, kp.Y, 16);
             G.stats.knots[k.type] = G.stats.knots.GetValueOrDefault(k.type) + 1;
             Narr.Think("firstKnot");
@@ -343,6 +346,7 @@ public class Body : Ent
     {
         _skel = null;
         anim += dt;
+        if (hitFlash > 0) hitFlash -= dt;
         foreach (var k in knots) if (k.flare > 0) k.flare -= dt;
         if (burnT > 0)
         {

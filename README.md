@@ -68,6 +68,11 @@ The game saves when you rest or save at a Bell Room. Continue from the title scr
 - A water shader with depth tint and drifting caustics, rain, lightning and a moonlit sky outdoors, and dust, drips, salt and bubbles indoors.
 - A finishing pass with underwater refraction, colour grade, vignette and film grain.
 - Synthesised sound rendered into cached samples, with streamed surf and drone ambience.
+- Set dressing generated from each room's tiles (`Decor.cs`): arcades and lancet windows, timber framing in the Saltworks, the giant's ribs, ridged flesh in the Gullet; banners, sconces, candles, statues, barrels, nets, books and bones; kelp, ivy and chains that sway; cobwebs, moss, salt, barnacles and a wet tide band on the stone. Candles, sconces, lamps and glowing nodules are real flickering lights, with moths and drifting spores.
+- A parallax night behind the shore (`Backdrop.cs`): the island with the abbey on its plateau and the dark lighthouse on the skull, moonlit clouds, sea stacks, fog banks, the moon's path on the water and gulls. The title screen is built from the same scene, with a boat rowing in.
+- Vector-drawn characters with simple rigs: Maren in her brass helmet and oilskin coat (stride, coat sway, landing squash, lean, bubbles under water), hooded and salt-crusted drowned with torn hems, NPCs, the Gullet, the Abbot, the Undertow and the Shoal. Item icons in the HUD, the satchel and on pickups.
+- Hit-stop and white hit flashes on knots, dust from landings and dashes, a dip to black between rooms and a red edge at one pip of health.
+- Fonts: IM Fell English for titles and text, Alegreya Sans for small print (both SIL Open Font License, in `godot/fonts`).
 - Native controller support through SDL3: Xbox, PlayStation (DualShock 4, DualSense) and Switch (Pro Controller, Joy-Con pairs), with the extras below.
 
 **Play on Windows:** unzip `Hollowmere-Godot-Windows.zip` and run `Hollowmere.exe`. Keep the `data_Hollowmere_windows_x86_64` folder next to it; it holds the .NET runtime. Saves live in `%APPDATA%\Godot\app_userdata\Hollowmere`.
@@ -86,6 +91,7 @@ The game has its own test harness. These run inside the real game:
 ```sh
 godot --headless --path godot -- --test              # every scripted scenario: the play.js ports, controllers, the opening, hints
 godot --path godot -- --shots out/ [room...]         # screenshots of every room
+godot --path godot -- --test perf                    # frame cost of the painters in the busiest rooms
 ```
 
 | Folder | Contents |
@@ -93,7 +99,7 @@ godot --path godot -- --shots out/ [room...]         # screenshots of every room
 | `godot/src/Core` | Constants and helpers, game data loading, input and controllers (`Pad.cs`: detection, rumble, light bar, gyro), synthesised audio, settings |
 | `godot/src/World` | The tide clock, tile queries and water, AABB physics |
 | `godot/src/Game` | Player, bodies and knots, bosses, objects, combat, story, narrative, hints, the opening's zones, the game loop and saving |
-| `godot/src/View` | The world view (lights, shadows, water, sky, post), tile art, HUD, button glyphs, menus, a Canvas-style drawing layer |
+| `godot/src/View` | The world view (lights, shadows, water, post), tile art and rock, room dressing (`Decor.cs`), the shore night and title vista (`Backdrop.cs`, `TitleVista.cs`), HUD and item icons, button glyphs, menus, a Canvas-style drawing layer |
 | `godot/shaders` | Water and post-processing shaders |
 
 ## Controllers

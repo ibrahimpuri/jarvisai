@@ -868,6 +868,20 @@ public static class Decor
         foreach (var d in items)
         {
             if (d.x < view.Position.X - 40 || d.x > view.End.X + 40 || d.y < view.Position.Y - 80 || d.y > view.End.Y + 80) continue;
+            // moths worrying at the flames
+            if (d.kind is "sconce" or "candelabra" or "lamp")
+            {
+                var (fx, fy) = d.kind == "sconce" ? (d.x + 3, d.y - 9) : d.kind == "candelabra" ? (d.x, d.y - 26) : (d.x, d.y + d.len + 4);
+                for (int m = 0; m < (d.seed > 0.5f ? 2 : 1); m++)
+                {
+                    float ph = t * (2.6f + m * 0.7f) + d.seed * 40 + m * 3;
+                    float mx = fx + MathF.Sin(ph) * (7 + m * 3) + MathF.Sin(ph * 2.7f) * 2, my = fy + MathF.Cos(ph * 1.3f) * (5 + m * 2) - 2;
+                    float flap = MathF.Abs(MathF.Sin(t * 38 + m * 2 + d.seed * 9));
+                    c.Fill = new Color(0.78f, 0.72f, 0.6f, 0.85f);
+                    c.Poly(new[] { new Vector2(mx, my), new Vector2(mx - 1.6f, my - 1.4f * flap), new Vector2(mx - 1.2f, my + 0.4f) });
+                    c.Poly(new[] { new Vector2(mx, my), new Vector2(mx + 1.6f, my - 1.4f * flap), new Vector2(mx + 1.2f, my + 0.4f) });
+                }
+            }
             switch (d.kind)
             {
                 case "kelp":
@@ -912,13 +926,14 @@ public static class Decor
                         float sway = MathF.Sin(t * 0.9f + d.seed * 10) * 0.05f;
                         float ex = d.x + MathF.Sin(sway) * d.len, ey = d.y + MathF.Cos(sway) * d.len;
                         if (d.kind == "rope_hang") { c.Stroke = C("#6a5438"); c.LineWidth = 1.2f; c.Line(d.x, d.y, ex, ey); c.Fill = C("#6a5438"); c.FillRect(ex - 1, ey - 1, 2, 3); break; }
+                        // the chain: a dark run with every other link showing its face
+                        c.Stroke = C("#2e2b28"); c.LineWidth = 0.7f; c.Line(d.x, d.y, ex, ey);
                         int links = (int)(d.len / 3);
-                        for (int i = 0; i < links; i++)
+                        c.Fill = C("#4a4642");
+                        for (int i = 0; i < links; i += 2)
                         {
-                            float k = (i + 0.5f) / links, lx = H.Lerp(d.x, ex, k), ly = H.Lerp(d.y, ey, k);
-                            c.Stroke = C("#3a3632"); c.LineWidth = 0.8f;
-                            if (i % 2 == 0) { c.BeginPath(); c.Ellipse(lx, ly, 0.9f, 1.6f, sway, 0, H.PI * 2); c.StrokePath(); }
-                            else c.Line(lx - 0.2f, ly - 1.4f, lx - 0.2f, ly + 1.4f);
+                            float k = (i + 0.5f) / links;
+                            c.FillRect(H.Lerp(d.x, ex, k) - 0.8f, H.Lerp(d.y, ey, k) - 1.3f, 1.6f, 2.6f);
                         }
                         if (d.kind == "lamp")
                         {
@@ -982,6 +997,12 @@ public static class Decor
                         float pulse = 0.6f + 0.4f * MathF.Sin(t * 1.3f + d.seed * 20);
                         c.Glow(d.x, d.y - 3, 14, new Color(0.3f, 1.1f, 1f, 0.16f * pulse));
                         for (int i = 0; i < 4; i++) c.Glow(d.x - 5 + Hsh(d.seed, i) * 10, d.y - 2, 2.5f, new Color(0.6f, 1.6f, 1.4f, 0.6f * pulse));
+                        // spores lifting off and fading
+                        for (int i = 0; i < 3; i++)
+                        {
+                            float sp = (t * 0.18f + i / 3f + d.seed) % 1;
+                            c.Glow(d.x - 4 + Hsh(d.seed, i + 9) * 8 + MathF.Sin(sp * 7 + i) * 4, d.y - 4 - sp * 34, 1.6f, new Color(0.5f, 1.4f, 1.3f, 0.5f * MathF.Sin(sp * H.PI)));
+                        }
                         break;
                     }
                 case "crystals":

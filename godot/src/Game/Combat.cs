@@ -50,6 +50,11 @@ public static class FX
     public static void Splash(float x, float y, int n = 10) => Spawn(x, y, n, new FXOpt { color = "#9fc4d0", ang = -H.PI / 2, spread = 1.0f, smin = 40, smax = 130, grav = 400 });
     public static void Sparks(float x, float y, int n = 6) => Spawn(x, y, n, new FXOpt { color = "#ffd080", size = 1.2f, smin = 60, smax = 160, glow = true, lmin = 0.1f, lmax = 0.3f });
     public static void Bubbles(float x, float y, int n = 1) => Spawn(x, y, n, new FXOpt { color = "#bfe0ff", ang = -H.PI / 2, spread = 0.4f, smin = 15, smax = 35, grav = -40, lmin = 0.6f, lmax = 1.4f });
+    public static void Dust(float x, float y, int n = 4, float dir = 0)
+    {
+        if (World.IsWater(x, y - 2)) return;
+        Spawn(x, y - 1, n, new FXOpt { color = "#8a8274", size = 1.8f, ang = dir == 0 ? -H.PI / 2 : (dir > 0 ? -0.35f : -H.PI + 0.35f), spread = dir == 0 ? 1.35f : 0.5f, smin = 12, smax = 45, grav = 30, lmin = 0.25f, lmax = 0.55f });
+    }
     public static void Embers(float x, float y, int n = 2) => Spawn(x, y, n, new FXOpt { color = "#ff8a30", ang = -H.PI / 2, spread = 0.6f, smin = 10, smax = 50, grav = -30, glow = true });
     public static void Update(float dt)
     {

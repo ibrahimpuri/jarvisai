@@ -435,6 +435,9 @@ public static class G
         if (swell > 9 && valveT <= 0) { valveT = H.Rand(60, 90); swell = 0; }
     }
     public static bool CanWake() => valveT <= 0;
+    // A heartbeat's pause on a solid hit, so it lands. Skipped under the test harness, which runs on fixed time.
+    public static float hitStop;
+    public static void HitStop(float s) => hitStop = MathF.Max(hitStop, s);
     public static void Shake(float n)
     {
         shakeAmt = MathF.Max(shakeAmt, n);

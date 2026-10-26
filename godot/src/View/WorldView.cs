@@ -11,7 +11,15 @@ public partial class DrawLayer : Node2D
 {
     public Action<Canvas> Paint;
     readonly Canvas cv = new();
-    public override void _Draw() => Paint?.Invoke(cv.Begin(this));
+    public static double DrawMs;    // time spent in the painters, for the perf probe
+    public static readonly Dictionary<string, double> ByLayer = new();
+    public override void _Draw()
+    {
+        long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
+        Paint?.Invoke(cv.Begin(this));
+        double ms = (System.Diagnostics.Stopwatch.GetTimestamp() - t0) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+        DrawMs += ms; ByLayer[Name] = ByLayer.GetValueOrDefault(Name) + ms;
+    }
 }
 
 public partial class WorldView : Node2D
@@ -108,7 +116,7 @@ public partial class WorldView : Node2D
         hudLayer.AddChild(hud);
 
         World.Dirty += () => dirty = true;
-        G.RoomChanged += () => dirty = true;
+        G.RoomChanged += () => { dirty = true; roomFade = 1; };
     }
     DrawLayer Add(DrawLayer d) { AddChild(d); return d; }
     SubViewport MakeBake(out DrawLayer art, Action<Canvas> paint)
@@ -219,6 +227,7 @@ public partial class WorldView : Node2D
         UpdateLights(p);
         UpdatePost(p, dt);
         foreach (var l in new[] { sky, back, deco, entities, water, waterLines, solid, dyn, fxShaded, fxGlow, fxText, rain, overlay, hud }) l.QueueRedraw();
+        if (sky.Name != "sky") { sky.Name = "sky"; back.Name = "back"; deco.Name = "deco"; entities.Name = "entities"; water.Name = "water"; waterLines.Name = "waterLines"; solid.Name = "solid"; dyn.Name = "dyn"; fxShaded.Name = "fxShaded"; fxGlow.Name = "fxGlow"; fxText.Name = "fxText"; rain.Name = "rain"; overlay.Name = "overlay"; hud.Name = "hud"; }
     }
 
     void UpdateLights(Player p)
@@ -441,7 +450,8 @@ public partial class WorldView : Node2D
         if (G.room == null) return;
         foreach (var e in G.ents) if (!e.isBody) e.Draw(c);
         foreach (var s in G.sawlines) s.Draw(c);
-        foreach (var e in G.ents) if (e.isBody && !e.gone) e.Draw(c);
+        foreach (var e in G.ents) if (e.isBody && !e.gone) { c.Flash = e is Body b && b.hitFlash > 0 ? MathF.Min(1, b.hitFlash / 0.08f) * 0.85f : 0; e.Draw(c); }
+        c.Flash = 0;
         G.player.Draw(c);
         foreach (var pr in G.projectiles) pr.Draw(c);
         foreach (var s in G.enemyShots) { c.StrokeStyle = "#a0b0b8"; c.LineWidth = 1.5f; c.Line(s.x, s.y, s.x - s.vx * 0.02f, s.y - s.vy * 0.02f); }
@@ -635,8 +645,20 @@ public partial class WorldView : Node2D
         c.StrokePath();
     }
 
+    float roomFade;
     void PaintOverlay(Canvas c)
     {
+        // a brief dip to black between rooms, and the edges reddening when Maren is one hit from death
+        if (roomFade > 0) { roomFade = MathF.Max(0, roomFade - G.frameDt * 4.5f); c.Fill = new Color(0, 0, 0, roomFade * roomFade * 0.85f); c.FillRect(0, 0, VW, VH); }
+        var pl = G.player;
+        if (G.mode == "play" && pl != null && !pl.dead && pl.hp <= 1)
+        {
+            float pulse = 0.55f + 0.45f * MathF.Sin(G.Now * 5.5f);
+            c.FillRectGradV(0, 0, VW, 50, new Color(0.45f, 0, 0, 0.35f * pulse), new Color(0.45f, 0, 0, 0));
+            c.FillRectGradV(0, VH - 50, VW, 50, new Color(0.45f, 0, 0, 0), new Color(0.45f, 0, 0, 0.35f * pulse));
+            c.FillRectGradH(0, 0, 70, VH, new Color(0.45f, 0, 0, 0.35f * pulse), new Color(0.45f, 0, 0, 0));
+            c.FillRectGradH(VW - 70, 0, 70, VH, new Color(0.45f, 0, 0, 0), new Color(0.45f, 0, 0, 0.35f * pulse));
+        }
         // The Undertow passing the Tithe window.
         if (G.glimpseT > 0)
         {

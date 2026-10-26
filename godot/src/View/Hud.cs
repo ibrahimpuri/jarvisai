@@ -194,7 +194,7 @@ public static class Hud
     static void PromptBox(Canvas c)
     {
         string text = G.promptText;
-        if (text == null) return;
+        if (text == null || UI.IsOpen()) return;
         c.Font = "9px serif";
         float w = Glyphs.Measure(c, text) + 22;
         float x = (H.VIEW_W - w) / 2, y = H.VIEW_H - 52;
@@ -241,7 +241,7 @@ public static class Hud
             Flourish(c, cx, 104, w + 34, a);
             c.Font = "8px caps"; c.Fill = new Color(0.72f, 0.66f, 0.54f, a);
             string region = Data.Regions.P(G.room.Region).S("name");
-            c.FillText(string.Join(" ", region.ToCharArray()) + (G.room.BellRoom ? "   ·   B E L L   R O O M" : ""), cx, 116);
+            c.FillText(string.Join(" ", region.ToCharArray()) + (G.room.BellRoom ? "   ·   B e l l   R o o m" : ""), cx, 116);
             c.TextAlign = 0;
         }
         Narr.DrawEpigraph(c, dt, 132);

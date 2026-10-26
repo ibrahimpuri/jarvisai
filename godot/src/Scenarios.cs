@@ -537,13 +537,35 @@ public static class Scenarios
             t.Ok("chain the chandelier rings to the gallery", s.ty <= 8 && s.tx >= 31, $"rings=[{string.Join(",", rings)}] end={s}");
         },
 
+        // Frame cost in the busiest rooms: CPU time per frame and draw calls, printed for the record.
+        ["perf"] = async t =>
+        {
+            foreach (var (room, x, y) in new[] { ("breakers", 20f, 12f), ("kilns", 20f, 16f), ("cloister", 20f, 16f), ("choir", 20f, 16f), ("abbot", 20f, 16f), ("ribshaft", 10f, 40f) })
+            {
+                t.Place(room, x, y);
+                await t.Run(0.5f);
+                double proc = 0; double calls = 0; int n = 0; DrawLayer.DrawMs = 0; DrawLayer.ByLayer.Clear();
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+                for (int i = 0; i < 60; i++)
+                {
+                    await t.Run(1 / 60f);
+                    proc += Performance.GetMonitor(Performance.Monitor.TimeProcess) * 1000;
+                    calls += Performance.GetMonitor(Performance.Monitor.RenderTotalDrawCallsInFrame);
+                    n++;
+                }
+                GD.Print($"PERF {room}: painters {DrawLayer.DrawMs / n:0.00} ms/frame, draw calls {calls / n:0}, wall {sw.Elapsed.TotalMilliseconds / n:0.0} ms/frame (software renderer)");
+                GD.Print("  " + string.Join(", ", DrawLayer.ByLayer.OrderByDescending(kv => kv.Value).Take(6).Select(kv => $"{kv.Key} {kv.Value / n:0.00}")));
+            }
+            t.Ok("perf probe ran", true);
+        },
+
         ["menus"] = async t =>
         {
             G.ToTitle(); await t.Run(0.3f); t.Snap("ui_title");
             t.Ok("title menu", UI.Kind == "title", UI.Kind);
             await t.ClickButton("Controls"); await t.Run(0.2f); t.Snap("ui_controls");
             await t.ClickButton("Back");
-            await t.ClickButton("Row out"); await t.Run(1.5f); t.Snap("ui_opening");
+            await t.ClickButton("Row out"); await t.Run(0.2f); t.Snap("ui_voyage"); await t.ClickButton("Cast off"); await t.Run(1.5f); t.Snap("ui_opening");
             t.Ok("opening cinematic", UI.Kind == "cinematic", UI.Kind);
             await t.Tap("pause"); await t.Run(0.5f);
             G.player.bag.Add("scrap", 6); G.player.bag.Add("oil", 2); G.player.bag.Add("kelp", 3);

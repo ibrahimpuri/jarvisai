@@ -71,10 +71,10 @@ public static class TileArt
             {
                 float cx = x + i * CELL, cy = y + j * CELL;
                 float n = Hollowmere.Decor.Fbm(cx / 38f, cy / 30f), fine = Hash((int)cx, (int)cy);
-                float edge = exposed ? 1 : 0.62f;
+                float edge = exposed ? 1 : 0.7f;
                 // light falls from above: the top few px of a surface are brighter, overhangs darker
                 float lift = (up && j == 0 ? 0.22f : up && j == 1 ? 0.08f : 0) - (down && j == 3 ? 0.18f : 0) + (left && i == 0 ? 0.06f : 0) - (right && i == 3 ? 0.12f : 0);
-                c.Fill = Rgb(pal.stone, (0.55f + n * 0.55f + fine * 0.06f + lift) * edge);
+                c.Fill = Rgb(pal.stone, (0.72f + n * 0.62f + fine * 0.07f + lift) * edge);
                 bool ul = up && left && i == 0 && j == 0, ur = up && right && i == 3 && j == 0, dl = down && left && i == 0 && j == 3, dr = down && right && i == 3 && j == 3;
                 if (ul) c.Poly(new[] { new Vector2(cx + CELL, cy), new Vector2(cx + CELL, cy + CELL), new Vector2(cx, cy + CELL) });
                 else if (ur) c.Poly(new[] { new Vector2(cx, cy), new Vector2(cx + CELL, cy + CELL), new Vector2(cx, cy + CELL) });
@@ -98,6 +98,14 @@ public static class TileArt
         if (exposed && h > 0.78f) { c.Stroke = new Color(0, 0, 0, 0.4f); c.LineWidth = 0.7f; c.BeginPath(); c.MoveTo(x + 4 + h * 6, y + 3); c.LineTo(x + 7 + h * 4, y + 8); c.LineTo(x + 5 + h * 6, y + 13); c.StrokePath(); }
         if (h < 0.18f) { c.Fill = new Color(0, 0, 0, 0.25f); c.FillCircle(x + 5 + h * 30, y + 9, 1.2f); }
         if (up) { c.Fill = H.Rgba(190, 210, 215, 0.18f); c.FillRect(x + (left ? 3 : 0), y, TS - (left ? 3 : 0) - (right ? 3 : 0), 1); }
+        // lichen on the weathered faces
+        if (exposed && h > 0.45f)
+            for (int i = 0; i < 3; i++)
+            {
+                float lx = x + 2 + Hash((int)x + i, (int)y * 3) * 12, ly = y + 2 + Hash((int)x * 5, (int)y + i) * 12;
+                c.Fill = i == 0 ? H.Rgba(170, 168, 120, 0.45f) : H.Rgba(150, 165, 150, 0.35f);
+                c.FillCircle(lx, ly, 0.7f + Hash(i, (int)x) * 0.8f);
+            }
     }
 
     // ---- solid masonry -------------------------------------------------------------------------------

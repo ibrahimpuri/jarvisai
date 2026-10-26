@@ -47,7 +47,9 @@ public class Canvas
     public void SetTransform(Transform2D t) { s.T = t; transformDirty = true; }
     public Transform2D GetTransform() => s.T;
     void ApplyT() { if (transformDirty) { ci.DrawSetTransformMatrix(s.T); transformDirty = false; } }
-    Color A(Color c) => new(c.R, c.G, c.B, c.A * s.Alpha);
+    // Flash whitens everything drawn while it is set (bodies struck by a hit).
+    public float Flash;
+    Color A(Color c) => Flash <= 0 ? new(c.R, c.G, c.B, c.A * s.Alpha) : new(H.Lerp(c.R, 1, Flash), H.Lerp(c.G, 1, Flash), H.Lerp(c.B, 1, Flash), c.A * s.Alpha);
 
     // ---- rects ---------------------------------------------------------------------------------
     public void FillRect(float x, float y, float w, float h)
@@ -148,29 +150,52 @@ public class Canvas
             if (n < 3) continue;
             var pts = new Vector2[n];
             for (int i = 0; i < n; i++) pts[i] = sp[i];
-            var idx = Geometry2D.TriangulatePolygon(pts);
-            if (idx.Length == 0)
-            {
-                // self-intersecting outline: fall back to a fan
-                idx = new int[(n - 2) * 3];
-                for (int i = 0; i < n - 2; i++) { idx[i * 3] = 0; idx[i * 3 + 1] = i + 1; idx[i * 3 + 2] = i + 2; }
-            }
-            var cols = new Color[n];
-            Array.Fill(cols, col);
+            // most shapes are convex (rects, discs, wedges): a fan needs no triangulation
+            var idx = Convex(pts) ? Fan(n) : Geometry2D.TriangulatePolygon(pts);
+            if (idx.Length == 0) idx = Fan(n);   // self-intersecting outline: fall back to a fan
+            if (!colorCache.TryGetValue(n, out var cols) || cols[0] != col) { cols = new Color[n]; Array.Fill(cols, col); colorCache[n] = cols; }
             RenderingServer.CanvasItemAddTriangleArray(rid, idx, pts, cols);
         }
     }
+    static readonly Dictionary<int, int[]> fans = new();
+    readonly Dictionary<int, Color[]> colorCache = new();
+    static int[] Fan(int n)
+    {
+        if (fans.TryGetValue(n, out var f)) return f;
+        f = new int[(n - 2) * 3];
+        for (int i = 0; i < n - 2; i++) { f[i * 3] = 0; f[i * 3 + 1] = i + 1; f[i * 3 + 2] = i + 2; }
+        return fans[n] = f;
+    }
+    static bool Convex(Vector2[] p)
+    {
+        int n = p.Length, sign = 0;
+        for (int i = 0; i < n; i++)
+        {
+            var a = p[i]; var b = p[(i + 1) % n]; var c = p[(i + 2) % n];
+            float cross = (b.X - a.X) * (c.Y - b.Y) - (b.Y - a.Y) * (c.X - b.X);
+            if (MathF.Abs(cross) < 1e-6f) continue;
+            int sg = cross > 0 ? 1 : -1;
+            if (sign == 0) sign = sg; else if (sg != sign) return false;
+        }
+        return true;
+    }
+    // Strokes: straight two-point segments go out together in one multiline; longer runs as polylines.
+    // Edges are smoothed by the viewport's multisampling, so the lines themselves are drawn plain.
+    readonly List<Vector2> segs = new();
     public void StrokePath()
     {
         ApplyT();
         var col = A(s.Stroke);
+        segs.Clear();
         foreach (var sp in path)
         {
             if (sp.Count < 2) continue;
-            ci.DrawPolyline(sp.ToArray(), col, s.LineWidth, true);
+            if (sp.Count == 2) { segs.Add(sp[0]); segs.Add(sp[1]); continue; }
+            ci.DrawPolyline(sp.ToArray(), col, s.LineWidth, false);
         }
+        if (segs.Count > 0) ci.DrawMultiline(segs.ToArray(), col, s.LineWidth);
     }
-    public void Line(float x1, float y1, float x2, float y2) { ApplyT(); ci.DrawLine(new Vector2(x1, y1), new Vector2(x2, y2), A(s.Stroke), s.LineWidth, true); }
+    public void Line(float x1, float y1, float x2, float y2) { ApplyT(); ci.DrawLine(new Vector2(x1, y1), new Vector2(x2, y2), A(s.Stroke), s.LineWidth, false); }
 
     // ---- text ------------------------------------------------------------------------------------
     // Bundled faces (SIL Open Font Licence, see fonts/): IM Fell English for words, its small caps for

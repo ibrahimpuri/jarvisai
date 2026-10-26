@@ -70,6 +70,7 @@ public partial class Main : Node2D
     {
         float dt = MathF.Min(0.033f, (float)delta);
         if (tester != null && tester.FixedStep) dt = 1 / 60f;
+        if (G.hitStop > 0) { G.hitStop -= dt; if (tester == null && G.mode == "play" && !UI.IsOpen()) dt *= 0.06f; }
         Inp.Poll(GetViewport(), dt);
         Pad.UpdateGyro(dt);
         tester?.BeforeStep();

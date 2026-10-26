@@ -70,16 +70,42 @@ public partial class UiRoot : CanvasLayer
         s.ContentMarginLeft = s.ContentMarginRight = pad; s.ContentMarginTop = s.ContentMarginBottom = pad * 0.6f;
         return s;
     }
+    static StyleBoxFlat Tab(StyleBoxFlat b) { b.BorderWidthLeft = 3; return b; }
+    // Menu panels share the HUD's look: a dark plate, a double gold rule, brackets at the corners.
+    static void Ornate(PanelContainer pc)
+    {
+        var empty = new StyleBoxEmpty { ContentMarginLeft = 11, ContentMarginRight = 11, ContentMarginTop = 9, ContentMarginBottom = 9 };
+        pc.AddThemeStyleboxOverride("panel", empty);
+        var cv = new Canvas();
+        pc.Draw += () =>
+        {
+            var c = cv.Begin(pc); var sz = pc.Size;
+            c.Fill = new Color(0, 0, 0, 0.45f); c.FillRect(3, 4, sz.X, sz.Y);
+            c.FillRectGradV(0, 0, sz.X, sz.Y, new Color(0.085f, 0.075f, 0.06f, 0.97f), new Color(0.04f, 0.035f, 0.03f, 0.97f));
+            c.Glow(sz.X / 2, 0, sz.X * 0.6f, 40, new Color(1, 0.8f, 0.45f, 0.05f));
+            var g = new Color(GOLD.R, GOLD.G, GOLD.B, 0.75f); var gd = new Color(GOLD.R, GOLD.G, GOLD.B, 0.3f);
+            c.Fill = gd; c.FillRect(0, 0, sz.X, 0.8f); c.FillRect(0, sz.Y - 0.8f, sz.X, 0.8f); c.FillRect(0, 0, 0.8f, sz.Y); c.FillRect(sz.X - 0.8f, 0, 0.8f, sz.Y);
+            c.Fill = new Color(GOLD.R, GOLD.G, GOLD.B, 0.18f); c.FillRect(3, 3, sz.X - 6, 0.5f); c.FillRect(3, sz.Y - 3.5f, sz.X - 6, 0.5f); c.FillRect(3, 3, 0.5f, sz.Y - 6); c.FillRect(sz.X - 3.5f, 3, 0.5f, sz.Y - 6);
+            c.Fill = g;
+            foreach (var (cx, cy, dx, dy) in new[] { (0f, 0f, 1, 1), (sz.X, 0f, -1, 1), (0f, sz.Y, 1, -1), (sz.X, sz.Y, -1, -1) })
+            {
+                c.FillRect(dx > 0 ? cx : cx - 9, dy > 0 ? cy : cy - 1.2f, 9, 1.2f);
+                c.FillRect(dx > 0 ? cx : cx - 1.2f, dy > 0 ? cy : cy - 9, 1.2f, 9);
+                c.Save(); c.Translate(cx + dx * 4.5f, cy + dy * 4.5f); c.Rotate(H.PI / 4); c.FillRect(-1.2f, -1.2f, 2.4f, 2.4f); c.Restore();
+            }
+            c.Save(); c.Translate(sz.X / 2, 0.4f); c.Rotate(H.PI / 4); c.FillRect(-2.2f, -2.2f, 4.4f, 4.4f); c.Restore();
+        };
+    }
     Theme BuildTheme()
     {
         var t = new Theme { DefaultFont = Canvas.GetFont(false, false, false), DefaultFontSize = 7 };
         var panel = Box(new Color(18 / 255f, 16 / 255f, 13 / 255f, 0.95f), H.Col("#5a4c36"), 1, 9);
         panel.ShadowColor = new Color(0, 0, 0, 0.6f); panel.ShadowSize = 8;
         t.SetStylebox("panel", "PanelContainer", panel);
-        t.SetStylebox("normal", "Button", Box(H.Col("#241f18"), H.Col("#5a4c36"), 1, 5));
-        t.SetStylebox("hover", "Button", Box(H.Col("#33291c"), GOLD, 1, 5));
-        t.SetStylebox("pressed", "Button", Box(H.Col("#3d3020"), GOLD, 1, 5));
-        t.SetStylebox("focus", "Button", Box(new Color(0, 0, 0, 0), WARM, 1, 5));
+        t.SetStylebox("normal", "Button", Box(new Color(0.11f, 0.095f, 0.075f, 0.9f), H.Col("#4a3e2c"), 1, 5));
+        t.SetStylebox("hover", "Button", Tab(Box(H.Col("#2e2619"), GOLD, 1, 5)));
+        t.SetStylebox("pressed", "Button", Tab(Box(H.Col("#3d3020"), GOLD, 1, 5)));
+        t.SetStylebox("focus", "Button", Tab(Box(new Color(1, 0.85f, 0.5f, 0.05f), WARM, 1, 5)));
         t.SetStylebox("disabled", "Button", Box(new Color(36 / 255f, 31 / 255f, 24 / 255f, 0.4f), new Color(90 / 255f, 76 / 255f, 54 / 255f, 0.4f), 1, 5));
         t.SetColor("font_color", "Button", TEXT);
         t.SetColor("font_hover_color", "Button", H.Col("#fff3d0"));
@@ -116,6 +142,7 @@ public partial class UiRoot : CanvasLayer
         center.SetAnchorsPreset(Control.LayoutPreset.FullRect);
         root.AddChild(center);
         var pc = new PanelContainer { CustomMinimumSize = new Vector2(width, 0) };
+        Ornate(pc);
         center.AddChild(pc);
         var scroll = new ScrollContainer { HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled, CustomMinimumSize = new Vector2(width - 18, 0), FollowFocus = true };
         pc.AddChild(scroll);
@@ -314,6 +341,7 @@ public partial class UiRoot : CanvasLayer
         Show("dialogue", true);
         dlgLines = lines; dlgI = i; dlgWho = who;
         var pc = new PanelContainer { CustomMinimumSize = new Vector2(253, 0) };
+        Ornate(pc);
         pc.SetAnchorsPreset(Control.LayoutPreset.CenterBottom);
         pc.GrowHorizontal = Control.GrowDirection.Both; pc.GrowVertical = Control.GrowDirection.Begin;
         pc.OffsetLeft = -126; pc.OffsetRight = 126; pc.OffsetBottom = -14;
@@ -348,27 +376,62 @@ public partial class UiRoot : CanvasLayer
     {
         Show("title");
         G.mode = "title";
-        var c = Panel(190);
-        H1(c, "HOLLOWMERE");
-        Lbl(c, "The tide redraws the map every ten minutes, and brings the dead back with it.", 5, MUTED, italic: true, center: true);
+        var vista = new TitleVista();
+        vista.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+        root.AddChild(vista);
+        var col = new VBoxContainer { Position = new Vector2(52, 150), CustomMinimumSize = new Vector2(170, 0) };
+        col.AddThemeConstantOverride("separation", 1);
+        root.AddChild(col);
+        if (G.HasSave()) TitleBtn(col, "Continue from the last Bell Room", () => { Close(); G.LoadGame(); Input.MouseMode = Input.MouseModeEnum.Hidden; });
+        TitleBtn(col, "Row out to the lighthouse", Voyage);
+        TitleBtn(col, "Controls", () => Controls(Title));
+        TitleBtn(col, "Controller settings", () => ControllerSettings(Title));
+        TitleBtn(col, "Toggle fullscreen (F11)", Settings.ToggleFullscreen);
+        TitleBtn(col, "Quit to desktop", () => GetTree().Quit());
+        var foot = new VBoxContainer { Position = new Vector2(52, 318), CustomMinimumSize = new Vector2(260, 0) };
+        root.AddChild(foot);
+        Lbl(foot, "Keyboard and mouse, or an Xbox, PlayStation or Switch controller. Best with headphones.", 4, MUTED);
+        Lbl(foot, PadLine(), 4, MUTED);
+        FocusFirst();
+    }
+    // Borderless menu entries for the title screen: a gold tab and a warmer glow mark the one in focus.
+    void TitleBtn(Control parent, string text, Action onPress)
+    {
+        var b = Btn(parent, text, onPress);
+        b.Alignment = HorizontalAlignment.Left;
+        b.AddThemeFontSizeOverride("font_size", 9);
+        var normal = new StyleBoxEmpty { ContentMarginLeft = 8, ContentMarginTop = 2, ContentMarginBottom = 2 };
+        StyleBoxFlat Lit(float a) { var sb = new StyleBoxFlat { BgColor = new Color(1, 0.8f, 0.45f, a), BorderColor = WARM, BorderWidthLeft = 2 }; sb.ContentMarginLeft = 8; sb.ContentMarginTop = sb.ContentMarginBottom = 2; return sb; }
+        b.AddThemeStyleboxOverride("normal", normal);
+        b.AddThemeStyleboxOverride("hover", Lit(0.06f));
+        b.AddThemeStyleboxOverride("focus", Lit(0.09f));
+        b.AddThemeStyleboxOverride("pressed", Lit(0.14f));
+        b.AddThemeColorOverride("font_color", H.Col("#c9bc9c"));
+    }
+    // Choices for a new game, asked once the player has decided to set out.
+    public void Voyage()
+    {
+        Show("voyage");
+        backAction = Title;
+        var vista = new TitleVista { ShowName = false };
+        vista.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+        root.AddChild(vista);
+        var c = Panel(210);
+        H2(c, "The crossing");
+        Lbl(c, "The tide redraws the map every ten minutes, and brings the dead back with it.", 5, MUTED, italic: true);
         H3(c, "Difficulty");
         var r = Row(c);
         foreach (var (id, name) in new[] { ("pilgrim", "Pilgrim"), ("keeper", "Keeper"), ("drowned", "Drowned") })
-            Btn(r, name, () => { difficulty = id; Title(); }, selected: difficulty == id);
+            Btn(r, name, () => { difficulty = id; Voyage(); }, selected: difficulty == id);
         Small(c, difficulty switch { "pilgrim" => "More scrap and a slower tide.", "keeper" => "As designed.", _ => "Saving costs 1 tallow, fewer lifeline drops, harder hits." });
         H3(c, "Tide length");
         var r2 = Row(c);
-        foreach (var v in new[] { 1f, 1.5f, 2f }) Btn(r2, (v * 100) + "%", () => { tide = v; Title(); }, selected: tide == v);
+        foreach (var v in new[] { 1f, 1.5f, 2f }) Btn(r2, (v * 100) + "%", () => { tide = v; Voyage(); }, selected: tide == v);
         Small(c, "More time between tides, without softening combat.");
         var col = Col(c);
-        Btn(col, "Row out to the lighthouse", () => { Close(); G.NewGame(difficulty, tide); }, primary: true);
-        if (G.HasSave()) Btn(col, "Continue from the last Bell Room", () => { Close(); G.LoadGame(); Input.MouseMode = Input.MouseModeEnum.Hidden; });
-        Btn(col, "Controls", () => Controls(Title));
-        Btn(col, "Controller settings", () => ControllerSettings(Title));
-        Btn(col, "Toggle fullscreen (F11)", Settings.ToggleFullscreen);
-        Btn(col, "Quit to desktop", () => GetTree().Quit());
-        Lbl(c, "Keyboard and mouse, or an Xbox, PlayStation or Switch controller. Best with headphones.", 4, MUTED, center: true);
-        Lbl(c, PadLine(), 4, MUTED, center: true);
+        Btn(col, "Cast off", () => { Close(); G.NewGame(difficulty, tide); }, primary: true);
+        Btn(col, "Back", Title);
+        Footer(c, ("confirm", "choose"), ("cancel", "back"));
         FocusFirst();
     }
 
@@ -694,10 +757,13 @@ public partial class UiRoot : CanvasLayer
                     slot.AddThemeStyleboxOverride("panel", Box(H.Col("#1b1813"), H.Col("#5a4c36"), 1, 3));
                     grid.AddChild(slot);
                     var v = new VBoxContainer(); slot.AddChild(v);
+                    // the item's picture and how many sit in this slot, then its name
                     var top = new HBoxContainer(); v.AddChild(top);
-                    var nm = Lbl(top, def.S("name") + (def.B("key") ? " (key)" : ""), 5);
+                    if (Icons.Has(i)) top.AddChild(new IconView(i) { CustomMinimumSize = new Vector2(13, 13) });
+                    var cnt = Lbl(top, def.B("key") ? "key" : here.ToString(), 5, WARM); cnt.HorizontalAlignment = HorizontalAlignment.Right; cnt.VerticalAlignment = VerticalAlignment.Center;
+                    var nm = Lbl(v, def.S("name"), 5);
+                    nm.AutowrapMode = TextServer.AutowrapMode.Off; nm.ClipText = true;
                     var col = H.Col(def.S("color")); nm.AddThemeColorOverride("font_color", col.Lerp(TEXT, 0.4f));
-                    if (!def.B("key")) Lbl(top, here.ToString(), 5, WARM).HorizontalAlignment = HorizontalAlignment.Right;
                     string item = i; int all = n;
                     if (k == 0) Btn(v, "Drop", () => { p.bag.Remove(item, all); G.SpawnLoose(item, p.Cx(), p.y + p.h - 4, all); Satchel(); });
                     count++;
@@ -858,6 +924,7 @@ public partial class UiRoot : CanvasLayer
         center.SetAnchorsPreset(Control.LayoutPreset.FullRect);
         root.AddChild(center);
         var pc = new PanelContainer { CustomMinimumSize = new Vector2(213, 0) };
+        Ornate(pc);
         var bx = Box(new Color(18 / 255f, 22 / 255f, 24 / 255f, 0.96f), H.Col("#3c4448"), 1, 14);
         bx.ShadowColor = new Color(0, 0, 0, 0.7f); bx.ShadowSize = 10;
         pc.AddThemeStyleboxOverride("panel", bx);
@@ -913,4 +980,12 @@ public partial class UiRoot : CanvasLayer
         Close();
         done?.Invoke();
     }
+}
+
+// An item's icon as a small control, for satchel slots and lists.
+public partial class IconView : Control
+{
+    readonly string id; readonly Canvas cv = new();
+    public IconView(string id) { this.id = id; MouseFilter = MouseFilterEnum.Ignore; SizeFlagsVertical = SizeFlags.ShrinkCenter; }
+    public override void _Draw() => Icons.Draw(cv.Begin(this), id, Size.X / 2, Size.Y / 2, MathF.Min(Size.X, Size.Y) * 0.95f);
 }
