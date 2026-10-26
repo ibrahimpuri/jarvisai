@@ -1,0 +1,646 @@
+// The other Brine bodies: Gullet, Bellmouth, Driftling, Saltwright, the Grafted choir, and corpses.
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text.Json.Nodes;
+using Godot;
+
+namespace Hollowmere;
+
+public class Shot { public float x, y, vx, vy, life, dmg; public object src; }
+
+// ---------------------------------------------------------------- Gullet
+public class Gullet : Body
+{
+    public float ax, ay, len;
+    bool stunOnLand;
+    public Gullet(Props spec, RoomDef room) : base(spec, room)
+    {
+        type = "gullet";
+        ax = spec.F("x"); ay = spec.F("anchorY"); len = spec.F("len", 4) * H.TILE;
+        AddKnot("tendril", "tendril", "tendril", 2, 4);
+        AddKnot("spine1", "spine", "s1", 3);
+        AddKnot("spine2", "spine", "s2", 3);
+        AddKnot("spine3", "spine", "s3", 3);
+        mode = "hang"; awakeMode = "ground";
+        w = 22; h = 9;
+        x = ax - w / 2; y = ay + len - h;
+    }
+    static Vector2 V(float x, float y) => new(x, y);
+    public override Dictionary<string, Vector2> Skeleton()
+    {
+        var j = new Dictionary<string, Vector2>();
+        float sway = mode == "hang" ? MathF.Sin(anim * 1.3f) * 2 : 0;
+        if (mode == "hang")
+        {
+            j["tendril"] = V(ax + sway * 0.4f, ay + len * 0.45f);
+            float bx = ax + sway, by = ay + len;
+            j["s1"] = V(bx, by - 10); j["s2"] = V(bx + 1, by - 5); j["s3"] = V(bx, by);
+            j["head"] = V(bx, by + 3);
+        }
+        else
+        {
+            float f = facing, x = Cx(), y = Feet() - 4;
+            float wv = MathF.Sin(anim * 10) * 1.5f;
+            j["s1"] = V(x - f * 8, y + wv); j["s2"] = V(x, y - wv); j["s3"] = V(x + f * 7, y + wv);
+            j["head"] = V(x + f * 12, y - 1);
+            j["tendril"] = V(x - f * 14, y + 2);
+        }
+        return j;
+    }
+    public override (float x, float y, float w, float h) HitBox()
+    {
+        if (mode == "hang") return (ax - 5, ay + len - 14, 10, 18);
+        return (x, y, w, h);
+    }
+    public override float Cx() => mode == "hang" ? ax : x + w / 2;
+    public override float Cy() => mode == "hang" ? ay + len - 5 : y + h / 2;
+    public override void Hear(float hx, float hy, float d, float r, string src)
+    {
+        if (mode == "hang")
+        {
+            // Drops on noise below it.
+            if (MathF.Abs(hx - ax) < 3.5f * H.TILE && hy > ay + len - 8 && (src == "scream" || G.CanWake())) Drop();
+            return;
+        }
+        base.Hear(hx, hy, d, r, src);
+    }
+    public void Drop(bool stunned = false)
+    {
+        if (mode != "hang") return;
+        mode = "fall";
+        x = ax - w / 2; y = ay + len - h;
+        vy = 50; stunOnLand = stunned;
+        K("tendril").broken = true;
+        Snd.Groan(Pan(), 0.2f);
+    }
+    public override void OnKnotBroken(Knot k, string src)
+    {
+        if (k.id == "tendril" && mode == "hang") { k.broken = false; Drop(true); return; }
+        if (k.type == "spine" && knots.Count(q => q.type == "spine" && q.broken) >= 3) Down(src);
+    }
+    public override bool DamageKnot(Knot k, float dmg, string src)
+    {
+        if (k.type == "spine" && mode == "hang" && src != "fire") dmg *= 0.5f;
+        return base.DamageKnot(k, dmg, src);
+    }
+    public override void Wake(bool force = false) { if (mode == "hang") Drop(); }
+    public override void Think(float dt)
+    {
+        var p = G.player;
+        if (mode == "hang") { vx = 0; vy = 0; return; }
+        if (mode == "fall")
+        {
+            if (onGround)
+            {
+                // Crushes whatever it lands on.
+                var hb = HitBox();
+                foreach (var e0 in G.ents.ToArray())
+                {
+                    if (e0 is Body e && e != this && e.Alive() && e.K("kneeL") != null)
+                    {
+                        var eb = e.HitBox();
+                        if (!H.RectsOverlap(hb.x, hb.y, hb.w, hb.h, eb.x, eb.y, eb.w, eb.h)) continue;
+                        e.DamageKnot(e.K("kneeL"), 9, "gullet"); e.DamageKnot(e.K("kneeR"), 9, "gullet"); e.stun = 2;
+                    }
+                }
+                if (p != null && H.RectsOverlap(hb.x, hb.y, hb.w, hb.h, p.x, p.y, p.w, p.h)) p.Hurt(2, this);
+                Snd.Thud(Pan()); FX.Salt(Cx(), Feet(), 10);
+                G.Shake(3);
+                mode = "ground"; stun = stunOnLand ? 3 : 0.8f;
+            }
+            return;
+        }
+        if (mode == "windup")
+        {
+            vx *= 0.8f; atkT -= dt;
+            if (atkT <= 0) { mode = "attack"; atkT = 0.25f; vx = facing * 220; }
+            return;
+        }
+        if (mode == "attack")
+        {
+            atkT -= dt;
+            var hb = HitBox();
+            if (p != null && H.RectsOverlap(hb.x, hb.y, hb.w, hb.h, p.x, p.y, p.w, p.h)) { p.Hurt(2, this); mode = "recover"; atkT = 0.8f; }
+            if (atkT <= 0) { mode = "recover"; atkT = 0.8f; }
+            return;
+        }
+        if (mode == "recover") { vx *= 0.85f; atkT -= dt; if (atkT <= 0) mode = "ground"; return; }
+        // ground crawl
+        cool -= dt;
+        bool sees = Perceives();
+        if (sees || (lastHeard != null && alert > 0))
+        {
+            float tx = sees ? p.Cx() : lastHeard.Value.X;
+            alert -= dt;
+            float dx = tx - Cx();
+            int s = (int)H.Sign(dx); if (s != 0) facing = s;
+            vx = H.Approach(vx, facing * 70, 500 * dt);
+            if (p != null && H.Dist(Cx(), Cy(), p.Cx(), p.Cy()) < 40 && cool <= 0)
+            {
+                mode = "windup"; atkT = 0.5f; cool = 1.8f;
+                foreach (var k in knots) if (!k.broken) k.flare = 0.5f;
+                Snd.Groan(Pan(), 0.2f);
+            }
+        }
+        else vx *= 0.9f;
+    }
+    public override void Physics(float dt, bool pinned = false)
+    {
+        if (mode == "hang") return;
+        base.Physics(dt, pinned);
+    }
+    public override void Draw(Canvas c)
+    {
+        if (gone) return;
+        var j = Skel();
+        c.StrokeStyle = "#9fb7c0"; c.LineWidth = 1.5f;
+        if (mode == "hang")
+        {
+            c.BeginPath(); c.MoveTo(ax, ay); c.QuadraticCurveTo(ax + MathF.Sin(anim) * 3, ay + len / 2, j["s1"].X, j["s1"].Y); c.StrokePath();
+            c.Fill = H.Rgba(220, 240, 250, 0.7f); c.FillRect(ax - 3, ay, 6, 2);
+        }
+        c.StrokeStyle = burnT > 0 ? "#2a1c10" : "#4a5550"; c.LineWidth = 6;
+        c.BeginPath(); c.MoveTo(j["s1"].X, j["s1"].Y); c.LineTo(j["s2"].X, j["s2"].Y); c.LineTo(j["s3"].X, j["s3"].Y); c.LineTo(j["head"].X, j["head"].Y); c.StrokePath();
+        c.FillStyle = burnT > 0 ? "#2a1c10" : "#4a5550";
+        foreach (var n in new[] { "s1", "s2", "s3", "head" }) c.FillCircle(j[n].X, j[n].Y, 3);
+        // a paler belly line
+        c.Stroke = H.Rgba(150, 170, 160, 0.35f); c.LineWidth = 1.5f;
+        c.BeginPath(); c.MoveTo(j["s1"].X, j["s1"].Y + 1.5f); c.LineTo(j["s2"].X, j["s2"].Y + 1.5f); c.LineTo(j["s3"].X, j["s3"].Y + 1.5f); c.StrokePath();
+        c.StrokeStyle = "#2a3230"; c.LineWidth = 1;
+        foreach (var n in new[] { "s1", "s2", "s3" })
+        {
+            var s = j[n];
+            c.BeginPath(); c.MoveTo(s.X - 4, s.Y + 3); c.LineTo(s.X - 6, s.Y + 6); c.MoveTo(s.X + 4, s.Y + 3); c.LineTo(s.X + 6, s.Y + 6); c.StrokePath();
+        }
+        c.FillStyle = "#c0d0c8"; c.BeginPath(); c.Arc(j["head"].X, j["head"].Y, 2.5f, 0, H.PI * 2); c.FillPath();
+        if (mode == "windup") { c.FillStyle = "#e0f0ff"; c.FillRect(j["head"].X - 1, j["head"].Y - 1, 2, 2); }
+    }
+    public override Props Serialize() { var s = base.Serialize(); s.Set("mode", mode == "fall" ? "ground" : mode); return s; }
+    public override void Restore(Props s)
+    {
+        base.Restore(s);
+        string sm = s.S("mode");
+        if (sm == "hang") { mode = "hang"; x = ax - w / 2; y = ay + len - h; }
+        else if (sm != "downed" && sm != "gone") { mode = "ground"; K("tendril").broken = true; }
+        w = 22; h = 9;
+    }
+    public override void SetPose(string p) { if (p == "lying") pose = "lying"; }
+    public override void StandUp()
+    {
+        base.StandUp();
+        w = 22; h = 9; mode = "ground"; K("tendril").broken = true;
+    }
+}
+
+// ---------------------------------------------------------------- Bellmouth
+public class Bellmouth : Body
+{
+    float screamCool, home, belly;
+    public Bellmouth(Props spec, RoomDef room) : base(spec, room)
+    {
+        type = "bellmouth";
+        AddKnot("jaw", "jaw", "jaw", 3);
+        AddKnot("shoulderL", "shoulder", "shoulderL", 3);
+        AddKnot("shoulderR", "shoulder", "shoulderR", 3);
+        AddKnot("crown", "crown", "sternum", 4, 5, 2);
+        w = 16; h = 30; x = spec.F("x") - 8; y = spec.F("y") - 30;
+        mode = "idle"; awakeMode = "idle";
+        home = spec.F("x");
+    }
+    public override void SetPose(string p) { if (p == "lying") base.SetPose("lying"); }
+    bool SeesLight()
+    {
+        var p = G.player;
+        var lights = new List<(float x, float y, bool lantern)>();
+        if (p != null && p.LanternLit() && !p.inBellRoom) lights.Add((p.Cx(), p.y + 8, true));
+        foreach (var pr in G.projectiles) if (pr.kind == "flare") lights.Add((pr.x, pr.y, false));
+        foreach (var l in lights)
+        {
+            float d = H.Dist(Cx(), y + 6, l.x, l.y);
+            float range = l.lantern ? (p.focusing ? 13 : 8) * H.TILE * (p.HasFitting("tallowr") ? 1.3f : 1) : 7 * H.TILE;
+            if (d > range) continue;
+            bool facingOK = H.Sign(l.x - Cx()) == facing || MathF.Abs(l.x - Cx()) < 20 || (l.lantern && p.BeamHits(Cx(), Cy()));
+            if (facingOK && Phys.Los(Cx(), y + 6, l.x, l.y)) return true;
+        }
+        return false;
+    }
+    public override void Think(float dt)
+    {
+        var p = G.player;
+        screamCool -= dt; cool -= dt;
+        if (mode == "inhale")
+        {
+            vx = 0; atkT -= dt;
+            K("jaw").flare = 0.2f;
+            if (K("jaw").broken) { mode = "idle"; screamCool = 4; H.ToastMsg("The Bellmouth chokes on its scream."); return; }
+            if (atkT <= 0)
+            {
+                mode = "idle"; screamCool = 9;
+                Snd.Scream(Pan());
+                G.Shake(4);
+                G.AddSwell(2);
+                foreach (var e0 in G.ents.ToArray()) if (e0 is Body e && e != this && e.mode == "dormant" && !e.corpse) { e.lastHeard = new Vector2(Cx(), Cy()); e.Wake(true); }
+                foreach (var e0 in G.ents.ToArray()) if (e0 is Gullet gl && gl.mode == "hang") gl.Drop();
+                Noise.Emit(Cx(), Cy(), 20, "scream");
+            }
+            return;
+        }
+        if (mode == "windup")
+        {
+            vx = 0; atkT -= dt;
+            if (atkT <= 0)
+            {
+                mode = "recover"; atkT = 0.6f;
+                if (p != null && H.Dist(Cx(), Cy(), p.Cx(), p.Cy()) < 34) p.Hurt(1, this);
+                Snd.Thud(Pan());
+            }
+            return;
+        }
+        if (mode == "recover") { atkT -= dt; if (atkT <= 0) mode = "idle"; return; }
+        // idle: sway, wander, look for light
+        if (H.Rand() < dt * 0.3f) facing = -facing;
+        float dx = home - Cx();
+        vx = MathF.Abs(dx) > 24 ? H.Sign(dx) * 15 : vx * 0.9f;
+        if (!K("jaw").broken && screamCool <= 0 && SeesLight())
+        {
+            mode = "inhale"; atkT = 1.5f;
+            if (p != null) { int s = (int)H.Sign(p.Cx() - Cx()); if (s != 0) facing = s; }
+            Snd.Inhale(Pan());
+            return;
+        }
+        if (p != null && ArmsOK() && cool <= 0 && H.Dist(Cx(), Cy(), p.Cx(), p.Cy()) < 30)
+        {
+            mode = "windup"; atkT = 0.7f; cool = 2;
+            int s = (int)H.Sign(p.Cx() - Cx()); facing = s != 0 ? s : 1;
+            foreach (var k in knots) if (!k.broken) k.flare = 0.7f;
+        }
+    }
+    public override Dictionary<string, Vector2> Skeleton()
+    {
+        var j = base.Skeleton();
+        belly = 0;
+        if (pose == "stand")
+        {
+            float puff = mode == "inhale" ? (1.5f - atkT) * 3 : 0;
+            j["jaw"] = new Vector2(j["jaw"].X, j["jaw"].Y + 1 + puff * 0.3f);
+            belly = puff;
+        }
+        return j;
+    }
+    public override void Draw(Canvas c)
+    {
+        if (gone) return;
+        var j = Skel();
+        DrawHuman(c, new Palette { robe = "#d8d4c8", skin = "#8e9e98", cowl = null, dark = "#6a6a62" });
+        if (pose == "stand")
+        {
+            float b = belly + 5;
+            var st = j["sternum"];
+            c.FillStyle = "#9aa8a2";
+            c.BeginPath(); c.Ellipse(st.X + facing * 2, st.Y + 3, b, b * 1.1f, 0, 0, H.PI * 2); c.FillPath();
+            c.Fill = H.Rgba(255, 255, 255, 0.12f);
+            c.BeginPath(); c.Ellipse(st.X + facing * 2 - 1.5f, st.Y + 1, b * 0.5f, b * 0.45f, 0, 0, H.PI * 2); c.FillPath();
+            c.FillStyle = "#d8d4c8"; c.FillRect(st.X - 6, st.Y + 4, 12, 3);
+            if (mode == "inhale") { c.FillStyle = "#101010"; c.BeginPath(); c.Arc(j["jaw"].X, j["jaw"].Y, 2, 0, H.PI * 2); c.FillPath(); }
+        }
+    }
+}
+
+// ---------------------------------------------------------------- Driftling
+public class Driftling : Body
+{
+    float nibble, flop;
+    Projectile flareTarget;
+    public string nest;
+    public Driftling(Props spec, RoomDef room) : base(spec, room)
+    {
+        type = "driftling";
+        w = 6; h = 4; x = spec.F("x"); y = spec.F("y");
+        AddKnot("core", "core", "core", 1, 3);
+        mode = "swim"; awakeMode = "swim";
+        vx = H.Rand(-30, 30); vy = H.Rand(-20, 20);
+        nest = spec.S("nest");
+        key ??= "drift" + H.Uid();
+    }
+    public override Dictionary<string, Vector2> Skeleton() => new() { ["core"] = new Vector2(Cx(), Cy()) };
+    public override void Hear(float hx, float hy, float d, float r, string src) { }
+    public override void Wake(bool force = false) { }
+    public override void OnKnotBroken(Knot k, string src) { gone = true; dead = true; FX.Salt(Cx(), Cy(), 4); }
+    public override void DamageFlesh(float dmg, float hx, float hy, string src) => OnKnotBroken(knots[0], src);
+    public override void Update(float dt)
+    {
+        _skel = null;
+        anim += dt;
+        if (gone) return;
+        var p = G.player;
+        bool inWater = World.IsWater(Cx(), Cy());
+        if (!inWater)
+        {
+            vy += 600 * dt; flop += dt;
+            if (flop > 3) { gone = true; dead = true; }
+            Phys.Move(this, dt);
+            return;
+        }
+        flop = 0;
+        // Drawn to light: flares first, then an unshuttered lantern.
+        float? tx = null, ty = null;
+        float best = 1e9f;
+        foreach (var pr in G.projectiles)
+            if (pr.kind == "flare" && (World.IsWater(pr.x, pr.y + 2) || MathF.Abs(pr.y - World.SurfaceAt(pr.x, pr.y)) < 40))
+            {
+                float d = H.Dist(Cx(), Cy(), pr.x, pr.y);
+                if (d < best && d < 260) { best = d; tx = pr.x; ty = pr.y; flareTarget = pr; }
+            }
+        if (tx == null && p != null && p.LanternLit() && !p.inBellRoom)
+        {
+            float d = H.Dist(Cx(), Cy(), p.Cx(), p.Cy());
+            if (d < 200) { tx = p.Cx(); ty = p.Cy(); flareTarget = null; }
+        }
+        if (tx == null && p != null && H.Dist(Cx(), Cy(), p.Cx(), p.Cy()) < 28) { tx = p.Cx(); ty = p.Cy(); }
+        if (tx != null)
+        {
+            float a = MathF.Atan2(ty.Value - Cy(), tx.Value - Cx()) + MathF.Sin(anim * 5 + key.Length) * 0.8f;
+            vx = H.Approach(vx, MathF.Cos(a) * 110, 400 * dt);
+            vy = H.Approach(vy, MathF.Sin(a) * 110, 400 * dt);
+        }
+        else
+        {
+            vx += H.Rand(-60, 60) * dt; vy += H.Rand(-60, 60) * dt;
+            vx *= 0.98f; vy *= 0.98f;
+        }
+        // keep under the surface
+        float surf = World.SurfaceAt(Cx(), Cy());
+        if (Cy() < surf + 4) vy = MathF.Abs(vy) + 20;
+        Phys.Move(this, dt);
+        nibble -= dt;
+        if (p != null && nibble <= 0 && H.RectsOverlap(x, y, w, h, p.x, p.y, p.w, p.h))
+        {
+            nibble = 1.0f;
+            if (p.dashT > 0) { OnKnotBroken(knots[0], "dash"); return; }
+            if (H.Rand() < 0.5f) p.Hurt(1, this);
+        }
+        // A flare stuck to a body: the swarm strips its knots for you.
+        var sb = flareTarget?.StuckBody;
+        if (sb != null && nibble <= 0)
+        {
+            if (H.Dist(Cx(), Cy(), sb.Cx(), sb.Cy()) < 20)
+            {
+                nibble = 0.8f;
+                var ks = sb.knots.Where(k => !k.broken && !k.plated && !sb.IsSealed(k)).ToList();
+                if (ks.Count > 0) sb.DamageKnot(H.Pick(ks), 1, "driftling");
+            }
+        }
+    }
+    public override void Draw(Canvas c)
+    {
+        if (gone) return;
+        float a = MathF.Atan2(vy, vx);
+        c.Save(); c.Translate(Cx(), Cy()); c.Rotate(a);
+        c.FillStyle = "#5c7078"; c.BeginPath(); c.Ellipse(0, 0, 4, 2, 0, 0, H.PI * 2); c.FillPath();
+        c.BeginPath(); c.MoveTo(-3, 0); c.LineTo(-6, -2 + MathF.Sin(anim * 20)); c.LineTo(-6, 2 + MathF.Sin(anim * 20)); c.FillPath();
+        c.Fill = H.Rgba(200, 230, 240, 0.6f); c.FillRect(1.5f, -1, 1, 1);
+        c.Restore();
+    }
+    public override Props Serialize() => null;
+}
+
+// ---------------------------------------------------------------- Saltwright
+public class Saltwright : Body
+{
+    float exposed;
+    public Saltwright(Props spec, RoomDef room) : base(spec, room)
+    {
+        type = "saltwright";
+        var a = AddKnot("armL", "arm", "elbowL", 4); a.plated = a.basePlated = true;
+        var b = AddKnot("armR", "arm", "elbowR", 4); b.plated = b.basePlated = true;
+        AddKnot("crown", "crown", "sternum", 5, 5, 2);
+        w = 16; h = 30; x = spec.F("x") - 8; y = spec.F("y") - 30;
+        mode = "idle"; awakeMode = "hunt";
+    }
+    public override void SetPose(string p) { if (p == "lying") base.SetPose("lying"); }
+    public override void Think(float dt)
+    {
+        var p = G.player;
+        cool -= dt;
+        if (mode == "windup")
+        {
+            vx = 0; atkT -= dt;
+            if (atkT <= 0)
+            {
+                mode = "recover"; atkT = 1.5f; exposed = 1.5f;
+                Snd.Thud(Pan()); G.Shake(2);
+                float hx = Cx() + facing * 22, hy = y + h - 8;
+                if (p != null && MathF.Abs(p.Cx() - hx) < 22 && MathF.Abs(p.Cy() - hy) < 24) p.Hurt(2, this);
+                // The pick breaks salt walls and floors.
+                for (int dy = -2; dy <= 1; dy++) for (int dx = 0; dx <= 1; dx++)
+                    {
+                        int tx = H.FloorI((hx + facing * dx * 16) / H.TILE), ty = H.FloorI(hy / H.TILE) + dy;
+                        if (World.CharAt(tx, ty) == 'S') { World.SetChar(tx, ty, ' '); FX.Salt(tx * 16 + 8, ty * 16 + 8, 14); Snd.Crack(); }
+                    }
+                FX.Salt(hx, hy + 6, 8);
+                Noise.Emit(hx, hy, 8, "pick");
+            }
+            return;
+        }
+        if (mode == "recover") { vx = 0; atkT -= dt; exposed = atkT; if (atkT <= 0) { mode = "hunt"; exposed = 0; } return; }
+        if (mode == "idle")
+        {
+            if (Perceives() || alert > 0) mode = "hunt";
+            vx *= 0.9f;
+            return;
+        }
+        if (Perceives()) { target = new Vector2(p.Cx(), 0); alert = 4; }
+        else if (lastHeard != null && alert > 0) { target = lastHeard; alert -= dt; }
+        else target = null;
+        if (target != null)
+        {
+            Pursue(dt, target.Value.X, 38);
+            if (p != null && ArmsOK() && cool <= 0 && MathF.Abs(p.Cx() - Cx()) < 40 && MathF.Abs(p.Cy() - Cy()) < 30)
+            {
+                mode = "windup"; atkT = 0.8f; cool = 2.2f;
+                int s = (int)H.Sign(p.Cx() - Cx()); facing = s != 0 ? s : 1;
+                foreach (var k in knots) if (!k.broken) k.flare = 0.8f;
+                Snd.Groan(Pan(), 0.3f);
+            }
+        }
+        else vx *= 0.9f;
+    }
+    // In the 1.5 s after its swing, a gaff strike pries an arm plate off.
+    public override bool DamageKnot(Knot k, float dmg, string src)
+    {
+        if (src == "gaff" && k.plated && exposed > 0) src = "pry";
+        return base.DamageKnot(k, dmg, src);
+    }
+    public override void Draw(Canvas c)
+    {
+        if (gone) return;
+        var j = Skel();
+        DrawHuman(c, new Palette { robe = "#5a4a3a", skin = "#8a8a7e", cowl = "#3a3028", dark = "#2a221a" });
+        if (pose == "stand")
+        {
+            // salt armour plates on shoulders and a pick
+            var sl = j["shoulderL"];
+            c.FillStyle = "#cfc8b8"; c.FillRect(sl.X - 5, sl.Y - 3, 10, 4);
+            c.Fill = H.Rgba(255, 255, 255, 0.25f); c.FillRect(sl.X - 5, sl.Y - 3, 10, 1);
+            var hand = j["handL"];
+            float ang = mode == "windup" ? -2.2f * facing : mode == "recover" ? 0.9f * facing : 0.3f * facing;
+            c.Save(); c.Translate(hand.X, hand.Y); c.Rotate(ang);
+            c.StrokeStyle = "#6a5030"; c.LineWidth = 2; c.BeginPath(); c.MoveTo(0, 0); c.LineTo(0, -16); c.StrokePath();
+            c.StrokeStyle = "#9aa0a4"; c.LineWidth = 2.5f; c.BeginPath(); c.MoveTo(-6, -15); c.QuadraticCurveTo(0, -19, 7, -14); c.StrokePath();
+            c.Restore();
+        }
+    }
+}
+
+// ---------------------------------------------------------------- Grafted (Act III choir)
+public class Grafted : Body
+{
+    float healT;
+    public Grafted(Props spec, RoomDef room) : base(spec, room)
+    {
+        type = "grafted";
+        passive = spec.B("passive");
+        AddKnot("elbowL", "elbow", "elbowL", 3);
+        AddKnot("elbowR", "elbow", "elbowR", 3);
+        AddKnot("graft", "graft", "neck", 3, 4);
+        AddKnot("crown", "crown", "sternum", 4, 5, 2);
+        mode = passive ? "idle" : "hunt"; awakeMode = passive ? "idle" : "hunt";
+        boss = spec.B("boss");
+        if (boss) { foreach (var k in knots) { k.max += 3; k.hp = k.max; } AddKnot("graft2", "graft", "hip", 4); }
+    }
+    public override bool Perceives() => !passive && base.Perceives();
+    public override void Hear(float hx, float hy, float d, float r, string src) { if (!passive) base.Hear(hx, hy, d, r, src); }
+    public override bool DamageKnot(Knot k, float dmg, string src) { if (passive) { passive = false; mode = "hunt"; G.OnChoirAttacked(); } return base.DamageKnot(k, dmg, src); }
+    public override void DamageFlesh(float dmg, float hx, float hy, string src) { if (passive) { passive = false; mode = "hunt"; G.OnChoirAttacked(); } base.DamageFlesh(dmg, hx, hy, src); }
+    public override LightSrc Light() => gone || mode == "downed" ? null : new LightSrc { x = Cx() + facing * 6, y = Cy(), r = 60, i = 0.6f, color = "255,200,120" };
+    public override void Think(float dt)
+    {
+        var p = G.player;
+        if (passive) { vx *= 0.8f; if (p != null) { int s = (int)H.Sign(p.Cx() - Cx()); facing = s != 0 ? s : 1; } return; }
+        cool -= dt;
+        // Retreat into water to heal.
+        bool hurt = knots.Any(k => k.broken && k.type != "crown");
+        if (hurt && World.IsWater(Cx(), Feet() - 2))
+        {
+            healT += dt;
+            if (healT > 3) { healT = 0; var k = knots.Find(k => k.broken && k.type != "crown"); if (k != null) { k.broken = false; k.hp = k.max; FX.Salt(Cx(), Cy(), 8); } }
+        }
+        if (mode == "windup")
+        {
+            vx = 0; atkT -= dt;
+            if (atkT <= 0 && p != null)
+            {
+                mode = "recover"; atkT = 1.0f;
+                float a = MathF.Atan2(p.Cy() - (y + 10), p.Cx() - Cx());
+                G.enemyShots.Add(new Shot { x = Cx(), y = y + 10, vx = MathF.Cos(a) * 340, vy = MathF.Sin(a) * 340, life = 2, dmg = 2, src = this });
+                Snd.Harpoon(Pan());
+            }
+            return;
+        }
+        if (mode == "recover") { atkT -= dt; if (atkT <= 0) mode = "hunt"; return; }
+        if (p == null) return;
+        float d = H.Dist(Cx(), Cy(), p.Cx(), p.Cy());
+        if (hurt && !World.IsWater(Cx(), Feet() - 2))
+        {
+            // look for water nearby
+            foreach (var dir in new[] { -1, 1 })
+                for (int i = 1; i < 12; i++)
+                    if (World.IsWater(Cx() + dir * i * H.TILE, Feet() - 2)) { Pursue(dt, Cx() + dir * i * H.TILE, 50); return; }
+        }
+        if (Perceives() || d < 12 * H.TILE)
+        {
+            if (d > 7 * H.TILE) Pursue(dt, p.Cx(), 50);
+            else if (d < 3 * H.TILE) Pursue(dt, Cx() - H.Sign(p.Cx() - Cx()) * 40, 50);
+            else vx *= 0.8f;
+            int s = (int)H.Sign(p.Cx() - Cx()); facing = s != 0 ? s : 1;
+            if (cool <= 0 && ArmsOK() && Phys.Los(Cx(), y + 10, p.Cx(), p.Cy()))
+            {
+                mode = "windup"; atkT = 0.9f; cool = boss ? 1.6f : 2.6f;
+                foreach (var k in knots) if (!k.broken) k.flare = 0.9f;
+            }
+        }
+        else vx *= 0.9f;
+    }
+    public override void Draw(Canvas c)
+    {
+        if (gone) return;
+        var j = Skel();
+        DrawHuman(c, new Palette { robe = boss ? "#4a2f5a" : "#3a3a5a", skin = "#9aa6b0", cowl = boss ? "#c0a060" : "#2a2a40", dark = "#1a1a2a" });
+        if (pose == "stand" && mode != "downed")
+        {
+            c.FillStyle = "#ffd080"; c.FillRect(j["handL"].X - 1.5f, j["handL"].Y - 1, 3, 3);
+            c.Fill = H.Rgba(200, 240, 255, 0.6f); c.FillRect(j["neck"].X - 2, j["neck"].Y - 1, 4, 2);
+        }
+    }
+}
+
+// A true corpse: no knots, never stands. Still a body you can drag (Dead Weight).
+public class Corpse : Body
+{
+    public float fadeKnots;
+    public Corpse(Props spec, RoomDef room) : base(spec, room)
+    {
+        type = "corpse"; corpse = true;
+        sailor = spec.B("sailor");
+        string sp = spec.S("pose");
+        SetPose(sp == "seated" || sp == "slumped" ? "seated" : "lying");
+        mode = "dormant";
+        if (sailor)
+        {
+            // The tutorial sailor shows knots that glint, then go dark.
+            AddKnot("kneeL", "knee", "kneeL", 1); AddKnot("kneeR", "knee", "kneeR", 1);
+            AddKnot("elbowL", "elbow", "elbowL", 1); AddKnot("elbowR", "elbow", "elbowR", 1);
+            fadeKnots = 0;
+        }
+    }
+    public override void Hear(float hx, float hy, float d, float r, string src) { }
+    public override void Wake(bool force = false) { }
+    public override bool DamageKnot(Knot k, float dmg, string src) => false;
+    public override void DamageFlesh(float d, float hx, float hy, string src) { Snd.Thud(Pan()); FX.Blood(hx, hy, 2); }
+    public override void Update(float dt)
+    {
+        _skel = null;
+        if (burnT > 0) { base.Update(dt); return; }
+        if (sailor && fadeKnots > 0) { fadeKnots -= dt; if (fadeKnots <= 0) knots.Clear(); }
+        Physics(dt);
+    }
+    public override void DrawKnots(Canvas c)
+    {
+        if (!sailor || knots.Count == 0) return;
+        float f = fadeKnots > 0 ? fadeKnots / 3 : 1;
+        foreach (var k in knots)
+        {
+            var p = KnotPos(k).Value;
+            float v = Render.KnotVisibility(p.X, p.Y, this) * f;
+            if (v < 0.05f) continue;
+            c.Fill = H.Rgba(200, 245, 255, v); c.Save(); c.Translate(p.X, p.Y); c.Rotate(H.PI / 4); c.FillRect(-1.8f, -1.8f, 3.6f, 3.6f); c.Restore();
+        }
+    }
+    public override void Draw(Canvas c)
+    {
+        if (gone) return;
+        DrawHuman(c, sailor ? new Palette { robe = "#2a3a4a", skin = "#8c9890", dark = "#1a242c" } : new Palette { robe = "#3b3631", skin = "#7a837a", cowl = "#2c2824" });
+    }
+    public override Props Serialize() => new(new JsonObject { ["x"] = x, ["y"] = y, ["gone"] = gone, ["pose"] = pose, ["facing"] = facing, ["knots"] = new JsonArray() });
+    public override void Restore(Props s) { x = s.F("x"); y = s.F("y"); gone = s.B("gone"); facing = s.I("facing", facing); SetPose(s.S("pose") ?? pose); if (sailor) knots.Clear(); }
+}
+
+public static class BodyTypes
+{
+    public static Body Make(string t, Props spec, RoomDef room) => t switch
+    {
+        "shucker" => new Shucker(spec, room),
+        "gullet" => new Gullet(spec, room),
+        "bellmouth" => new Bellmouth(spec, room),
+        "driftling" => new Driftling(spec, room),
+        "saltwright" => new Saltwright(spec, room),
+        "grafted" => new Grafted(spec, room),
+        "corpse" => new Corpse(spec, room),
+        "abbot" => new Abbot(spec, room),
+        "undertow" => new Undertow(spec, room),
+        "shoal" => new Shoal(spec, room),
+        _ => null,
+    };
+    public static bool Has(string t) => t is "shucker" or "gullet" or "bellmouth" or "driftling" or "saltwright" or "grafted" or "corpse" or "abbot" or "undertow" or "shoal";
+}

@@ -1,0 +1,669 @@
+// The world on screen: sky, back walls, bodies, water, masonry, effects, real 2D lights with
+// shadows cast by the masonry, bloom, rain and a finishing post pass. Reads game state; never writes it.
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using Godot;
+
+namespace Hollowmere;
+
+public partial class DrawLayer : Node2D
+{
+    public Action<Canvas> Paint;
+    readonly Canvas cv = new();
+    public override void _Draw() => Paint?.Invoke(cv.Begin(this));
+}
+
+public partial class WorldView : Node2D
+{
+    const int TS = H.TILE;
+    const int VW = H.VIEW_W, VH = H.VIEW_H;
+
+    CanvasModulate modulate;
+    DrawLayer back, entities, water, waterLines, solid, dyn, fxShaded, fxGlow, fxText, sky, rain, overlay, hud;
+    // Static room art is baked once per room into offscreen textures and drawn as single lit quads.
+    SubViewport backBake, solidBake;
+    DrawLayer backArt, solidArt;
+    int bakeWait;
+    Node2D occluders, lightRoot;
+    PointLight2D lantern, aura;
+    readonly List<PointLight2D> pool = new();
+    Camera2D camera;
+    ColorRect postRect;
+    ShaderMaterial waterMat, postMat;
+    Texture2D lightTex, coneWide, coneFocus;
+    Color ambient = new(0.35f, 0.38f, 0.42f);
+
+    // per-room cache
+    RoomDef cached;
+    bool dirty = true;
+    int[] dist = Array.Empty<int>();
+    readonly List<(int x, int y)> dynCells = new(), windows = new(), ceilings = new(), tops = new();
+    readonly List<int> pillars = new();
+
+    // atmosphere
+    class Drop { public float x, y, v, l; }
+    class Mote { public string kind; public float x, y, vx, vy, life, p; }
+    readonly List<Drop> drops = new();
+    readonly List<Mote> motes = new();
+    float lightningNext = 12, lightningFlash, lightningSecond = -1, underSmooth;
+    readonly (float x, float y, float s, float p)[] stars = Enumerable.Range(0, 90).Select(_ => (H.Rand(), H.Rand() * 0.55f, H.Rand(), H.Rand() * 6)).ToArray();
+    readonly (float x, float y, float r)[] clouds = Enumerable.Range(0, 26).Select(_ => (H.Rand() * 1280, 30 + H.Rand() * 110, 30 + H.Rand() * 60)).ToArray();
+
+    public override void _Ready()
+    {
+        // Light shapes are imported textures (tools/make_light_textures.py writes them).
+        lightTex = GD.Load<Texture2D>("res://textures/light_radial.png");
+        coneWide = GD.Load<Texture2D>("res://textures/light_cone_wide.png");
+        coneFocus = GD.Load<Texture2D>("res://textures/light_cone_focus.png");
+
+        // sky behind everything, in screen space and outside the world's light
+        var skyLayer = new CanvasLayer { Layer = -10 };
+        AddChild(skyLayer);
+        sky = new DrawLayer { Paint = PaintSky };
+        skyLayer.AddChild(sky);
+
+        modulate = new CanvasModulate { Color = ambient };
+        AddChild(modulate);
+        backBake = MakeBake(out backArt, PaintBack);
+        solidBake = MakeBake(out solidArt, PaintSolid);
+        back = Add(new DrawLayer { Paint = c => DrawBake(c, backBake) });
+        entities = Add(new DrawLayer { Paint = PaintEntities });
+        water = Add(new DrawLayer { Paint = PaintWater });
+        waterMat = new ShaderMaterial { Shader = GD.Load<Shader>("res://shaders/water.gdshader") };
+        water.Material = waterMat;
+        waterLines = Add(new DrawLayer { Paint = PaintWaterLines });
+        solid = Add(new DrawLayer { Paint = c => DrawBake(c, solidBake) });
+        dyn = Add(new DrawLayer { Paint = PaintDynamic });
+        fxShaded = Add(new DrawLayer { Paint = PaintFxShaded });
+        fxGlow = Add(new DrawLayer { Paint = PaintFxGlow, Material = new CanvasItemMaterial { BlendMode = CanvasItemMaterial.BlendModeEnum.Add, LightMode = CanvasItemMaterial.LightModeEnum.Unshaded } });
+        fxText = Add(new DrawLayer { Paint = PaintFxText, Material = new CanvasItemMaterial { LightMode = CanvasItemMaterial.LightModeEnum.Unshaded } });
+        occluders = Add(new Node2D());
+        lightRoot = Add(new Node2D());
+
+        lantern = new PointLight2D { Texture = coneWide, Color = new Color(1f, 0.86f, 0.62f), Energy = 1.25f, ShadowEnabled = true, ShadowFilter = Light2D.ShadowFilterEnum.Pcf13, ShadowFilterSmooth = 2f, BlendMode = Light2D.BlendModeEnum.Add };
+        lightRoot.AddChild(lantern);
+        aura = new PointLight2D { Texture = lightTex, Color = new Color(1f, 0.88f, 0.7f), Energy = 0.8f, ShadowEnabled = true, ShadowFilter = Light2D.ShadowFilterEnum.Pcf5, ShadowFilterSmooth = 2f };
+        lightRoot.AddChild(aura);
+
+        camera = new Camera2D { AnchorMode = Camera2D.AnchorModeEnum.FixedTopLeft, Enabled = true };
+        AddChild(camera);
+
+        // rain, glimpses and the finishing pass sit above the world, below the HUD
+        var postLayer = new CanvasLayer { Layer = 5 };
+        AddChild(postLayer);
+        rain = new DrawLayer { Paint = PaintRain };
+        postLayer.AddChild(rain);
+        overlay = new DrawLayer { Paint = PaintOverlay };
+        postLayer.AddChild(overlay);
+        postMat = new ShaderMaterial { Shader = GD.Load<Shader>("res://shaders/post.gdshader") };
+        postRect = new ColorRect { Material = postMat, MouseFilter = Control.MouseFilterEnum.Ignore, Size = new Vector2(VW, VH) };
+        postLayer.AddChild(postRect);
+
+        var hudLayer = new CanvasLayer { Layer = 10 };
+        AddChild(hudLayer);
+        hud = new DrawLayer { Paint = c => { if (G.mode == "play" && !UI.CinematicOpen) Hud.Draw(c); } };
+        hudLayer.AddChild(hud);
+
+        World.Dirty += () => dirty = true;
+        G.RoomChanged += () => dirty = true;
+    }
+    DrawLayer Add(DrawLayer d) { AddChild(d); return d; }
+    SubViewport MakeBake(out DrawLayer art, Action<Canvas> paint)
+    {
+        var vp = new SubViewport { TransparentBg = true, Disable3D = true, RenderTargetUpdateMode = SubViewport.UpdateMode.Disabled, CanvasItemDefaultTextureFilter = Viewport.DefaultCanvasItemTextureFilter.Nearest };
+        AddChild(vp);
+        art = new DrawLayer { Paint = paint };
+        vp.AddChild(art);
+        return vp;
+    }
+    void DrawBake(Canvas c, SubViewport vp)
+    {
+        var r = G.room;
+        if (r == null || cached != r || bakeWait > 0) return;
+        c.Fill = Colors.White;
+        c.Texture(vp.GetTexture(), r.Px, r.Py);
+    }
+    T Add<T>(T n) where T : Node { AddChild(n); return n; }
+
+    // ---- per-room cache -------------------------------------------------------------------------
+    char At(RoomDef r, int lx, int ly) => (lx < 0 || ly < 0 || lx >= r.Tw || ly >= r.Th) ? World.CharAt(r.Ox + lx, r.Oy + ly) : r.Live[ly * r.Tw + lx];
+    bool SolidAt(RoomDef r, int lx, int ly) => TileArt.IsSolidCh(At(r, lx, ly));
+
+    void Rebuild()
+    {
+        var r = G.room;
+        cached = r; dirty = false;
+        dist = new int[r.Tw * r.Th];
+        for (int ly = 0; ly < r.Th; ly++) for (int lx = 0; lx < r.Tw; lx++)
+            {
+                if (SolidAt(r, lx, ly)) { dist[ly * r.Tw + lx] = 0; continue; }
+                int d = 9;
+                for (int rad = 1; rad <= 4 && d == 9; rad++)
+                    for (int dy = -rad; dy <= rad && d == 9; dy++)
+                        for (int dx = -rad; dx <= rad; dx++)
+                            if ((Math.Abs(dx) == rad || Math.Abs(dy) == rad) && SolidAt(r, lx + dx, ly + dy)) { d = rad; break; }
+                dist[ly * r.Tw + lx] = d;
+            }
+        dynCells.Clear(); windows.Clear(); ceilings.Clear(); tops.Clear(); pillars.Clear();
+        var pset = new HashSet<int>();
+        for (int ly = 0; ly < r.Th; ly++) for (int lx = 0; lx < r.Tw; lx++)
+            {
+                char ch = r.Live[ly * r.Tw + lx];
+                int tx = r.Ox + lx, ty = r.Oy + ly;
+                if (ch == 'w') windows.Add((tx, ty));
+                if (TileArt.DYNAMIC.Contains(ch)) dynCells.Add((tx, ty));
+                if (ch == '|') pset.Add(tx);
+                if (!SolidAt(r, lx, ly) && SolidAt(r, lx, ly - 1) && TileArt.SOLIDS.Contains(At(r, lx, ly - 1))) ceilings.Add((tx, ty));
+                if (!SolidAt(r, lx, ly) && SolidAt(r, lx, ly + 1)) tops.Add((tx, ty + 1));
+            }
+        pillars.AddRange(pset);
+        BuildOccluders(r);
+        var pal = TileArt.PAL[r.Region];
+        ambient = r.Outdoor ? new Color(0.46f, 0.5f, 0.58f) : r.BellRoom ? pal.ambient * 1.3f : pal.ambient;
+        ambient.A = 1;
+        foreach (var (vp, art) in new[] { (backBake, backArt), (solidBake, solidArt) })
+        {
+            vp.Size = new Vector2I((int)r.Pw, (int)r.Ph);
+            art.Position = new Vector2(-r.Px, -r.Py);
+            art.QueueRedraw();
+            vp.RenderTargetUpdateMode = SubViewport.UpdateMode.Once;
+        }
+        bakeWait = 2;
+    }
+
+    // Masonry casts shadows: one occluder per run of exposed solid tiles in each row. The face toward a
+    // light stays lit (front faces are culled) and the shadow starts behind the first course of stone.
+    void BuildOccluders(RoomDef r)
+    {
+        foreach (var c in occluders.GetChildren()) c.QueueFree();
+        bool Occ(int lx, int ly) { char ch = At(r, lx, ly); return (TileArt.SOLIDS.Contains(ch) && ch != '_') || ch == 'S' || ch == 'C'; }
+        bool Exposed(int lx, int ly) => !SolidAt(r, lx - 1, ly) || !SolidAt(r, lx + 1, ly) || !SolidAt(r, lx, ly - 1) || !SolidAt(r, lx, ly + 1);
+        for (int ly = 0; ly < r.Th; ly++)
+        {
+            int run = -1;
+            for (int lx = 0; lx <= r.Tw; lx++)
+            {
+                bool on = lx < r.Tw && Occ(lx, ly) && Exposed(lx, ly);
+                if (on && run < 0) run = lx;
+                if (!on && run >= 0)
+                {
+                    float x0 = r.Px + run * TS, x1 = r.Px + lx * TS, y0 = r.Py + ly * TS, y1 = y0 + TS;
+                    var poly = new OccluderPolygon2D { Polygon = new[] { new Vector2(x0, y0), new Vector2(x1, y0), new Vector2(x1, y1), new Vector2(x0, y1) }, CullMode = OccluderPolygon2D.CullModeEnum.CounterClockwise, Closed = true };
+                    occluders.AddChild(new LightOccluder2D { Occluder = poly });
+                    run = -1;
+                }
+            }
+        }
+    }
+
+    // ---- frame ----------------------------------------------------------------------------------------
+    public override void _Process(double delta)
+    {
+        if (G.room == null) return;
+        if (dirty || cached != G.room) Rebuild();
+        float dt = (float)delta;
+        if (bakeWait > 0) bakeWait--;
+        UpdateAtmosphere(dt);
+        var p = G.player;
+        float sx = Settings.Shake ? G.shakeX : 0, sy = Settings.Shake ? G.shakeY : 0;
+        camera.Position = G.cam + new Vector2(sx, sy);
+        modulate.Color = G.room.Outdoor ? ambient.Lerp(new Color(0.85f, 0.9f, 1f), lightningFlash * 0.6f) : ambient;
+        UpdateLights(p);
+        UpdatePost(p, dt);
+        foreach (var l in new[] { sky, back, entities, water, waterLines, solid, dyn, fxShaded, fxGlow, fxText, rain, overlay, hud }) l.QueueRedraw();
+    }
+
+    void UpdateLights(Player p)
+    {
+        bool lit = p.LanternLit() && !p.dead;
+        lantern.Visible = lit;
+        if (lit)
+        {
+            float t = G.Now;
+            float flick = 1 + MathF.Sin(t * 17) * 0.02f + MathF.Sin(t * 41) * 0.012f;
+            float range = (p.focusing ? 260 : 160) * flick;
+            lantern.Texture = p.focusing ? coneFocus : coneWide;
+            lantern.TextureScale = range / 256f;
+            lantern.Position = p.LanternPos();
+            lantern.Rotation = p.aim;
+            lantern.Energy = (p.focusing ? 1.9f : 1.5f) * flick;
+        }
+        aura.Visible = !p.dead;
+        aura.Position = new Vector2(p.Cx(), p.Cy());
+        aura.TextureScale = (lit ? 52 : 28) / 128f;
+        aura.Energy = lit ? 1.1f : 0.55f;
+
+        // every other light this frame: lamps, bells, flares, glowing collectibles, fire
+        var srcs = new List<LightSrc>();
+        foreach (var l in G.frameLights) if (!l.player) srcs.Add(l);
+        foreach (var f in Fire.cells.Values) srcs.Add(new LightSrc { x = f.tx * TS + 8, y = f.ty * TS + 8, r = 60, i = 0.8f, color = "255,140,50" });
+        while (pool.Count < srcs.Count)
+        {
+            var pl = new PointLight2D { Texture = lightTex, ShadowFilter = Light2D.ShadowFilterEnum.Pcf5, ShadowFilterSmooth = 2f };
+            lightRoot.AddChild(pl); pool.Add(pl);
+        }
+        for (int i = 0; i < pool.Count; i++)
+        {
+            var pl = pool[i];
+            if (i >= srcs.Count) { pl.Visible = false; continue; }
+            var l = srcs[i];
+            pl.Visible = true;
+            pl.Position = new Vector2(l.x, l.y);
+            pl.TextureScale = l.r * 1.25f / 128f;
+            var col = ParseRgb(l.color ?? "255,200,120");
+            pl.Color = col.Lerp(Colors.White, 0.35f);
+            pl.Energy = l.i * 1.4f;
+            pl.ShadowEnabled = l.r >= 60;
+        }
+    }
+    static readonly Dictionary<string, Color> rgbCache = new();
+    static Color ParseRgb(string s)
+    {
+        if (rgbCache.TryGetValue(s, out var c)) return c;
+        var p = s.Split(',');
+        c = new Color(float.Parse(p[0]) / 255f, float.Parse(p[1]) / 255f, float.Parse(p[2]) / 255f);
+        rgbCache[s] = c;
+        return c;
+    }
+
+    void UpdatePost(Player p, float dt)
+    {
+        postRect.Size = GetViewport().GetVisibleRect().Size;
+        bool under = p.HeadUnder() && !p.dead;
+        underSmooth = H.Approach(underSmooth, under ? 1 : 0, dt * 3);
+        var r = G.room;
+        postMat.SetShaderParameter("under", underSmooth);
+        postMat.SetShaderParameter("tint", r.Brine ? new Color(120 / 255f, 140 / 255f, 120 / 255f, 0.18f * underSmooth) : new Color(20 / 255f, 60 / 255f, 80 / 255f, 0.28f * underSmooth));
+        var grade = r.Outdoor ? H.Rgba(40, 60, 80) : TileArt.PAL[r.Region].grade;
+        postMat.SetShaderParameter("grade", new Vector3(grade.R, grade.G, grade.B));
+        Color flash = new(0, 0, 0, 0);
+        if (G.flash > 0) flash = new Color(160 / 255f, 20 / 255f, 20 / 255f, MathF.Min(0.8f, G.flash));
+        else if (lightningFlash > 0 && r.Outdoor) flash = new Color(210 / 255f, 225 / 255f, 240 / 255f, lightningFlash * 0.16f);
+        postMat.SetShaderParameter("flash", flash);
+        postMat.SetShaderParameter("pressure", G.pressureWarn);
+    }
+
+    // ---- atmosphere: rain, lightning, motes, drips, bubbles ------------------------------------------
+    (int x, int y)? PickVisible(List<(int x, int y)> list)
+    {
+        for (int i = 0; i < 4 && list.Count > 0; i++)
+        {
+            var q = H.Pick(list); float x = q.x * TS, y = q.y * TS;
+            if (x > G.cam.X - TS && x < G.cam.X + VW && y > G.cam.Y - TS && y < G.cam.Y + VH) return q;
+        }
+        return null;
+    }
+    void UpdateAtmosphere(float dt)
+    {
+        var r = G.room; var cam = G.cam;
+        if (r.Outdoor)
+        {
+            while (drops.Count < 190) drops.Add(new Drop { x = H.Rand() * (VW + 120) - 60, y = H.Rand() * VH, v = 300 + H.Rand() * 160, l = 6 + H.Rand() * 8 });
+            foreach (var d in drops) { d.y += d.v * dt; d.x -= d.v * 0.28f * dt; if (d.y > VH || d.x < -40) { d.y = -10; d.x = H.Rand() * (VW + 120); } }
+            var top = tops.Count > 0 && H.Rand() < dt * 40 ? PickVisible(tops) : null;
+            if (top != null)
+            {
+                float x = top.Value.x * TS + H.Rand() * TS, y = top.Value.y * TS;
+                if (!World.SolidPx(x, y - 4)) FX.Spawn(x, y, 2, new FXOpt { color = "rgba(170,200,215,0.7)", ang = -H.PI / 2, spread = 0.9f, smin = 20, smax = 50, grav = 300, lmin = 0.15f, lmax = 0.3f, size = 1 });
+            }
+            lightningNext -= dt;
+            if (lightningNext <= 0)
+            {
+                lightningNext = 14 + H.Rand() * 22; lightningFlash = 1; lightningSecond = 0.18f;
+                G.After(0.7f + H.Rand() * 1.2f, Snd.Rumble);
+            }
+        }
+        else drops.Clear();
+        if (lightningSecond >= 0) { lightningSecond -= dt; if (lightningSecond < 0) lightningFlash = MathF.Max(lightningFlash, 0.7f); }
+        lightningFlash = MathF.Max(0, lightningFlash - dt * 2.6f);
+
+        string reg = r.Region;
+        int want = r.Outdoor ? 0 : 52;
+        if (motes.Count > want) motes.RemoveRange(want, motes.Count - want);
+        while (motes.Count < want) motes.Add(SpawnMote(true));
+        float t = G.Now;
+        for (int i = motes.Count - 1; i >= 0; i--)
+        {
+            var m = motes[i];
+            m.life -= dt;
+            if (m.kind == "drip")
+            {
+                m.vy += 500 * dt;
+                if (World.SolidPx(m.x, m.y + 2) || World.IsWater(m.x, m.y + 2)) { FX.Spawn(m.x, m.y, 3, new FXOpt { color = "rgba(160,200,215,0.7)", ang = -H.PI / 2, spread = 1, smin = 15, smax = 45, grav = 300, lmin = 0.2f, lmax = 0.4f, size = 1 }); m.life = 0; }
+            }
+            else if (m.kind == "bubble") { m.vy = -18; m.vx = MathF.Sin(t * 3 + m.p) * 6; if (!World.IsWater(m.x, m.y)) m.life = 0; }
+            else m.vx += MathF.Sin(t * 0.7f + m.p) * 2 * dt;
+            m.x += m.vx * dt; m.y += m.vy * dt;
+            bool off = m.x < cam.X - 40 || m.x > cam.X + VW + 40 || m.y < cam.Y - 40 || m.y > cam.Y + VH + 40;
+            if (m.life <= 0 || off) motes[i] = SpawnMote(false);
+        }
+    }
+    Mote SpawnMote(bool initial)
+    {
+        var cam = G.cam; string reg = G.room.Region;
+        float x = cam.X + H.Rand() * VW, y = cam.Y + H.Rand() * VH;
+        float r = H.Rand();
+        var ceil = (reg is "wrackline" or "cloister" or "choir" or "gullet") && r < 0.12f ? PickVisible(ceilings) : null;
+        if (ceil != null) return new Mote { kind = "drip", x = ceil.Value.x * TS + 4 + H.Rand() * 8, y = ceil.Value.y * TS + 1, life = 4 };
+        if (World.IsWater(x, y)) return new Mote { kind = "bubble", x = x, y = y, vy = -18, life = 3 + H.Rand() * 3, p = H.Rand() * 6 };
+        if (reg == "saltworks" && r < 0.6f) return new Mote { kind = "salt", x = x, y = initial ? y : cam.Y - 5, vx = 4, vy = 9 + H.Rand() * 6, life = 12, p = H.Rand() * 6 };
+        if (reg is "ribvault" or "skull" && r < 0.25f) return new Mote { kind = "ember", x = x, y = y, vx = (H.Rand() - 0.5f) * 4, vy = -4 - H.Rand() * 4, life = 5 + H.Rand() * 5, p = H.Rand() * 6 };
+        return new Mote { kind = "dust", x = x, y = y, vx = (H.Rand() - 0.5f) * 4, vy = (H.Rand() - 0.5f) * 3, life = 6 + H.Rand() * 8, p = H.Rand() * 6 };
+    }
+
+    // ---- painters -------------------------------------------------------------------------------------
+    void PaintSky(Canvas c)
+    {
+        var r = G.room; var cam = G.cam; float t = G.Now;
+        if (r == null) return;
+        if (!r.Outdoor)
+        {
+            var pal = TileArt.PAL[r.Region];
+            c.FillRectGradV(0, 0, VW, VH, pal.bg0, pal.bg1);
+            return;
+        }
+        c.FillRectGradV(0, 0, VW, VH * 0.55f, H.Col("#04070b"), H.Col("#0c141b"));
+        c.FillRectGradV(0, VH * 0.55f, VW, VH * 0.45f, H.Col("#0c141b"), H.Col("#16222b"));
+        float mx = 150, my = 62;
+        c.Glow(mx, my, 125, H.Rgba(180, 200, 215, 0.3f));
+        foreach (var s in stars)
+        {
+            float tw = 0.35f + 0.35f * MathF.Sin(t * 1.5f + s.p);
+            float sxp = ((s.x * 900 - cam.X * 0.03f) % 900 + 900) % 900;
+            c.Fill = H.Rgba(210, 220, 230, tw); c.FillRect(sxp, s.y * 220, s.s > 0.85f ? 1.5f : 1, s.s > 0.85f ? 1.5f : 1);
+        }
+        c.FillStyle = "#d8e0e4"; c.FillCircle(mx, my, 13);
+        c.Fill = H.Rgba(150, 165, 175, 0.5f); c.FillCircle(mx + 4, my - 3, 3); c.FillCircle(mx - 4, my + 4, 2);
+        // drifting clouds
+        float cx = -((cam.X * 0.04f + t * 3) % 1280);
+        foreach (var cl in clouds)
+            for (int k = -1; k <= 1; k++)
+            {
+                float x = cl.x + cx + k * 1280;
+                if (x < -cl.r || x > VW + cl.r) continue;
+                c.Glow(x, cl.y + 10, cl.r, cl.r * 0.7f, H.Rgba(40, 52, 62, 0.55f));
+            }
+        // the dark lighthouse on the skull
+        float lx = 470 - (cam.X - r.Px) * 0.06f, ly = 120 - (cam.Y - r.Py) * 0.03f;
+        c.FillStyle = "#070b0e";
+        c.BeginPath(); c.MoveTo(lx, ly + 150); c.QuadraticCurveTo(lx + 40, ly + 70, lx + 70, ly + 74); c.QuadraticCurveTo(lx + 105, ly + 72, lx + 140, ly + 150); c.FillPath();
+        c.BeginPath(); c.Arc(lx + 70, ly + 92, 26, H.PI, H.PI * 2); c.FillPath();
+        c.FillRect(lx + 64, ly + 30, 12, 50);
+        c.FillRect(lx + 60, ly + 24, 20, 8);
+        c.BeginPath(); c.MoveTo(lx + 60, ly + 24); c.LineTo(lx + 70, ly + 12); c.LineTo(lx + 80, ly + 24); c.FillPath();
+        c.FillStyle = "#0d1418"; c.FillRect(lx + 66, ly + 26, 8, 4);
+        // the far sea with a moon path
+        c.FillRectGradV(0, 250, VW, VH - 250, H.Col("#0d1820"), H.Col("#060c11"));
+        for (int i = 0; i < 60; i++)
+        {
+            float y = 252 + i * 1.8f, w = 6 + i * 0.9f + TileArt.Hash(i, 7) * 10;
+            float wob = MathF.Sin(t * 1.3f + i * 0.7f) * 3;
+            c.Fill = H.Rgba(190, 210, 220, 0.22f - i * 0.003f);
+            c.FillRect(mx - w / 2 + (TileArt.Hash(i, 3) - 0.5f) * 8 + wob, y, w, 1);
+        }
+    }
+
+    void PaintBack(Canvas c)
+    {
+        var r = G.room; if (r == null || cached != r) return;
+
+        var pal = TileArt.PAL[r.Region];
+        for (int ly = 0; ly < r.Th; ly++) for (int lx = 0; lx < r.Tw; lx++)
+            {
+                char ch = r.Live[ly * r.Tw + lx];
+                float x = r.Px + lx * TS, y = r.Py + ly * TS; int tx = r.Ox + lx, ty = r.Oy + ly;
+                if (!r.Outdoor && !TileArt.COVERS.Contains(ch) && ch != 'w') TileArt.BackTile(c, x, y, tx, ty, pal, r, dist.Length > 0 ? dist[ly * r.Tw + lx] : 4);
+                if (ch == 'w') TileArt.WindowHole(c, x, y);
+                if (TileArt.DECOR.Contains(ch)) TileArt.Decor(c, ch, x, y, tx, ty);
+            }
+        // tide marks on pillars (static per room; drawn with the back wall)
+        if (r.Row == 4 && r.FixedWater == null)
+        {
+            float lo = (Tide.SEA_LOW - Tide.spring) * TS, hi = (Tide.SEA_HIGH - Tide.spring) * TS;
+            c.Font = "6px monospace";
+            foreach (int tx in pillars)
+                for (int i = 0; i < 4; i++)
+                {
+                    float y = H.Lerp(lo, hi, i / 3f);
+                    c.Fill = H.Rgba(200, 170, 90, 0.55f); c.FillRect(tx * TS + 3, y - 0.5f, TS - 6, 1.2f);
+                    c.Fill = H.Rgba(200, 170, 90, 0.45f); c.FillText(new[] { "I", "II", "III", "IV" }[i], tx * TS + 4, y - 2);
+                }
+        }
+    }
+
+    void PaintSolid(Canvas c)
+    {
+        var r = G.room; if (r == null || cached != r) return;
+        var pal = TileArt.PAL[r.Region];
+        bool SA(int lx, int ly) => SolidAt(r, lx, ly);
+        for (int ly = 0; ly < r.Th; ly++) for (int lx = 0; lx < r.Tw; lx++)
+            {
+                char ch = r.Live[ly * r.Tw + lx];
+                if (!TileArt.SOLIDS.Contains(ch)) continue;
+                TileArt.SolidTile(c, ch, r.Px + lx * TS, r.Py + ly * TS, r.Ox + lx, r.Oy + ly, r, pal, SA, lx, ly);
+            }
+    }
+
+    void PaintDynamic(Canvas c)
+    {
+        var cam = G.cam;
+        foreach (var (tx, ty) in dynCells)
+        {
+            float x = tx * TS, y = ty * TS;
+            if (x + TS < cam.X || x > cam.X + VW || y + TS < cam.Y || y > cam.Y + VH) continue;
+            TileArt.Dynamic(c, World.CharAt(tx, ty), x, y, tx, ty, G.Now);
+        }
+    }
+
+    void PaintEntities(Canvas c)
+    {
+        if (G.room == null) return;
+        foreach (var e in G.ents) if (!e.isBody) e.Draw(c);
+        foreach (var s in G.sawlines) s.Draw(c);
+        foreach (var e in G.ents) if (e.isBody && !e.gone) e.Draw(c);
+        G.player.Draw(c);
+        foreach (var pr in G.projectiles) pr.Draw(c);
+        foreach (var s in G.enemyShots) { c.StrokeStyle = "#a0b0b8"; c.LineWidth = 1.5f; c.Line(s.x, s.y, s.x - s.vx * 0.02f, s.y - s.vy * 0.02f); }
+        foreach (var m in motes)
+        {
+            switch (m.kind)
+            {
+                case "drip": c.Fill = H.Rgba(170, 210, 225, 0.8f); c.FillRect(m.x, m.y, 1, 2.5f); break;
+                case "bubble": c.Stroke = H.Rgba(190, 225, 240, 0.5f); c.LineWidth = 0.6f; c.BeginPath(); c.Arc(m.x, m.y, 1.4f, 0, H.PI * 2); c.StrokePath(); break;
+                case "salt": c.Fill = H.Rgba(240, 242, 246, 0.6f); c.FillRect(m.x, m.y, 1, 1); break;
+                case "ember": break;
+                default: c.Fill = H.Rgba(220, 210, 180, 0.35f); c.FillRect(m.x, m.y, 1, 1); break;
+            }
+        }
+    }
+
+    // Water spans across the visible part of the room, filled with the water shader.
+    void PaintWater(Canvas c)
+    {
+        var r = G.room; if (r == null) return;
+        var cam = G.cam; float t = G.Now;
+        float x0 = MathF.Max(r.Px, cam.X - 4), x1 = MathF.Min(r.Px + r.Pw, cam.X + VW + 4);
+        float bottom = MathF.Min(r.Py + r.Ph, cam.Y + VH + 4);
+        float top = float.PositiveInfinity;
+        var span = new List<Vector2>();
+        void Flush()
+        {
+            if (span.Count >= 2)
+            {
+                var pts = new List<Vector2>(span) { new(span[^1].X, bottom), new(span[0].X, bottom) };
+                c.Fill = Colors.White; c.Poly(pts.ToArray());
+            }
+            span.Clear();
+        }
+        for (float x = x0; x <= x1 + 3; x += 4)
+        {
+            float s = World.RoomSurface(r, x);
+            if (!float.IsFinite(s) || s >= bottom) { Flush(); continue; }
+            float y = s + MathF.Sin(x * 0.05f + t * 2) * 0.8f + MathF.Sin(x * 0.13f - t * 1.3f) * 0.4f;
+            if (span.Count > 0 && MathF.Abs(span[^1].Y - y) > 12) { span.Add(new Vector2(x - 0.01f, span[^1].Y)); Flush(); }
+            span.Add(new Vector2(x, y));
+            top = MathF.Min(top, y);
+        }
+        Flush();
+        if (!float.IsFinite(top)) return;
+        if (r.Brine) { waterMat.SetShaderParameter("top_col", H.Rgba(190, 205, 190, 0.38f)); waterMat.SetShaderParameter("deep_col", H.Rgba(110, 130, 115, 0.62f)); waterMat.SetShaderParameter("caustic_col", new Vector3(0.9f, 0.95f, 0.85f)); }
+        else if (r.Deep) { waterMat.SetShaderParameter("top_col", H.Rgba(25, 70, 90, 0.5f)); waterMat.SetShaderParameter("deep_col", H.Rgba(4, 16, 24, 0.82f)); waterMat.SetShaderParameter("caustic_col", new Vector3(0.45f, 0.7f, 0.85f)); }
+        else { waterMat.SetShaderParameter("top_col", H.Rgba(40, 95, 110, 0.38f)); waterMat.SetShaderParameter("deep_col", H.Rgba(8, 28, 40, 0.7f)); waterMat.SetShaderParameter("caustic_col", new Vector3(0.55f, 0.82f, 0.92f)); }
+        waterMat.SetShaderParameter("top_y", top);
+    }
+
+    void PaintWaterLines(Canvas c)
+    {
+        var r = G.room; if (r == null) return;
+        var cam = G.cam; float t = G.Now;
+        float x0 = MathF.Max(r.Px, cam.X - 4), x1 = MathF.Min(r.Px + r.Pw, cam.X + VW + 4);
+        float bottom = MathF.Min(r.Py + r.Ph, cam.Y + VH + 4);
+        c.Stroke = r.Brine ? H.Rgba(235, 245, 235, 0.6f) : H.Rgba(150, 210, 228, 0.55f); c.LineWidth = 1;
+        var line = new List<Vector2>();
+        void FlushLine() { if (line.Count >= 2) { c.BeginPath(); c.MoveTo(line[0].X, line[0].Y); for (int i = 1; i < line.Count; i++) c.LineTo(line[i].X, line[i].Y); c.StrokePath(); } line.Clear(); }
+        int k = 0;
+        for (float x = x0; x <= x1 + 3; x += 4, k++)
+        {
+            float s = World.RoomSurface(r, x);
+            if (!float.IsFinite(s) || s >= bottom) { FlushLine(); continue; }
+            float y = s + MathF.Sin(x * 0.05f + t * 2) * 0.8f + MathF.Sin(x * 0.13f - t * 1.3f) * 0.4f;
+            if (line.Count > 0 && MathF.Abs(line[^1].Y - y) > 12) FlushLine();
+            line.Add(new Vector2(x, y));
+            if (k % 3 == 0 && MathF.Sin(x * 0.3f + t * 3.1f) > 0.75f) { c.Fill = H.Rgba(220, 240, 250, 0.5f); c.FillRect(x, y - 0.5f, 3, 1); }
+        }
+        FlushLine();
+        // Ebb currents
+        if (Tide.PhaseId() == "ebbing" && r.Seaward != 0)
+        {
+            c.Stroke = H.Rgba(160, 210, 230, 0.2f);
+            for (int i = 0; i < 14; i++)
+            {
+                float px = ((i * 97 + t * 60 * r.Seaward) % r.Pw + r.Pw) % r.Pw + r.Px;
+                float s = World.RoomSurface(r, px);
+                if (!float.IsFinite(s)) continue;
+                float py = s + 10 + (i * 37) % MathF.Max(10, r.Py + r.Ph - s - 20);
+                c.Line(px, py, px + 12 * r.Seaward, py);
+            }
+        }
+    }
+
+    void PaintFxShaded(Canvas c)
+    {
+        foreach (var q in FX.parts)
+        {
+            if (q.glow) continue;
+            var col = q.color; col.A *= MathF.Max(0, q.life / q.max);
+            c.Fill = col; c.FillRect(q.x - q.size / 2, q.y - q.size / 2, q.size, q.size);
+        }
+    }
+
+    // Additive, unshaded: anything that gives off light. Values above 1 bloom.
+    void PaintFxGlow(Canvas c)
+    {
+        var r = G.room; if (r == null) return;
+        var p = G.player; float t = G.Now; var cam = G.cam;
+        // soft halos around every light source
+        foreach (var l in G.frameLights)
+        {
+            if (l.player) continue;
+            var col = ParseRgb(l.color ?? "255,200,120");
+            c.Glow(l.x, l.y, l.r * 0.9f, new Color(col.R, col.G, col.B, 0.15f * l.i));
+            c.Glow(l.x, l.y, 5, new Color(col.R * 1.6f, col.G * 1.6f, col.B * 1.6f, 0.9f * l.i));
+        }
+        // light shafts through stained glass
+        if (!r.Outdoor)
+        {
+            foreach (var (tx, ty) in windows)
+            {
+                float x = tx * TS, y = ty * TS;
+                if (x < cam.X - 160 || x > cam.X + VW + 40 || y < cam.Y - 200 || y > cam.Y + VH + 20) continue;
+                var hc = new[] { H.Rgba(255, 160, 140), H.Rgba(150, 180, 255), H.Rgba(255, 225, 150), H.Rgba(150, 240, 200) }[(int)(TileArt.Hash(tx, ty) * 4) % 4];
+                float a = 0.09f + 0.03f * MathF.Sin(t * 0.6f + tx);
+                var top = new Color(hc.R, hc.G, hc.B, a); var bot = new Color(hc.R, hc.G, hc.B, 0);
+                c.FillPolyGrad(new[] { new Vector2(x + 2, y), new Vector2(x + 14, y), new Vector2(x + 70, y + 160), new Vector2(x + 40, y + 160) }, new[] { top, top, bot, bot });
+                c.Glow(x + 8, y + 8, 10, new Color(hc.R, hc.G, hc.B, 0.25f));
+            }
+        }
+        // fire
+        foreach (var f in Fire.cells.Values)
+        {
+            float fx = f.tx * TS, fy = f.ty * TS;
+            float fl = MathF.Sin(t * 20 + f.tx) * 2, fl2 = MathF.Sin(t * 27 + f.tx * 3) * 1.5f;
+            c.Fill = new Color(0.8f, 0.24f, 0.08f, 0.6f); c.BeginPath(); c.MoveTo(fx, fy + TS); c.QuadraticCurveTo(fx + 3, fy + 6, fx + 8, fy + fl); c.QuadraticCurveTo(fx + 13, fy + 6, fx + 16, fy + TS); c.FillPath();
+            c.Fill = new Color(1.3f, 0.7f, 0.2f, 0.8f); c.BeginPath(); c.MoveTo(fx + 3, fy + TS); c.QuadraticCurveTo(fx + 5, fy + 9, fx + 8, fy + 4 + fl2); c.QuadraticCurveTo(fx + 11, fy + 9, fx + 13, fy + TS); c.FillPath();
+            c.Fill = new Color(1.6f, 1.4f, 0.9f, 0.9f); c.BeginPath(); c.MoveTo(fx + 6, fy + TS); c.LineTo(fx + 8, fy + 10 - fl); c.LineTo(fx + 10, fy + TS); c.FillPath();
+        }
+        // the lantern itself, and the warm wash of its beam, stopped by walls
+        if (p.LanternLit() && !p.dead)
+        {
+            float range = p.focusing ? 260 : 160, spread = p.focusing ? 0.24f : 0.7f;
+            var o = p.LanternPos();
+            const int n = 30;
+            var pts = new Vector2[n + 2]; var cols = new Color[n + 2];
+            pts[0] = o; cols[0] = new Color(1f, 0.78f, 0.47f, p.focusing ? 0.22f : 0.18f);
+            for (int i = 0; i <= n; i++)
+            {
+                float a = p.aim - spread + spread * 2 * i / n;
+                float d = Phys.Ray(o.X, o.Y, a, range);
+                pts[i + 1] = new Vector2(o.X + MathF.Cos(a) * (d + 4), o.Y + MathF.Sin(a) * (d + 4));
+                cols[i + 1] = new Color(1f, 0.78f, 0.47f, 0.18f * (1 - d / range) * (p.focusing ? 1.2f : 1));
+            }
+            c.FillPolyGrad(pts, cols);
+            var lp = p.LanternPos();
+            c.Glow(lp.X, lp.Y + 1.5f, p.focusing ? 9 : 7, new Color(1.6f, 1.25f, 0.7f, 0.9f));
+            if (G.muzzle > 0) c.Glow(p.Cx() + MathF.Cos(p.aim) * 14, p.y + 9 + MathF.Sin(p.aim) * 14, 12, new Color(2f, 1.6f, 1f, G.muzzle * 12));
+        }
+        // knots: they glint, they do not reflect
+        foreach (var e in G.ents) if (e.isBody && !e.gone) e.DrawKnots(c);
+        foreach (var tr in G.tracers) { c.Stroke = new Color(1.6f, 1.4f, 1.1f, tr.t * 10); c.LineWidth = 1; c.Line(tr.x1, tr.y1, tr.x2, tr.y2); }
+        foreach (var q in FX.parts)
+        {
+            if (!q.glow) continue;
+            float a = MathF.Max(0, q.life / q.max);
+            var col = q.color;
+            c.Fill = new Color(col.R * 1.5f, col.G * 1.5f, col.B * 1.5f, col.A * a);
+            c.FillRect(q.x - q.size / 2, q.y - q.size / 2, q.size, q.size);
+        }
+        foreach (var m in motes) if (m.kind == "ember") { c.Fill = new Color(1.4f, 0.6f, 0.2f, 0.5f + 0.3f * MathF.Sin(t * 5 + m.p)); c.FillRect(m.x, m.y, 1, 1); }
+        if (p.beamPath != null && p.beamPath.Count > 1)
+        {
+            c.Stroke = new Color(1.3f, 1.2f, 0.9f, 0.3f); c.LineWidth = 3;
+            c.BeginPath(); c.MoveTo(p.beamPath[0].X, p.beamPath[0].Y);
+            foreach (var q in p.beamPath) c.LineTo(q.X, q.Y);
+            c.StrokePath();
+            c.Stroke = new Color(1.6f, 1.5f, 1.2f, 0.35f); c.LineWidth = 1;
+            c.BeginPath(); c.MoveTo(p.beamPath[0].X, p.beamPath[0].Y);
+            foreach (var q in p.beamPath) c.LineTo(q.X, q.Y);
+            c.StrokePath();
+        }
+    }
+
+    void PaintFxText(Canvas c)
+    {
+        Narr.DrawWorld(c);
+        foreach (var n in G.noiseRings) { c.Stroke = H.Rgba(200, 200, 180, n.t * 0.12f); c.LineWidth = 1; c.BeginPath(); c.Arc(n.x, n.y, n.r * (1 - n.t), 0, H.PI * 2); c.StrokePath(); }
+    }
+
+    void PaintRain(Canvas c)
+    {
+        if (drops.Count == 0) return;
+        c.Stroke = H.Rgba(170, 195, 210, 0.28f); c.LineWidth = 1;
+        c.BeginPath();
+        foreach (var d in drops) { c.MoveTo(d.x, d.y); c.LineTo(d.x + d.l * 0.28f, d.y - d.l); }
+        c.StrokePath();
+    }
+
+    void PaintOverlay(Canvas c)
+    {
+        // The Undertow passing the Tithe window.
+        if (G.glimpseT > 0)
+        {
+            float t = 4 - G.glimpseT;
+            float x = -200 + t * 220;
+            c.Fill = new Color(0, 0, 0, 0.75f);
+            c.BeginPath(); c.Ellipse(x, 60, 160, 40, 0, 0, H.PI * 2); c.FillPath();
+            c.Fill = H.Rgba(120, 40, 30, 0.6f); c.BeginPath(); c.MoveTo(x - 30, 40); c.LineTo(x - 20, 10); c.LineTo(x - 10, 40); c.FillPath();
+        }
+    }
+}

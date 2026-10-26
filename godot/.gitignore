@@ -1,0 +1,7 @@
+.godot/
+.mono/
+bin/
+obj/
+*.tmp
+*.translation
+export_credentials.cfg
