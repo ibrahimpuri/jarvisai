@@ -37,7 +37,8 @@ public static class Inp
 
     static HashSet<string> down = new(), prev = new();
     static readonly HashSet<string> keyDown = new(), keyPrev = new();
-    public static Func<string, bool> HeldOverride;   // automation hook for tests
+    public static readonly HashSet<string> TestHeld = new();   // tests: actions held down this frame
+    public static bool ForceL, ForceR;                        // tests: mouse buttons
     public static Vector2 stick, aimStick;           // gamepad left / right sticks
     public static bool padAim;                       // right stick aimed recently
     public static bool enabled = true;
@@ -69,11 +70,12 @@ public static class Inp
             }
         }
         foreach (var a in injected) down.Add(a);
+        foreach (var a in TestHeld) down.Add(a);
         injected.Clear();
         var mp = MouseOverride ?? vp.GetMousePosition();
         if (mp.X != mouse.x || mp.Y != mouse.y) padAim = false;
         mouse.x = mp.X; mouse.y = mp.Y;
-        bool l = focused && Input.IsMouseButtonPressed(MouseButton.Left), r = focused && Input.IsMouseButtonPressed(MouseButton.Right);
+        bool l = ForceL || (focused && Input.IsMouseButtonPressed(MouseButton.Left)), r = ForceR || (focused && Input.IsMouseButtonPressed(MouseButton.Right));
         mouse.lp |= l && !mouse.l; mouse.rp |= r && !mouse.r;
         mouse.lr |= !l && mouse.l; mouse.rr |= !r && mouse.r;
         mouse.l = l; mouse.r = r;
@@ -87,7 +89,7 @@ public static class Inp
         }
     }
 
-    public static bool Held(string a) => HeldOverride != null ? HeldOverride(a) : down.Contains(a);
+    public static bool Held(string a) => down.Contains(a);
     public static bool Hit(string a) => down.Contains(a) && !prev.Contains(a);
     public static bool Up(string a) => !down.Contains(a) && prev.Contains(a);
     public static void Press(string a) => injected.Add(a);   // tests: hold an action for one poll

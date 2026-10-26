@@ -89,7 +89,12 @@ public class Canvas
     public void Glow(float x, float y, float r, Color col) { ApplyT(); ci.DrawTextureRect(Radial, new Rect2(x - r, y - r, r * 2, r * 2), false, A(col)); }
     public void Glow(float x, float y, float rx, float ry, Color col) { ApplyT(); ci.DrawTextureRect(Radial, new Rect2(x - rx, y - ry, rx * 2, ry * 2), false, A(col)); }
     public void Texture(Texture2D tex, float x, float y) { ApplyT(); ci.DrawTexture(tex, new Vector2(x, y), A(s.Fill)); }
-    public void Poly(Vector2[] pts) { ApplyT(); if (pts.Length >= 3) ci.DrawColoredPolygon(pts, A(s.Fill)); }
+    public void Poly(Vector2[] pts)
+    {
+        if (pts.Length < 3) return;
+        BeginPath(); MoveTo(pts[0].X, pts[0].Y); for (int i = 1; i < pts.Length; i++) LineTo(pts[i].X, pts[i].Y);
+        FillPath();
+    }
 
     // ---- paths -------------------------------------------------------------------------------------
     public void BeginPath() { path.Clear(); cur = null; }

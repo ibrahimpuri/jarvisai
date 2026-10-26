@@ -96,6 +96,10 @@ public static class G
                 for (int tx = 0; tx < r.Map[ty].Length; tx++)
                     if (r.Ents.TryGetValue(r.Map[ty][tx], out var e) && e.S("type") == "wrackpool" && !wrackPools.ContainsKey(r.Region))
                         wrackPools[r.Region] = new Spot { room = r.Id, x = r.Px + tx * TS + 8, y = r.Py + (ty + 1) * TS - 2 };
+        foreach (var r in Data.Rooms)
+            foreach (var e in r.Ents2)
+                if (e.S("type") == "wrackpool" && !wrackPools.ContainsKey(r.Region))
+                    wrackPools[r.Region] = new Spot { room = r.Id, x = r.Px + e.I("tx") * TS + 8, y = r.Py + (e.I("ty") + 1) * TS - 2 };
     }
 
     static void PlaceAtStart()
@@ -109,6 +113,7 @@ public static class G
 
     public static void NewGame(string diff, float tide)
     {
+        timers.Clear();
         difficulty = diff;
         Tide.scale = tide * (diff == "pilgrim" ? 1.25f : 1);
         Tide.t = 0; Tide.cycle = 0; Tide.spring = 0;
@@ -149,6 +154,7 @@ public static class G
                     s.Set("tx", tx); s.Set("ty", ty);
                     o.Add(s);
                 }
+        foreach (var e in r.Ents2) o.Add(new Props(JsonNode.Parse(e.O.ToJsonString()).AsObject()));
         var taken = new HashSet<(int, int)>(o.Select(s => (s.I("tx"), s.I("ty"))));
         o.AddRange(Narr.CarvingSpecs(r, taken));
         foreach (var s in o)
@@ -696,6 +702,7 @@ public static class G
         Props d = null;
         try { d = new Props(JsonNode.Parse(Godot.FileAccess.GetFileAsString(SAVE_PATH)).AsObject()); } catch { }
         if (d == null) { UI.Title(); return; }
+        timers.Clear();
         World.Reset();
         World.flags = d.P("flags") ?? Props.Empty();
         var states = new Dictionary<string, RoomState>();

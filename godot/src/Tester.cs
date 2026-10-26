@@ -15,14 +15,12 @@ public partial class Tester : Node
     readonly string[] args;
     int pass, fail;
     string outDir = "user://shots";
-    public HashSet<string> held = new();
 
     public Tester(string[] a) { args = a; }
 
     public override async void _Ready()
     {
         Inp.enabled = false;
-        Inp.HeldOverride = a => held.Contains(a);
         int oi = Array.IndexOf(args, "--out");
         if (oi >= 0 && oi + 1 < args.Length) outDir = args[oi + 1];
         DirAccess.MakeDirRecursiveAbsolute(outDir.StartsWith("user://") ? ProjectSettings.GlobalizePath(outDir) : outDir);
@@ -47,12 +45,17 @@ public partial class Tester : Node
     }
     void Shot(string name)
     {
-        var img = GetViewport().GetTexture().GetImage();
+        if (DisplayServer.GetName() == "headless") return;   // nothing to capture
+        var img = GetViewport().GetTexture()?.GetImage();
+        if (img == null) return;   // headless: nothing to capture
         string path = outDir.TrimEnd('/') + "/" + name + ".png";
         img.SavePng(path);
     }
     void StartGame()
     {
+        G.DeleteSave();
+        Inp.TestHeld.Clear(); Inp.ForceL = Inp.ForceR = false; Inp.MouseOverride = null;
+        G.god = false;
         G.NewGame("keeper", 1);
         UI.Close();
         Narr.Reset();
@@ -105,16 +108,45 @@ public partial class Tester : Node
             GD.Print("--- " + n);
             if (!Scenarios.All.TryGetValue(n, out var sc)) { Check(n, false, "no such scenario"); continue; }
             StartGame();
-            held.Clear();
+            await Frames(8);
             try { await sc(this); }
             catch (Exception e) { Check(n, false, e.Message); Errors.Add(e.ToString()); }
         }
     }
 
     // ---- helpers for scenarios ----
-    public async Task Run(float seconds) => await Frames((int)(seconds * 60));
-    public async Task Hold(string action, float seconds) { held.Add(action); await Run(seconds); held.Remove(action); }
-    public async Task Tap(string action) { Inp.Press(action); await Frames(2); }
-    public void Ok(string name, bool ok, string info = "") => Check(name, ok, info);
+    public async Task Run(float seconds) => await Frames(Math.Max(1, (int)(seconds * 60)));
+    public void Down(params string[] actions) { foreach (var a in actions) Inp.TestHeld.Add(a); }
+    public void Release(params string[] actions) { foreach (var a in actions) Inp.TestHeld.Remove(a); }
+    public async Task Hold(string action, float seconds) { Down(action); await Run(seconds); Release(action); await Frames(1); }
+    // a key press: through the UI when a menu is open, otherwise to the game
+    public async Task Tap(string action)
+    {
+        if (UI.IsOpen())
+        {
+            if (action == "interact" || action == "jump") UI.Inst.TestAccept();
+            else if (action == "pause") UI.Inst.TestCancel();
+            await Frames(2);
+            return;
+        }
+        Down(action); await Frames(1); Release(action); await Frames(1);
+    }
+    public async Task Click() { Inp.ForceL = true; await Frames(2); Inp.ForceL = false; await Frames(1); }
+    public async Task<bool> ClickButton(string text) { bool ok = UI.Inst.TestClick(text); await Frames(2); return ok; }
+    public void AimAt(float wx, float wy) => Inp.MouseOverride = new Vector2(wx - G.cam.X, wy - G.cam.Y);
+    public void Place(string roomId, float tx, float ty)
+    {
+        var r = Data.Room[roomId];
+        if (G.room != r) G.EnterRoom(r);
+        var p = G.player;
+        p.x = r.Px + tx * 16 + 3; p.y = r.Py + (ty + 1) * 16 - p.h; p.vx = p.vy = 0;
+        G.SnapCamera();
+    }
+    public (string room, float x, float y, int tx, int ty, int hp, string st, bool ground, string phase) State()
+    {
+        var p = G.player; var r = G.room;
+        return (r.Id, MathF.Round(p.x), MathF.Round(p.y), H.FloorI(p.Cx() / 16) - r.Ox, H.FloorI((p.y + p.h - 1) / 16) - r.Oy, p.hp, p.state, p.onGround, Tide.PhaseId());
+    }
+    public void Ok(string name, bool ok, object info = null) => Check(name, ok, info?.ToString() ?? "");
     public void Snap(string name) => Shot(name);
 }

@@ -271,7 +271,7 @@ public class UndertowSystem
 // ---------------------------------------------------------------- Abbot of Salt
 public class Abbot : Body
 {
-    bool started;
+    public bool started;
     float slamX;
     public Abbot(Props spec, RoomDef room) : base(spec, room)
     {
@@ -308,7 +308,7 @@ public class Abbot : Body
         return base.DamageKnot(k, dmg, src);
     }
     public override void DamageFlesh(float d, float hx, float hy, string src) { if (!started) Start(); Snd.Tink(Pan()); }
-    void Start() { started = true; mode = "hunt"; Snd.Toll(); G.bossBar = this; H.ToastMsg("The Abbot of Salt rises from his kilns."); }
+    public void Start() { started = true; mode = "hunt"; Snd.Toll(); G.bossBar = this; H.ToastMsg("The Abbot of Salt rises from his kilns."); }
     public override void OnKnotBroken(Knot k, string src)
     {
         if (k.type == "crown")
@@ -475,7 +475,7 @@ public class Shoal : Body
         return j;
     }
     public override void Hear(float hx, float hy, float d, float r, string src) { if (!started) Start(); }
-    void Start() { started = true; mode = "hunt"; G.bossBar = this; H.ToastMsg("Five bodies fused into one rolling mass. The Shoal."); Snd.Scream(); }
+    public void Start() { started = true; mode = "hunt"; G.bossBar = this; H.ToastMsg("Five bodies fused into one rolling mass. The Shoal."); Snd.Scream(); }
     public override bool DamageKnot(Knot k, float d, string s) { if (!started) Start(); return base.DamageKnot(k, d, s); }
     public override void OnKnotBroken(Knot k, string src)
     {

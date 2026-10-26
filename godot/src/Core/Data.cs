@@ -87,6 +87,7 @@ public class RoomDef
     public List<Pool> Pools;
     public string[] Map;
     public Dictionary<char, Props> Ents = new();
+    public List<Props> Ents2 = new();     // entities placed by coordinates rather than by map legend
     public Props Raw;
     // computed by World.Build
     public int Tw, Th, Ox, Oy;
@@ -134,6 +135,7 @@ public static class Data
             if (p.A("pools") is JsonArray pools)
                 r.Pools = pools.Select(x => { var q = new Props(x.AsObject()); return new Pool { Id = q.S("id"), X0 = q.I("x0"), X1 = q.I("x1"), Empty = q.F("empty"), Full = q.F("full"), Raw = q }; }).ToList();
             if (p.P("ents") is Props ents) foreach (var k in ents.Keys) r.Ents[k[0]] = ents.P(k);
+            if (p.A("ents2") is JsonArray e2) r.Ents2 = e2.Select(x => new Props(x.AsObject())).ToList();
             Rooms.Add(r); Room[r.Id] = r;
         }
     }

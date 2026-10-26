@@ -59,6 +59,43 @@ npm start             # or run the desktop app straight from the source
 
 The game saves when you rest or save at a Bell Room. Continue from the title screen.
 
+## Godot / C# edition
+
+`godot/` is a rebuild of the same game in Godot 4.7 with C# (.NET 8). The game systems are a faithful port of the JavaScript code; Godot does the presentation:
+
+- Real 2D lights with shadows cast by the masonry (occluders are generated from each room's tiles), including a cone light for the lantern that walls block.
+- Per-region ambient darkness, bloom on flames, knots and embers, and light shafts through stained glass.
+- A water shader with depth tint and drifting caustics, rain, lightning and a moonlit sky outdoors, and dust, drips, salt and bubbles indoors.
+- A finishing pass with underwater refraction, colour grade, vignette and film grain.
+- Synthesised sound rendered into cached samples, with streamed surf and drone ambience.
+- Native menus with keyboard and gamepad navigation (left stick to move, right stick to aim, triggers to fire and focus).
+
+**Play on Windows:** unzip `Hollowmere-Godot-Windows.zip` and run `Hollowmere.exe`. Keep the `data_Hollowmere_windows_x86_64` folder next to it; it holds the .NET runtime. Saves live in `%APPDATA%\Godot\app_userdata\Hollowmere`.
+
+**Build it yourself** with the Godot 4.7 .NET editor and the .NET 8 SDK:
+
+```sh
+node tools/export-data.js                 # rooms, items and lore -> godot/data/game.json
+python3 tools/make_light_textures.py      # light shapes -> godot/textures/
+cd godot && dotnet build                  # compile the C#
+godot --headless --path . --export-release "Windows Desktop" ../windows-build/godot/Hollowmere.exe
+```
+
+The game has its own test harness. These run inside the real game:
+
+```sh
+godot --headless --path godot -- --test              # 24 scripted scenarios ported from tools/play.js
+godot --path godot -- --shots out/ [room...]         # screenshots of every room
+```
+
+| Folder | Contents |
+| --- | --- |
+| `godot/src/Core` | Constants and helpers, game data loading, input, synthesised audio, settings |
+| `godot/src/World` | The tide clock, tile queries and water, AABB physics |
+| `godot/src/Game` | Player, bodies and knots, bosses, objects, combat, story, narrative, the game loop and saving |
+| `godot/src/View` | The world view (lights, shadows, water, sky, post), tile art, HUD, menus, a Canvas-style drawing layer |
+| `godot/shaders` | Water and post-processing shaders |
+
 ## What is in the build
 
 Every core system in the design document is implemented and wired together:
@@ -91,7 +128,7 @@ The document plans 8-10 people over 30 months for about 180 rooms and a 10-12 ho
 ```sh
 node tools/validate.js      # room sizes, legend, and that every open edge meets an open neighbour
 node tools/reach.js         # movement-model reachability of the critical path, gate integrity, and soft-lock (trap) detection
-node tools/play.js          # 22 scripted gameplay scenarios with real keyboard and mouse input (Playwright)
+node tools/play.js          # 23 scripted gameplay scenarios with real keyboard and mouse input (Playwright)
 node tools/route.js         # the movement model plans routes; an in-page autopilot plays them with real physics
 node tools/soak.js 5        # random bot in every room and tide phase, reports runtime errors
 node tools/tour.js out/     # screenshots of every room

@@ -30,6 +30,7 @@ public static class UI
     public static void Close() => Inst?.Close();
     public static bool CinematicOpen => Inst != null && Inst.cine != null;
     public static string Kind => Inst?.kind;
+    public static string DialogueWho => Inst?.DlgWho;
 }
 
 public partial class UiRoot : CanvasLayer
@@ -139,7 +140,9 @@ public partial class UiRoot : CanvasLayer
     Button Btn(Control parent, string text, Action onPress, bool primary = false, bool selected = false, bool disabled = false)
     {
         var b = new Button { Text = text, Disabled = disabled, FocusMode = Control.FocusModeEnum.All, ClipText = false };
-        b.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+        // Buttons in a full-width column wrap long labels; buttons in a row size to their text.
+        if (parent is VBoxContainer) { b.AutowrapMode = TextServer.AutowrapMode.WordSmart; b.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; }
+        else b.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
         if (primary || selected) b.AddThemeStyleboxOverride("normal", Box(selected ? H.Col("#33291c") : H.Col("#241f18"), GOLD, 1, 5));
         if (selected) b.AddThemeColorOverride("font_color", H.Col("#fff3d0"));
         b.Pressed += () => { Snd.Ui(); onPress(); };
@@ -193,6 +196,35 @@ public partial class UiRoot : CanvasLayer
         if (cine != null) { var d = cine.done; cine = null; if (d != null) Callable.From(d).CallDeferred(); }
         Inp.Clear();
         Input.MouseMode = G.mode == "play" ? Input.MouseModeEnum.Hidden : Input.MouseModeEnum.Visible;
+    }
+
+    // ---- test hooks ------------------------------------------------------------------------------------
+    public string DlgWho => dlgLines != null ? dlgWho : null;
+    public void TestAccept()
+    {
+        if (dlgLines != null) Advance();
+        else if (cine != null) NextCine();
+        else if (kind == "inscription") Close();
+    }
+    public void TestCancel()
+    {
+        if (cine != null) { FinishCine(); return; }
+        if (kind is "title" or "ending" or "death") return;
+        Close();
+    }
+    public bool TestClick(string textStart)
+    {
+        var b = FindButtons(root).FirstOrDefault(x => x.Text.StartsWith(textStart) && !x.Disabled && x.IsVisibleInTree());
+        if (b == null) return false;
+        b.EmitSignal(BaseButton.SignalName.Pressed);
+        return true;
+    }
+    public string AllText()
+    {
+        var sb = new System.Text.StringBuilder();
+        void Walk(Node n) { foreach (var c in n.GetChildren()) { if (c is Label l) sb.Append(l.Text).Append('\n'); if (c is Button bt) sb.Append(bt.Text).Append('\n'); Walk(c); } }
+        Walk(root);
+        return sb.ToString();
     }
 
     // ---- input ---------------------------------------------------------------------------------------
