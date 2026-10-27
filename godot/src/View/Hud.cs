@@ -292,7 +292,7 @@ public static class Hud
         if (Inp.padAim)
         {
             var p = G.player;
-            mx = p.Cx() + MathF.Cos(p.aim) * 60 - G.cam.X; my = p.y + 9 + MathF.Sin(p.aim) * 60 - G.cam.Y;
+            var ms = G.WorldToScreen(p.Cx() + MathF.Cos(p.aim) * 60, p.y + 9 + MathF.Sin(p.aim) * 60); mx = ms.X; my = ms.Y;
         }
         c.Stroke = new Color(0, 0, 0, 0.5f); c.LineWidth = 2;
         c.BeginPath(); c.MoveTo(mx - 5, my); c.LineTo(mx - 2, my); c.MoveTo(mx + 2, my); c.LineTo(mx + 5, my);

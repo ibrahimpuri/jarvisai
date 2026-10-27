@@ -237,7 +237,7 @@ public static class Hollow
     static Vector2 AimPoint(Player p)
     {
         if (Inp.padAim) return new Vector2(p.Cx() + MathF.Cos(p.aim) * 60, p.y + 9 + MathF.Sin(p.aim) * 60);
-        return new Vector2(Inp.mouse.x + G.cam.X, Inp.mouse.y + G.cam.Y);
+        return G.ScreenToWorld(Inp.mouse.x, Inp.mouse.y);
     }
 
     // ---- The Calling ----------------------------------------------------------------------------------

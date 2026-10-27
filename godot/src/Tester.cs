@@ -91,6 +91,7 @@ public partial class Tester : Node
         foreach (var id in ids)
         {
             G.EnterRoom(Data.Room[id]);
+            LightingManager.Inst?.OnRoom(G.room, true);   // a screenshot shows the room's own light, not a blend from the last
             PlaceInRoom(Data.Room[id]);
             G.titleT = 0; H.Toasts.Clear();
             Inp.MouseOverride = new Vector2(560, 180);

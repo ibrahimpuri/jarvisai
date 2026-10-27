@@ -129,6 +129,17 @@ H.LORE = {
     learn_riptide: 'The Hollow sang back to the thing outside the glass. It kept a little of what it heard.',
     learn_salting: 'The salt in the pans is humming the same note as the box.',
     learn_answer: 'Every brother in the cloister turned his head as I passed. All of them, together.',
+    // monuments: what she thinks when she stops beside one (StoryFocus)
+    mon_keeper: 'The first Hult, holding her lamp up at the reef. Someone has tied red cloth round her wrist. Mama did that, every spring.',
+    mon_votives: 'A little boat nailed up for every ship the reef took. Eleven of them are new.',
+    mon_scales: 'One pan for the salt. The other is worn smooth, in the shape of a man kneeling.',
+    mon_abbot: 'The Abbot, holding out his hand. The salt has grown out of his palm like another hand, reaching back for him.',
+    mon_weeper: 'Hands over his eyes. Do not look into the water. He kept the Rule longer than anyone.',
+    mon_roper: 'He never let go of the rope. Not when the sea came in. Not after.',
+    mon_bell: 'The great bell came down through the floor. It must have rung once more when it landed.',
+    mon_mitten: 'A child\'s red mitten, tied to the highest peg she could reach. Agathe, age nine. Mama.',
+    mon_swallowed: 'A keel, sticking out of the wall like a fishbone in a throat. It\'s still going down.',
+    mon_lens: 'The old lens, cracked clean through. Light against the salt. The salt won, for a while.',
   },
 
   // Hints: a glyph and a word or two over Maren's head. Each appears only when it is relevant and the

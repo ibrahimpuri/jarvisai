@@ -34,6 +34,12 @@ public static class G
     public static List<Tracer> tracers = new();
     public static List<Ring> noiseRings = new();
     public static List<LightSrc> frameLights = new();
+    // The story-focus lean: the finishing pass magnifies the frame a little about a focal point (view px), so aiming
+    // and anything else that maps the screen to the world goes through these two.
+    public static float leanZoom = 1;
+    public static Vector2 leanFocal = new(H.VIEW_W / 2f, H.VIEW_H / 2f);
+    public static Vector2 ScreenToWorld(float sx, float sy) => cam + leanFocal + (new Vector2(sx, sy) - leanFocal) / leanZoom;
+    public static Vector2 WorldToScreen(float wx, float wy) => leanFocal + (new Vector2(wx, wy) - cam - leanFocal) * leanZoom;
     public static int act = 1;
     public static Props quests = Props.Empty();
     public static Stats stats = new();
@@ -787,10 +793,12 @@ public static class G
         var p = player; var r = room;
         float look = p.facing * 30;
         float tx = p.Cx() + look - H.VIEW_W / 2, ty = p.Cy() - H.VIEW_H / 2 - 10;
+        if (!snap) { tx += StoryFocus.CamOffset.X; ty += StoryFocus.CamOffset.Y; }
         if (r.Pw <= H.VIEW_W) tx = r.Px + (r.Pw - H.VIEW_W) / 2; else tx = H.Clamp(tx, r.Px, r.Px + r.Pw - H.VIEW_W);
         if (r.Ph <= H.VIEW_H) ty = r.Py + (r.Ph - H.VIEW_H) / 2; else ty = H.Clamp(ty, r.Py, r.Py + r.Ph - H.VIEW_H);
         if (snap) { cam = new Vector2(tx, ty); return; }
-        cam = new Vector2(H.Lerp(cam.X, tx, MathF.Min(1, dt * 6)), H.Lerp(cam.Y, ty, MathF.Min(1, dt * 6)));
+        float k = MathF.Min(1, dt * 6 * StoryFocus.Damping);
+        cam = new Vector2(H.Lerp(cam.X, tx, k), H.Lerp(cam.Y, ty, k));
     }
 
     // ------------------------------------------------------------------ main step
@@ -803,7 +811,7 @@ public static class G
         {
             if (mode == "title" && !UI.IsOpen()) UI.Title();
             // keep the backdrop alive on the title screen
-            if (mode == "title") { Tide.Update(0); frameLights = new(); }
+            if (mode == "title") { Tide.Update(0); frameLights = new(); leanZoom = 1; }
             return;
         }
         if (Inp.Hit("pause")) { UI.Pause(); return; }
@@ -957,10 +965,13 @@ public static class G
         tracers.RemoveAll(t => t.t <= 0);
         if (H.FloorI(stats.time) % 2 == 0) MarkSeen();
 
+        // what Maren is looking at (camera, focus and light lean toward it; see StoryFocus)
+        StoryFocus.Update(dt);
         // Lights for this frame
         var lights = new List<LightSrc> { new() { player = true } };
         foreach (var e in ents) { var l = e.Light(); if (l != null) lights.Add(l); }
         foreach (var pr in projectiles) { var l = pr.Light(); if (l != null) lights.Add(l); }
+        StoryFocus.AddLights(lights);
         frameLights = lights;
 
         promptText = ComputePrompt();

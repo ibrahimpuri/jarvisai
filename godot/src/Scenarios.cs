@@ -893,6 +893,80 @@ public static class Scenarios
             t.Ok("perf probe ran", true);
         },
 
+        ["storyfocus"] = async t =>
+        {
+            // every monument finds somewhere to stand
+            foreach (var d in Monuments.DEFS)
+                t.Ok($"the {d.id} monument stands in {d.room}", Monuments.For(Data.Room[d.room]) != null);
+            // stop beside the Abbot in the Kilns: the camera leans in, the background softens, the light warms, she thinks
+            World.flags.Set("hollowGift", true);
+            var kr = Data.Room["kilns"];
+            var m = Monuments.For(kr);
+            t.Place("kilns", (m.x - kr.Px) / 16 - 2, (m.floor - kr.Py) / 16 - 1);
+            foreach (var b in G.ents.OfType<Body>()) b.gone = true;
+            G.player.invulnT = 0;
+            var lm = LightingManager.Inst;
+            await t.Run(0.2f);
+            Vector2 cam0 = G.cam;
+            await t.Run(3.5f);
+            t.Ok("the Abbot is what she is looking at", StoryFocus.Active?.id == "abbot", StoryFocus.Active?.id);
+            t.Ok("the focus rises while she stands still", StoryFocus.W > 0.6f, StoryFocus.W);
+            // the Kilns is one screen, so the camera cannot travel: the frame leans in instead
+            t.Ok("the camera leans toward him", StoryFocus.CamOffset.Length() > 6 && G.leanZoom > 1.04f, $"{StoryFocus.CamOffset} lean {G.leanZoom:0.000}");
+            var aimAt = G.ScreenToWorld(G.WorldToScreen(m.x, m.Cy).X, G.WorldToScreen(m.x, m.Cy).Y);
+            t.Ok("aiming still lands where the cursor is", (aimAt - new Vector2(m.x, m.Cy)).Length() < 0.01f, aimAt);
+            t.Ok("and follows more loosely", StoryFocus.Damping < 0.8f, StoryFocus.Damping);
+            t.Ok("the background softens", lm.FocusBlur > 0.8f && lm.FarBlur > lm.Cur.farBlur + 0.8f, lm.FocusBlur);
+            t.Ok("the frame closes in a little", lm.FocusVignette > 0.08f, lm.FocusVignette);
+            t.Ok("the ambient leans toward his colour", lm.FocusW > 0.3f && lm.FocusTint.R > lm.FocusTint.B, lm.FocusW);
+            t.Ok("a soft light comes up on him", G.frameLights.Any(l => !l.player && MathF.Abs(l.x - m.x) < 1 && l.i > 0.2f));
+            t.Ok("she has a thought about him, once", G.narr.thoughts.Contains("mon_abbot"));
+            t.Snap("focus_1_abbot");
+            // walk away and it lets go
+            G.player.x = kr.Px + 34 * 16; G.player.vx = 0;
+            await t.Run(2.5f);
+            t.Ok("walking away lets him go", StoryFocus.Active?.id != "abbot" || StoryFocus.W < 0.1f, $"{StoryFocus.Active?.id} {StoryFocus.W:0.00}");
+            await t.Run(2f);
+            t.Ok("and an unread carving nearby takes its place, more softly", StoryFocus.Active?.id == "carving" && StoryFocus.W > 0.3f && StoryFocus.W < 0.75f, $"{StoryFocus.Active?.id} {StoryFocus.W:0.00}");
+            // a fight takes it away at once
+            t.Place("kilns", (m.x - kr.Px) / 16 - 2, (m.floor - kr.Py) / 16 - 1);
+            await t.Run(3f);
+            float before = StoryFocus.W;
+            var sp = Props.Empty(); sp.Set("x", G.player.Cx() + 90); sp.Set("y", m.floor); sp.Set("key", "focus_threat"); sp.Set("pose", "standing");
+            var foe = new Shucker(sp, kr); foe.mode = "hunt"; G.ents.Add(foe);
+            await t.Run(0.6f);
+            t.Ok("a hostile nearby lets it all go, fast", before > 0.5f && StoryFocus.W < 0.15f && StoryFocus.Calm < 0.2f, $"{before:0.00} -> {StoryFocus.W:0.00} calm {StoryFocus.Calm:0.00}");
+            t.Ok("and the camera stops leaning", StoryFocus.CamOffset.Length() < 4, StoryFocus.CamOffset);
+            foe.gone = true;
+            // crossing into another region blends the light rather than snapping it
+            t.Place("cloister", 8, 16);
+            await t.Run(0.05f);
+            float b0 = lm.Blend; var amb0 = lm.Cur.ambient;
+            t.Ok("the new region's light starts blending in", lm.Region == "cloister" && b0 < 0.3f, $"{lm.Region} {b0:0.00}");
+            var want = LightingManager.MOODS["cloister"].ambient; var was = LightingManager.MOODS["saltworks"].ambient;
+            t.Ok("partway between the two moods", amb0.G > MathF.Min(want.G, was.G) - 0.001f && amb0.G < MathF.Max(want.G, was.G) + 0.001f && amb0 != want, amb0);
+            await t.Run(3.2f);
+            t.Ok("and settles on the Cloister's", lm.Blend >= 1 && lm.Cur.ambient.IsEqualApprox(want), lm.Cur.ambient);
+            t.Snap("focus_2_cloister");
+        },
+
+        ["monuments"] = async t =>
+        {
+            // a tour: stand beside each monument a while and look
+            World.flags.Set("hollowGift", true);
+            G.god = true; G.player.abilities.Add("seal");   // the Gullet's is under deep water
+            foreach (var d in Monuments.DEFS)
+            {
+                var r = Data.Room[d.room]; var m = Monuments.For(r);
+                t.Place(d.room, (m.x - r.Px) / 16 - 3, (m.floor - r.Py) / 16 - 1);
+                foreach (var b in G.ents.OfType<Body>()) b.gone = true;
+                G.player.invulnT = 0; G.player.facing = 1;
+                await t.Run(3.5f);
+                t.Ok($"lingering by the {d.id} brings the focus up", StoryFocus.Active?.id == d.id && StoryFocus.W > 0.5f, $"{StoryFocus.Active?.id} {StoryFocus.W:0.00}");
+                t.Snap("monument_" + d.id);
+            }
+        },
+
         ["menus"] = async t =>
         {
             G.ToTitle(); await t.Run(0.3f); t.Snap("ui_title");

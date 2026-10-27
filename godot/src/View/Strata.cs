@@ -326,6 +326,136 @@ public static class Strata
                 break;
         }
     }
+    // ---- near: the ruin's own bones, dark against the fog ------------------------------------------------------
+    // Between the fog and the back wall: what is left of the structure that stood here, in near-black silhouette,
+    // seen only where the wall has fallen away. The broken ribs of the vault and the piers that held them, the
+    // Saltworks' pipes and hoists, the Saint's vertebrae, the Gullet's hanging tendrils. This is the layer that
+    // gives a Hollow Knight room its depth: something dark and close in front of something pale and far.
+    public static void PaintNear(Canvas c, RoomDef r, Rect2 a)
+    {
+        if (r.Outdoor) return;
+        var rng = new Random(Seed(r) + 9);
+        float x0 = a.Position.X, y0 = a.Position.Y, w = a.Size.X, h = a.Size.Y, bot = y0 + h;
+        var ink = V(0.045f); var edge = V(0.12f);
+        switch (Style(r))
+        {
+            case "gothic":
+                for (float x = x0 + R(rng, -80, 40); x < x0 + w; x += R(rng, 230, 330))
+                {
+                    float span = R(rng, 150, 230), spring = y0 + h * R(rng, 0.2f, 0.32f), apex = y0 - R(rng, 10, 40);
+                    // the piers, one or both broken off below the springing
+                    for (int side = 0; side < 2; side++)
+                    {
+                        float px = x + side * span - 10, top = rng.NextDouble() < 0.4 ? spring + R(rng, 0.2f, 0.5f) * (bot - spring) : spring;
+                        c.Fill = ink; c.FillRect(px, top, 20, bot - top + 4);
+                        c.Fill = edge; c.FillRect(px, top, 2, bot - top + 4);
+                        if (top > spring) { c.Fill = ink; c.Poly(new[] { new Vector2(px, top), new Vector2(px + 5, top - R(rng, 6, 14)), new Vector2(px + 11, top - 3), new Vector2(px + 16, top - R(rng, 8, 18)), new Vector2(px + 20, top) }); }
+                        else { c.Fill = ink; c.FillRect(px - 5, spring - 4, 30, 8); }
+                    }
+                    // the rib of the vault, a pointed arch; half the time one half has fallen
+                    bool brokenL = rng.NextDouble() < 0.3, brokenR = !brokenL && rng.NextDouble() < 0.4;
+                    float mx = x + span / 2;
+                    void Rib(float ax, float bx, bool broken)
+                    {
+                        float ex = broken ? H.Lerp(ax, bx, R(rng, 0.35f, 0.6f)) : bx;
+                        int n = 16;
+                        var outer = new List<Vector2>(); var inner = new List<Vector2>();
+                        for (int i = 0; i <= n; i++)
+                        {
+                            float t = i / (float)n, px = H.Lerp(ax, ex, t);
+                            float u = MathF.Abs(px - mx) / (span / 2);              // 1 at the springing, 0 at the apex
+                            float py = apex + (spring - apex) * (1 - MathF.Sqrt(MathF.Max(0, 1 - u)));   // pointed at the apex, upright at the springing
+                            outer.Add(new Vector2(px, py)); inner.Add(new Vector2(px, py + 11));
+                        }
+                        inner.Reverse();
+                        var poly = outer.Concat(inner).ToArray();
+                        c.Fill = ink; c.Poly(poly);
+                        c.Stroke = edge; c.LineWidth = 1.2f;
+                        c.BeginPath(); c.MoveTo(outer[0].X, outer[0].Y); foreach (var q in outer) c.LineTo(q.X, q.Y); c.StrokePath();
+                        // the voussoirs
+                        c.Stroke = V(0.08f); c.LineWidth = 0.8f;
+                        for (int i = 2; i < outer.Count - 1; i += 2) c.Line(outer[i].X, outer[i].Y, inner[outer.Count - 1 - i].X, inner[outer.Count - 1 - i].Y);
+                        if (broken) { var e = outer[^1]; c.Fill = ink; c.Poly(new[] { e, new Vector2(e.X + 4, e.Y + 6), new Vector2(e.X - 2, e.Y + 9), new Vector2(e.X + 1, e.Y + 13), new Vector2(e.X - 5, e.Y + 11) }); }
+                    }
+                    if (!brokenL) Rib(x, mx, false); else Rib(x, mx, true);
+                    if (!brokenR) Rib(x + span, mx, false); else Rib(x + span, mx, true);
+                    // a corona of candles still hanging from the keystone on its chains
+                    if (rng.NextDouble() < 0.6)
+                    {
+                        float cy = apex + R(rng, 0.35f, 0.55f) * (bot - apex), rx = R(rng, 14, 22);
+                        c.Stroke = V(0.07f); c.LineWidth = 1;
+                        c.Line(mx, apex + 8, mx - rx, cy); c.Line(mx, apex + 8, mx + rx, cy); c.Line(mx, apex + 8, mx, cy - 3);
+                        c.Stroke = ink; c.LineWidth = 3; c.BeginPath(); c.Ellipse(mx, cy, rx, 3.5f, 0, 0, H.PI * 2); c.StrokePath();
+                        for (int k = 0; k < 6; k++) { float cx = mx - rx + k * rx * 0.4f; c.Fill = ink; c.FillRect(cx - 1, cy - 6, 2, 5); }
+                    }
+                }
+                break;
+            case "works":
+            {
+                // the salt mains: great pipes across the hall with flanged joints, a hoist and its hook
+                int pipes = 1 + rng.Next(2);
+                for (int i = 0; i < pipes; i++)
+                {
+                    float py = y0 + h * R(rng, 0.12f, 0.38f) + i * 40, pr = R(rng, 6, 9);
+                    c.FillRectGradV(x0, py - pr, w, pr * 2, V(0.1f), V(0.03f));
+                    c.Fill = edge; c.FillRect(x0, py - pr, w, 1.2f);
+                    for (float fx = x0 + R(rng, 0, 60); fx < x0 + w; fx += R(rng, 60, 110)) { c.Fill = ink; c.FillRect(fx, py - pr - 3, 7, pr * 2 + 6); c.Fill = V(0.1f); c.FillRect(fx, py - pr - 3, 7, 1); }
+                    // a branch dropping to the floor
+                    float dx = x0 + R(rng, 0.2f, 0.8f) * w;
+                    c.Fill = ink; c.FillRect(dx, py, pr * 1.4f, bot - py); c.Fill = edge; c.FillRect(dx, py, 1.2f, bot - py);
+                    c.Fill = ink; c.FillCircle(dx + pr * 0.7f, py + R(rng, 40, 90), pr * 1.4f);
+                }
+                for (float x = x0 + R(rng, 40, 160); x < x0 + w; x += R(rng, 200, 320))
+                {
+                    // a gantry crane's beam, and the hook on its chain
+                    float by = y0 + h * R(rng, 0.05f, 0.15f), bl = R(rng, 90, 150);
+                    c.Fill = ink; c.FillRect(x, by, bl, 9); c.Fill = edge; c.FillRect(x, by, bl, 1);
+                    c.Stroke = ink; c.LineWidth = 1.4f;
+                    for (float k = x + 6; k < x + bl - 6; k += 12) { c.Line(k, by + 9, k + 6, by); c.Line(k + 6, by, k + 12, by + 9); }
+                    float hx = x + bl * R(rng, 0.4f, 0.8f), hl = R(rng, 60, 140);
+                    c.Stroke = V(0.06f); c.LineWidth = 1.6f; c.Line(hx, by + 9, hx, by + 9 + hl);
+                    for (float yy = by + 12; yy < by + 9 + hl; yy += 5) { c.Fill = V(0.06f); c.FillRect(hx - 1.5f, yy, 3, 3); }
+                    c.Stroke = ink; c.LineWidth = 3; c.BeginPath(); c.Arc(hx + 3, by + 13 + hl, 5, -H.PI * 0.5f, H.PI * 0.95f); c.StrokePath();
+                }
+                break;
+            }
+            case "bone":
+                // the Saint's spine, arching overhead, and ribs coming down out of the dark
+                {
+                    float sy = y0 + h * R(rng, 0.06f, 0.16f);
+                    for (float x = x0 - 10; x < x0 + w + 20; x += 26)
+                    {
+                        float yy = sy + MathF.Sin((x - x0) / w * H.PI * 1.3f + 0.4f) * 22;
+                        c.Fill = ink; c.BeginPath(); c.Ellipse(x, yy, 11, 9, 0, 0, H.PI * 2); c.FillPath();
+                        c.Fill = edge; c.BeginPath(); c.Ellipse(x - 2, yy - 4, 7, 2.5f, 0, 0, H.PI * 2); c.FillPath();
+                        c.Fill = ink; c.Poly(new[] { new Vector2(x - 3, yy + 6), new Vector2(x + 3, yy + 6), new Vector2(x + 1, yy + 26), new Vector2(x - 1, yy + 26) });
+                    }
+                    for (float x = x0 + R(rng, -40, 60); x < x0 + w; x += R(rng, 160, 240))
+                    {
+                        float len = R(rng, 0.5f, 0.85f) * h, bend = R(rng, 40, 80);
+                        c.Stroke = ink; c.LineWidth = 13;
+                        c.BeginPath(); c.MoveTo(x, sy); c.QuadraticCurveTo(x + bend, sy + len * 0.5f, x + bend * 0.4f, sy + len); c.StrokePath();
+                        c.Stroke = edge; c.LineWidth = 2;
+                        c.BeginPath(); c.MoveTo(x - 5, sy); c.QuadraticCurveTo(x + bend - 5, sy + len * 0.5f, x + bend * 0.4f - 5, sy + len); c.StrokePath();
+                    }
+                }
+                break;
+            case "flesh":
+                // tendrils hanging from the roof of the throat, a few still lit at the tip
+                for (float x = x0 + R(rng, 0, 30); x < x0 + w; x += R(rng, 24, 60))
+                {
+                    float len = R(rng, 0.2f, 0.7f) * h, sway = R(rng, -14, 14), wid = R(rng, 4, 10);
+                    var pts = new List<Vector2>();
+                    int n = 10;
+                    for (int i = 0; i <= n; i++) { float t = i / (float)n; pts.Add(new Vector2(x - wid * (1 - t) + MathF.Sin(t * 3 + x) * sway * t, y0 + len * t)); }
+                    for (int i = n; i >= 0; i--) { float t = i / (float)n; pts.Add(new Vector2(x + wid * (1 - t) + MathF.Sin(t * 3 + x) * sway * t, y0 + len * t)); }
+                    c.Fill = ink; c.Poly(pts.ToArray());
+                    if (rng.NextDouble() < 0.35) { var tip = pts[n]; c.Fill = Gl(0.6f); c.FillCircle(tip.X, tip.Y, 1.6f); }
+                }
+                break;
+        }
+    }
+
     static void Chains(Canvas c, Rect2 a, Random rng, float v)
     {
         float x0 = a.Position.X, y0 = a.Position.Y, w = a.Size.X, h = a.Size.Y;
@@ -378,7 +508,7 @@ public static class Strata
 
     // The wall behind the playfield survives only near the rock; elsewhere it has fallen and the depths
     // show through. Masonry falls brick by brick, so its broken edge steps; bone and flesh are organic.
-    public static void PaintBackWall(Canvas c, RoomDef r, Func<int, int, bool> solid)
+    public static void PaintBackWall(Canvas c, RoomDef r, Func<int, int, bool> solid, IEnumerable<DecorItem> decor = null)
     {
         string style = Style(r);
         if (style == "shore") return;   // outside, the island itself is the backdrop
@@ -395,30 +525,13 @@ public static class Strata
         if (style == "bone") { Ossuary(c, r, Field); return; }
         if (style is "gothic" or "works")
         {
-            const float BW = 16, BH = 8, ISO = 2.4f;
-            int cols = (int)(r.Pw / BW) + 2, rows = (int)(r.Ph / BH) + 1;
-            bool Has(int bx, int by)
+            // ashlar and its four hundred years of weather (Masonry), standing where the rock still holds it up
+            float Rock(float px, float py)
             {
-                if (by < 0 || by >= rows) return false;
-                float off = (by % 2) * BW / 2;
-                return Field(bx * BW + off + BW / 2 - BW / 2, by * BH + BH / 2, 1) < ISO;
+                float u = px / TS - 0.5f, w = py / TS - 0.5f; int ix = (int)MathF.Floor(u), iy = (int)MathF.Floor(w); float fu = u - ix, fw = w - iy;
+                return H.Lerp(H.Lerp(D(ix, iy), D(ix + 1, iy), fu), H.Lerp(D(ix, iy + 1), D(ix + 1, iy + 1), fu), fw);
             }
-            for (int by = 0; by < rows; by++)
-                for (int bx = -1; bx < cols; bx++)
-                {
-                    if (!Has(bx, by)) continue;
-                    float off = (by % 2) * BW / 2, x = r.Px + bx * BW + off - BW / 2, y = r.Py + by * BH;
-                    float h = TileArt.Hash(bx * 7 + r.Ox, by * 3 + r.Oy), low = Math.Clamp((y - r.Py) / MathF.Max(1, r.Ph), 0, 1);
-                    // mortar behind, the brick's face inset, a lighter top where nothing sits on it
-                    c.Fill = V(0.05f); c.FillRect(x, y, BW, BH);
-                    bool chipped = !Has(bx, by - 1) && h > 0.55f;
-                    var face = VA(0.15f + h * 0.06f - low * 0.03f, low * 0.15f);
-                    c.Fill = face;
-                    if (chipped) c.Poly(new[] { new Vector2(x + 0.6f, y + BH - 0.6f), new Vector2(x + 0.6f, y + 0.6f + 3), new Vector2(x + BW * 0.6f, y + 0.6f), new Vector2(x + BW - 0.6f, y + 2), new Vector2(x + BW - 0.6f, y + BH - 0.6f) });
-                    else c.FillRect(x + 0.6f, y + 0.6f, BW - 1.2f, BH - 1.2f);
-                    if (!Has(bx, by - 1)) { c.Fill = V(0.3f, 0.8f); c.FillRect(x + 0.6f, y + (chipped ? 2 : 0.6f), BW - 1.2f, 0.8f); }
-                    if (h < 0.1f) { c.Fill = V(0.08f); c.FillRect(x + 3, y + 2, 4, 3); }
-                }
+            Masonry.Paint(c, r, Field, 2.4f, Rock, solid, decor, style == "works");
             return;
         }
         // bone and flesh: organic shapes from the same field

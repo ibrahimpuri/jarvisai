@@ -38,7 +38,14 @@ public static class Palettes
     };
     static readonly RegionPalette OUTDOOR = P("#06090d", "#6c7e8c", "#2c3e4e", "#7c9c8c", "#e0eaf4", "#2e5a6a", "#06121a");
 
-    public static RegionPalette For(RoomDef r) => r == null ? OUTDOOR : r.Outdoor ? OUTDOOR : REG.TryGetValue(r.Region, out var p) ? p : REG["wrackline"];
+    public static RegionPalette Raw(RoomDef r) => r == null ? OUTDOOR : r.Outdoor ? OUTDOOR : REG.TryGetValue(r.Region, out var p) ? p : REG["wrackline"];
+    // The palette in use: in the current room, the one LightingManager is blending toward as Maren crosses regions.
+    public static RegionPalette For(RoomDef r) => r != null && r == G.room && LightingManager.Inst?.Palette != null ? LightingManager.Inst.Palette : Raw(r);
+    public static RegionPalette Lerp(RegionPalette a, RegionPalette b, float t) => a == b || a == null ? b : new()
+    {
+        shade = a.shade.Lerp(b.shade, t), lit = a.lit.Lerp(b.lit, t), fog = a.fog.Lerp(b.fog, t), accent = a.accent.Lerp(b.accent, t), glow = a.glow.Lerp(b.glow, t),
+        waterTop = a.waterTop.Lerp(b.waterTop, t), waterDeep = a.waterDeep.Lerp(b.waterDeep, t),
+    };
 
     // Toward high water: darker, colder, wetter.
     static Color Tide(Color c, float w) => c.Lerp(new Color(c.R * 0.72f, c.G * 0.8f, c.B * 0.92f), w);
@@ -54,8 +61,9 @@ public static class Palettes
 
     // Sets one layer's material for the room. fog is how deep the layer sits; bright undoes the
     // world's ambient darkening for layers in the lit canvas.
-    public static void Apply(ShaderMaterial m, RoomDef r, float w, float fog, float heightFog, float dither, float bright = 1)
+    public static void Apply(ShaderMaterial m, RoomDef r, float w, float fog, float heightFog, float dither, float bright = 1, float vault = 0)
     {
+        m.SetShaderParameter("vault", vault); m.SetShaderParameter("room_top", r.Py); m.SetShaderParameter("room_bottom", r.Py + r.Ph);
         var p = For(r);
         m.SetShaderParameter("shade_col", Tide(p.shade, w));
         m.SetShaderParameter("lit_col", Tide(p.lit, w));
@@ -70,7 +78,16 @@ public static class Palettes
         m.SetShaderParameter("bright", bright);
     }
 
-    static Shader shader;
+    static Shader shader, worldShader;
+    // The lit world's material: the palette, then relief, direct and indirect light (shaders/world.gdshader).
+    public static ShaderMaterial WorldMaterial(bool premul = true)
+    {
+        worldShader ??= GD.Load<Shader>("res://shaders/world.gdshader");
+        var m = new ShaderMaterial { Shader = worldShader };
+        m.SetShaderParameter("premul", premul ? 1f : 0f);
+        m.SetShaderParameter("alpha_mul", 1f);
+        return m;
+    }
     public static ShaderMaterial Material(float blur = 0, bool premul = true, float alpha = 1)
     {
         shader ??= GD.Load<Shader>("res://shaders/palette.gdshader");

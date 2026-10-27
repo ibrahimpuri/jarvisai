@@ -138,7 +138,7 @@ public class Player : Mover
         if (Inp.padAim) aim = PadAim(dt);
         else
         {
-            float mx = Inp.mouse.x + G.cam.X, my = Inp.mouse.y + G.cam.Y;
+            var mw = G.ScreenToWorld(Inp.mouse.x, Inp.mouse.y); float mx = mw.X, my = mw.Y;
             aim = MathF.Atan2(my - (y + 9), mx - Cx());
             padVec = new Vector2(MathF.Cos(aim), MathF.Sin(aim)) * 80;
         }
