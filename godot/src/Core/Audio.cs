@@ -657,6 +657,54 @@ public partial class Snd : Node
     public static void Surge(bool up) => Play("surge" + up, 3f, s => { s.NoiseSweep(2.4f, 0.4f, "lowpass", up ? 150 : 600, up ? 600 : 150, 0.7f, 0.5f); s.Swell("sine", up ? 49 : 65, 2.6f, 0.3f, 0.7f, 0, up ? 65 : 41); }, 0.7f, 0, 1);
     public static void Crystal(float pan = 0) => Play("crystal", 0.8f, s => { s.Clicks(26, 0.6f, 0.35f, 4800, 0.6f); s.NoiseSweep(0.5f, 0.15f, "highpass", 2500, 6000, 1); }, 0.6f, pan, 2);
 
+    // ---- the last night's weapons (Legend.cs) ---------------------------------------------------------------
+    // The Saint's Tine: the sea thrown as a lance. A wet crack, the water tearing past, and under it something very
+    // large singing the hymn's lowest note through several throats.
+    public static void TineThrow(float pan = 0) => Play("tinethrow", 1.6f, s =>
+    {
+        s.Noise(0.05f, 0.9f, "lowpass", 2400, 0.7f, 0.001f);
+        s.NoiseSweep(0.55f, 0.7f, "bandpass", 2600, 500, 1.4f, 0.01f, 0.02f);
+        s.Noise(0.4f, 0.35f, "lowpass", 600, 0.6f, 0.02f, 0.05f);
+        s.Voice(1.2f, 0.35f, 73.4f, 69, (300, 870, 2240), (570, 840, 2410), 0.3f, 0.5f, 0.2f, 0.01f, 0.03f, 0.08f, 0.8f, 0.6f, 3);
+        s.Tine(293.7f, 0.15f, 1.0f, 0.02f);
+    }, 0.8f, pan, 3);
+    public static void TineHit(float pan = 0) => Play("tinehit", 0.6f, s => { s.Noise(0.1f, 0.7f, "lowpass", 1100, 0.8f, 0.001f); s.NoiseSweep(0.4f, 0.4f, "bandpass", 1800, 600, 1.5f, 0.005f, 0.02f); }, 0.8f, pan, 3);
+    // empty, it drinks from her: a pull of wet breath through the glove, and her heart answering it out of time
+    public static void TineDrink() => Play("tinedrink", 1.4f, s =>
+    {
+        s.NoiseSweep(0.8f, 0.5f, "bandpass", 1800, 400, 2.5f, 0.3f);
+        s.Tone("sine", 52, 0.2f, 0.6f, 40, 0.5f); s.Tone("sine", 52, 0.2f, 0.45f, 40, 0.8f);
+        s.Voice(0.6f, 0.2f, 180, 140, (730, 1090, 2440), (300, 870, 2240), 0.9f, 0.6f, 0.4f, 0, 0.1f, 0.05f);
+    }, 0.8f, 0, 2);
+    // the bone growing through the harpoon: grinding and cracking, something swallowing, the hymn swelling in the walls
+    public static void Merge() => Play("merge", 5f, s =>
+    {
+        for (int i = 0; i < 18; i++) s.Noise(0.12f, 0.35f, "bandpass", H.Rand(300, 900), 4, 0.01f, i * 0.18f + H.Rand(0, 0.08f));
+        s.Clicks(40, 3f, 0.25f, 2600, 0.6f, 0.2f);
+        s.Swell("sine", 36.7f, 4.6f, 0.5f, 1.5f, 0.02f, 34);
+        s.Swell("triangle", 146.8f, 4f, 0.12f, 2f, 0.03f, 0, 0.6f, 900);
+        s.Swell("triangle", 220f, 4f, 0.08f, 2.2f, 0.03f, 0, 0.8f, 900);
+        s.Voice(3.4f, 0.35f, 98, 92, (300, 870, 2240), (570, 840, 2410), 0.3f, 0.6f, 0.3f, 0.02f, 1.0f, 0.8f, 0.7f, 0.7f, 4);
+    }, 0.9f, 0, 1);
+    // prised free: a wet tearing, the bone letting go of the stock, and a ringing out of tune that dies
+    public static void Unmerge() => Play("unmerge", 2.6f, s =>
+    {
+        s.NoiseSweep(0.9f, 0.6f, "bandpass", 500, 2200, 1.5f, 0.05f);
+        for (int i = 0; i < 8; i++) s.Noise(0.05f, 0.4f, "bandpass", H.Rand(1500, 3500), 4, 0.002f, 0.4f + i * 0.09f);
+        s.Tine(293.7f, 0.25f, 2.2f, 0.9f); s.Tine(277.2f, 0.12f, 2.0f, 0.92f);
+    }, 0.8f, 0, 1);
+    // the Burning Glass catching: a soft thump of air, a high glassy whine, the hiss of what it touches
+    public static void GlassOn() => Play("glasson", 1.2f, s =>
+    {
+        s.Noise(0.12f, 0.5f, "lowpass", 700, 0.7f, 0.003f);
+        s.Swell("sine", 1760, 1.0f, 0.06f, 0.05f, 0.004f, 1980);
+        s.Swell("sine", 2637, 1.0f, 0.03f, 0.1f, 0.005f);
+        s.NoiseSweep(0.9f, 0.15f, "highpass", 3000, 6000, 1, 0.2f, 0.1f);
+    }, 0.6f, 0, 2);
+    public static void GlassHiss(float pan = 0) => Play("glasshiss", 0.7f, s => { s.Noise(0.6f, 0.3f, "highpass", 3500, 0.8f, 0.05f); s.Clicks(10, 0.5f, 0.2f, 3800, 0.8f); }, 0.5f, pan, 3);
+    // the lens too hot: a sharp tick, and steam
+    public static void GlassCrack() => Play("glasscrack", 1.4f, s => { s.Tone("triangle", 3200, 0.05f, 0.25f, 2400); s.NoiseSweep(1.1f, 0.3f, "highpass", 6000, 2000, 1, 0.02f, 0.05f); }, 0.6f, 0, 1);
+
     // A bell somewhere far off in the abbey: Ansel keeping the hour, or something that thinks it is.
     public static void FarBell(float pan) => Bell(H.Pick(new[] { 98f, 110f, 130.8f }), 0.06f, pan, 5);
 }

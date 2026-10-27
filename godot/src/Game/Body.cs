@@ -21,6 +21,9 @@ public class Palette { public string robe, skin, cowl, dark = "#1a1d1e"; }
 public class Body : Ent
 {
     public float anim, stun, pinT, burnT, atkT, cool, alert, speed = 45, hpScale = 1, fireT;
+    // How much faster and quicker to strike the drowned are than the old margins: the Brine grows stronger with each
+    // act (the spring tide most of all), and the crossing chosen at the start scales it.
+    public static float Menace => (1 + 0.08f * (G.act - 1)) * (G.difficulty == "pilgrim" ? 0.85f : G.difficulty == "drowned" ? 1.1f : 1);
     public float? barbT, climbT;
     public Knot pinKnot;
     public List<Knot> knots = new();
@@ -203,7 +206,7 @@ public class Body : Ent
         float pan = Pan();
         var kp = KnotPos(k) ?? new Vector2(Cx(), Cy());
         // crusted in salt, a joint is brittle as glass: one blow shatters it (a plate just flies off)
-        if (saltT > 0 && src is "rivet" or "gaff" or "harpoon" or "stomp" or "thrall")
+        if (saltT > 0 && src is "rivet" or "gaff" or "harpoon" or "stomp" or "thrall" or "tine")
         {
             if (k.plated) { k.plated = false; FX.Salt(kp.X, kp.Y, 10); }
             else if (!IsSealed(k)) { dmg = 99; FX.Salt(kp.X, kp.Y, 24); Snd.Crystal(pan); }
@@ -211,7 +214,7 @@ public class Body : Ent
         if (IsSealed(k)) { Snd.Tink(pan); FX.Sparks(kp.X, kp.Y, 3); Flinch(); return false; }
         if (k.plated)
         {
-            if (src == "gaff" || src == "fire" || src == "pry")
+            if (src == "gaff" || src == "fire" || src == "pry" || src == "glass")
             {
                 k.plateHp -= src == "pry" ? 2 : 1;
                 Snd.Crack(pan); FX.Salt(kp.X, kp.Y, 6);
@@ -225,7 +228,7 @@ public class Body : Ent
         if (k.flare > 0 && src == "rivet") dmg *= 2;
         k.hp -= dmg;
         hitFlash = 0.11f;
-        if (src is "rivet" or "gaff" or "harpoon" or "saw" or "stomp" or "bolt" or "sling") G.HitStop(0.025f);
+        if (src is "rivet" or "gaff" or "harpoon" or "saw" or "stomp" or "bolt" or "sling" or "tine") G.HitStop(0.025f);
         if (src is "rivet" or "gaff" or "harpoon" or "saw" or "stomp") Hints.Did(src == "gaff" ? "gaffknot" : "knot");
         if (src == "gaff") Hints.Did("knot");
         FX.Salt(kp.X, kp.Y, 5);
@@ -256,7 +259,7 @@ public class Body : Ent
     {
         if (gone) return;
         // a blow anywhere on a salted body shatters the limb nearest it
-        if (saltT > 0 && src is "rivet" or "gaff" or "harpoon" or "stomp" or "thrall")
+        if (saltT > 0 && src is "rivet" or "gaff" or "harpoon" or "stomp" or "thrall" or "tine")
         {
             var limb = knots.Where(k => !k.broken && k.type != "crown" && KnotPos(k) != null).OrderBy(k => (KnotPos(k).Value - new Vector2(hx, hy)).LengthSquared()).FirstOrDefault();
             if (limb != null) { DamageKnot(limb, 99, src); return; }
@@ -722,14 +725,17 @@ public class Shucker : Body
 {
     public bool standOnWater;
     public int grabHits;
+    // Once it has her, it does not walk: it lurches, a scrabbling burst nearly as fast as she can run, then has to
+    // stop and gather itself, and lurches again.
+    public float lurchT, lurchCool;
     public Shucker(Props spec, RoomDef room) : base(spec, room)
     {
         type = "shucker";
-        AddKnot("kneeL", "knee", "kneeL", 3);
-        AddKnot("kneeR", "knee", "kneeR", 3);
-        AddKnot("elbowL", "elbow", "elbowL", 3);
-        AddKnot("elbowR", "elbow", "elbowR", 3);
-        AddKnot("crown", "crown", "sternum", 4, 5, 2);
+        AddKnot("kneeL", "knee", "kneeL", 4);
+        AddKnot("kneeR", "knee", "kneeR", 4);
+        AddKnot("elbowL", "elbow", "elbowL", 4);
+        AddKnot("elbowR", "elbow", "elbowR", 4);
+        AddKnot("crown", "crown", "sternum", 5, 5, 2);
         teodor = spec.B("teodor");
         standOnWater = spec.B("standOnWater");
         string sp = spec.S("pose");
@@ -773,19 +779,20 @@ public class Shucker : Body
             return;
         }
         bool crawling = pose == "crawl";
-        float spd = crawling ? 80 : (K("kneeL").broken || K("kneeR").broken ? 30 : 45);
+        float menace = Menace;
+        float spd = (crawling ? 85 : (K("kneeL").broken || K("kneeR").broken ? 34 : 55)) * menace;
         if (mode == "grab")
         {
             vx = 0;
             if (p == null || p.grabbedBy != this) { mode = "recover"; atkT = 0.6f; return; }
             atkT -= dt;
-            if (atkT <= 0) { atkT = 1.3f; p.Hurt(1, this); }
+            if (atkT <= 0) { atkT = G.difficulty == "pilgrim" ? 1.3f : 1.0f; p.Hurt(1, this); }
             return;
         }
         if (mode == "windup")
         {
             vx *= 0.85f; atkT -= dt;
-            if (atkT <= 0) { mode = "attack"; atkT = 0.3f; vx = facing * (crawling ? 160 : 200); }
+            if (atkT <= 0) { mode = "attack"; atkT = 0.32f; vx = facing * (crawling ? 190 : 250) * menace; }
             return;
         }
         if (mode == "attack")
@@ -807,11 +814,18 @@ public class Shucker : Body
         else target = null;
         if (target != null)
         {
-            Pursue(dt, target.Value.X, spd);
             float d = H.Dist(Cx(), Cy(), p.Cx(), p.Cy());
-            if (p != null && !p.dead && d < 32 && cool <= 0 && ArmsOK() && Perceives())
+            bool sees = Perceives();
+            lurchCool -= dt; lurchT -= dt;
+            if (sees && lurchCool <= 0 && d > 36 && d < 8 * H.TILE)
             {
-                mode = "windup"; atkT = 0.6f; cool = 1.4f;
+                lurchT = H.Rand(0.8f, 1.5f); lurchCool = lurchT + H.Rand(1.0f, 2.2f) / menace;
+                if (H.Rand() < 0.5f) Voices.Alert(this);
+            }
+            Pursue(dt, target.Value.X, lurchT > 0 ? (crawling ? 135 : 118) * menace : spd);
+            if (p != null && !p.dead && d < 32 && cool <= 0 && ArmsOK() && sees)
+            {
+                mode = "windup"; atkT = 0.5f / menace + Legend.Hesitation; cool = 1.3f; lurchT = 0;
                 int s = (int)H.Sign(p.Cx() - Cx()); if (s != 0) facing = s;
                 foreach (var k in knots) if (!k.broken) k.flare = 0.6f;
                 Voices.Windup(this);

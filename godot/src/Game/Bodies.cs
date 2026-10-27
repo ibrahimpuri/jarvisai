@@ -293,7 +293,8 @@ public class Bellmouth : Body
             if (atkT <= 0)
             {
                 mode = "recover"; atkT = 0.6f;
-                if (p != null && H.Dist(Cx(), Cy(), p.Cx(), p.Cy()) < 34) p.Hurt(1, this);
+                // the bell of its skull brought down on her: a heavy blow
+                if (p != null && H.Dist(Cx(), Cy(), p.Cx(), p.Cy()) < 34) p.Hurt(2, this);
                 Snd.Thud(Pan());
             }
             return;

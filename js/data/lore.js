@@ -129,6 +129,17 @@ H.LORE = {
     learn_riptide: 'The Hollow sang back to the thing outside the glass. It kept a little of what it heard.',
     learn_salting: 'The salt in the pans is humming the same note as the box.',
     learn_answer: 'Every brother in the cloister turned his head as I passed. All of them, together.',
+    // the last night: the legendary weapons, and what the Tine does to the one who carries it (Legend.cs)
+    hollowQuiet: 'The Hollow takes the brine of the ones I break. The sea on its own only fills it halfway.',
+    socketDry: 'A hollow in the bone, the shape of the box in my hand. Someone carved round it a long time ago.',
+    tineFirst: 'It went through all of them. It didn\'t slow down. It wanted to keep going.',
+    tineDrinks: 'It was empty, so it drank from me. It did not ask.',
+    glassFirst: 'Mama\'s glass. It burns what the lamp burns. I can smell them cooking.',
+    glassBurnsMe: 'The light found the salt in my hand. It hurts. Good.',
+    host1: 'The Tine is warm when I wake. I don\'t remember picking it up.',
+    host2: 'It has grown into the stock. Into my glove. I can\'t see where the bone stops.',
+    host3: 'They don\'t all turn to look at me any more. Some of them bow their heads.',
+    host4: 'I can hear it. Under the island. It is so old, and so tired, and it has been waiting for someone to hear it.',
     // monuments: what she thinks when she stops beside one (StoryFocus)
     mon_keeper: 'The first Hult, holding her lamp up at the reef. Someone has tied red cloth round her wrist. Mama did that, every spring.',
     mon_votives: 'A little boat nailed up for every ship the reef took. Eleven of them are new.',
@@ -237,13 +248,52 @@ H.LORE = {
     },
   },
 
+  // The legendary weapons of the last night, Act III only (Godot build only; see Legend.cs). The Abbot did not want
+  // the Hollow for his pans: he meant to lay it in the Saint's Ear and be grown into what the Saint is, the thing the
+  // sea dreams through. Hesper rowed it past the reef so that no one could. The Saint has been dying for three
+  // hundred years, and a sea that size needs a host.
+  legend: {
+    socket: {
+      name: "The Saint's Ear",
+      dry: 'A hollow in the bone of the vault, curled like a shell and exactly the size of the reliquary in your hand. Letters are cut all round its lip, older than the Abbey: QUOD AURIS AUDIT, AURIS FIT. What the ear hears, the ear becomes.\n\nIt is dry. It is waiting for something.',
+      wet: 'The hollow in the bone is running with brine, though nothing drips into it, and the Hollow hums against your breastplate so hard your teeth ache. It wants to go back in. It wants something in its hand when it does.\n\nScratched into the bone beside it, newer than the letters, in a hand you have seen on the Abbot\'s ledgers: HERE. AT THE SPRING TIDE. IT DOES NOT HURT.',
+      ask: 'Lay the Hollow in the Saint\'s Ear, with the Harpoon Gun across it? The bone will grow the two together.',
+      noHollow: 'The Ear is the shape of something you are not carrying.',
+      noHarpoon: 'The Ear wants something in its hand. The Harpoon Gun would do.',
+      merged: 'The bone takes the harpoon the way a shell takes a grain of sand. When you lift it out, the Hollow has grown through the stock and the prod and the line, ribbed and pale and warm, and it is not a harpoon any more.',
+      already: 'The Ear is empty again. What it held is in your hand, and it is growing.',
+    },
+    tine: {
+      name: "The Saint's Tine",
+      desc: 'Throw it ({fire}) and a lance of the sea itself runs through everything in its way, breaking a knot in each. Each throw drinks a quarter of the Hollow; the brine of the knots it breaks fills it again, and so does the sea, to the brim. Empty, it drinks from you.\n\nWhile it is grown together the Hollow sings no verses, and the bells hurt it. A bench can prise it free, while it still comes free.',
+    },
+    unmerge: {
+      ask: 'Prise the Hollow out of the Tine? The Harpoon Gun comes back as it was. The Hollow comes back empty.',
+      rooted: 'Prise the Hollow out of the Tine? It has rooted: it will tear you coming out.',
+      done: 'You work the bone loose from the stock with Ansel\'s pry, a hair at a time. The Hollow comes away quiet and cold.',
+      torn: 'It comes out of the stock, and out of the glove, and out of the palm of your hand. It takes some of you with it.',
+    },
+    glass: {
+      name: 'The Burning Glass',
+      desc: 'Agathe\'s spare lamp lens: a disc of Mere-ivory ground as thin as a fingernail, in a brass hood that screws onto your lantern. Hold {fire} and your lamp burns in a line, like the great lamp: the beam cracks every knot it touches and burns the fallen so they never stand again. It drinks your oil quickly, and three seconds of it makes the lens too hot to hold to.',
+      note: 'A label is tied to the hood in your mother\'s hand: “For Maren, if she comes. It burns what the lamp burns. Count who is still alive. A.H.”',
+    },
+    npc: {
+      hesper: 'You put it in the Ear. Oh, Maren. That is what the Abbot wanted it for. Not his pans: he wanted to be what it grows into. The Saint is dying, and it has been dying since the brothers came, and a sea that size needs something to dream it. I rowed the Hollow out past the reef so that nobody could ever be that. Take it out while it still comes out.',
+      ansel: 'What is that in your hand? It was the Hollow. It was a harpoon. Child, put it down. Please, put it down and let me look at your glove.',
+      odile: 'That thing\'s breathing. Your harpoon is breathing. I am not going to say anything else about it.',
+    },
+    agathe: 'Maren. What is in your hand? No. Look at me, not at the window. The sea is up to the sill tonight, and the tables say it cannot be. It is waiting for you. If you go down to it, there will be no lamp, and no ferry, and no daughter. Only the sea, with your face.',
+    choice: 'There is a fourth thing, and only you can do it now. Go to the window. The sea is waiting under it.',
+  },
+
   // Epilogue lines shown one by one after the ending, chosen by what happened.
   fates: {
-    ansel: { alive: 'Brother Ansel rang the chapel bell every hour until the end of his life, and it was a long one.', burned: 'Brother Ansel was ringing his bell when the beam found him. The bell went on swinging for a while after.', sold: 'The chapel bell never rang again. Nobody found Brother Ansel.', sunk: 'Brother Ansel rang the chapel bell as the island went under, until the water reached the rope.' },
-    odile: { alive: 'Odile Marrow built a boat out of salvage and a stubborn temper, and was the first to row back to the mainland in forty nights.', lost: 'Odile Marrow\'s bench stands in the Saltworks, tools still laid out, waiting for someone who does not come.' },
+    ansel: { alive: 'Brother Ansel rang the chapel bell every hour until the end of his life, and it was a long one.', burned: 'Brother Ansel was ringing his bell when the beam found him. The bell went on swinging for a while after.', sold: 'The chapel bell never rang again. Nobody found Brother Ansel.', sunk: 'Brother Ansel rang the chapel bell as the island went under, until the water reached the rope.' , host: 'Brother Ansel rang the chapel bell until the sea came in under the door. Then he set down the rope, and went out to meet it.' },
+    odile: { alive: 'Odile Marrow built a boat out of salvage and a stubborn temper, and was the first to row back to the mainland in forty nights.', lost: 'Odile Marrow\'s bench stands in the Saltworks, tools still laid out, waiting for someone who does not come.' , host: 'Odile Marrow rowed for the mainland alone, and made it, and told them. They thought the island had driven her mad. Then the ships started coming in on the reef.' },
     teodor: { saved: 'Teodor woke up on the ferry, knotless and very confused, with Odile holding his hand hard enough to hurt.', dead: 'Teodor\'s tags hang above Odile\'s bench, where the light catches them.' },
-    hesper: { alive: 'Hesper Vane sang the last verse alone on the shore, and nobody could say afterwards whether the sea had answered.', burned: 'Hesper Vane walked into the beam with her arms open. She did not look afraid.', dead: 'The Choir buried Hesper Vane in the drained shrine, and sang over her with no water to carry the song.', sunk: 'Hesper Vane went down with the island, singing the seventh verse at last.' },
-    agathe: { dark: 'Agathe Hult rowed the ferry herself, and did not once look back at the dark lamp.', relight: 'Agathe Hult kept the lamp beside her daughter, and taught her every step of all two hundred and twelve.', hymn: 'Agathe Hult watched from the rope ferry until there was nothing left to watch.' },
-    maren: { dark: 'Maren Hult never kept a light. She dove wrecks for a living, and every one she found had a name she remembered.', relight: 'Maren Hult became the Keeper of Hollowmere. Ships pass the reef safely now. She does not sleep well.', relightGrafted: 'The beam found the salt in Maren Hult too. The Keepers\' log records her name, and that she lit the lamp first.', hymn: 'Maren Hult is part of the hymn now. Fishermen say that on still nights you can hear it under the reef.' },
+    hesper: { alive: 'Hesper Vane sang the last verse alone on the shore, and nobody could say afterwards whether the sea had answered.', burned: 'Hesper Vane walked into the beam with her arms open. She did not look afraid.', dead: 'The Choir buried Hesper Vane in the drained shrine, and sang over her with no water to carry the song.', sunk: 'Hesper Vane went down with the island, singing the seventh verse at last.' , host: 'Hesper Vane knelt on the Choir Steps as the new Saint went down past her into the deep, and wept, and was the first to sing for it.' },
+    agathe: { dark: 'Agathe Hult rowed the ferry herself, and did not once look back at the dark lamp.', relight: 'Agathe Hult kept the lamp beside her daughter, and taught her every step of all two hundred and twelve.', hymn: 'Agathe Hult watched from the rope ferry until there was nothing left to watch.' , host: 'Agathe Hult was the first to drown for the new Saint. Her daughter called her by name, and she came.' },
+    maren: { dark: 'Maren Hult never kept a light. She dove wrecks for a living, and every one she found had a name she remembered.', relight: 'Maren Hult became the Keeper of Hollowmere. Ships pass the reef safely now. She does not sleep well.', relightGrafted: 'The beam found the salt in Maren Hult too. The Keepers\' log records her name, and that she lit the lamp first.', hymn: 'Maren Hult is part of the hymn now. Fishermen say that on still nights you can hear it under the reef.' , host: 'There is no Maren Hult. There is the sea off Hollowmere, very deep and very patient, and on still nights it says the names of ships before they wreck.' },
   },
 };

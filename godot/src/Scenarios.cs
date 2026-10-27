@@ -288,6 +288,8 @@ public static class Scenarios
             // at stone, salt rises in a pillar
             Hollow.Hold(true); Hollow.verse = "salting";
             foreach (var b in G.ents.OfType<Body>()) b.gone = true;
+            t.Ok("a verse just sung is still ringing", Hollow.Ringing("salting") > 0, Hollow.Ringing("salting"));
+            Hollow.ringing.Clear();
             Hollow.resonance = 60;
             t.AimAt(G.player.Cx() + 40, G.player.y + G.player.h + 8);
             await t.Click(); await t.Run(0.3f);
@@ -300,6 +302,10 @@ public static class Scenarios
             var th = Spawn("answer_a", 19); var foe = Spawn("answer_b", 25);
             await t.Run(0.3f);
             Hollow.resonance = 60;
+            t.AimAt(th.Cx(), th.Cy());
+            await t.Click(); await t.Run(0.2f);
+            t.Ok("the Answer is too costly to sing at 60", th.thrallT <= 0 && Hollow.resonance == 60, Hollow.resonance);
+            Hollow.resonance = 80; await t.Run(0.4f);
             t.AimAt(th.Cx(), th.Cy());
             await t.Click(); await t.Run(0.2f);
             t.Ok("the Answer turns a body", th.thrallT > 0, th.thrallT);
@@ -1106,7 +1112,7 @@ public static class Scenarios
             p.hp = 3; p.bag.Add("stitchkit", 1);
             await t.PadTap(JoyButton.DpadUp); await t.Run(0.1f);
             t.Ok("d-pad up uses a poultice", p.healKind == "poultice", p.healKind);
-            await t.Run(3.2f); p.hp = 2;
+            await t.Run(4.2f); p.hp = 2;
             await t.PadHold(JoyButton.DpadUp, 0.5f);
             t.Ok("holding d-pad up kneels for the stitch kit", p.healKind == "stitch" && p.healT > 0, $"{p.healKind} {p.healT}");
             await t.Run(4.2f);
@@ -1352,6 +1358,197 @@ public static class Scenarios
             G.Save();
             var saved = new Props(JsonNode.Parse(Godot.FileAccess.GetFileAsString("user://hollowmere_save.json")).AsObject());
             t.Ok("narrative state saved", saved.P("narr")?.Has("read") == true);
+        },
+        // She is the prey: the drowned close on her, she has little grace after a hit, and the Hollow is a last breath.
+        ["prey"] = async t =>
+        {
+            var p = G.player;
+            var kilns = Data.Room["kilns"];
+            t.Place("kilns", 15, 18);
+            foreach (var b in G.ents.OfType<Body>()) b.gone = true;
+            Shucker Spawn(string key, int tx)
+            {
+                var sp = Props.Empty(); sp.Set("x", kilns.Px + tx * 16 + 8); sp.Set("y", kilns.Py + 19 * 16); sp.Set("key", key); sp.Set("pose", "standing"); sp.Set("facing", -1);
+                var b = new Shucker(sp, kilns); G.ents.Add(b); return b;
+            }
+            var a = Spawn("prey_a", 21);
+            t.Ok("a Shucker's limbs take two rivets, its crown three", a.K("kneeL").max == 4 && a.K("crown").max == 5, $"{a.K("kneeL").max}/{a.K("crown").max}");
+            // it sees her lamp, and it lurches
+            await t.Run(0.2f);
+            float top = 0, x0 = a.Cx();
+            for (int i = 0; i < 60; i++) { await t.Run(1 / 60f); top = MathF.Max(top, MathF.Abs(a.vx)); if (a.mode != "hunt") break; }
+            t.Ok("once it has seen her it lurches, near her running speed", top > 100 && top < 150, $"top speed {top:0}");
+            // she has little grace after a hit
+            a.gone = true; await t.Run(0.1f);
+            p.hp = 5; p.invulnT = 0; p.Hurt(1, null);
+            t.Ok("after a hit she has 0.6 s of grace (not 0.9)", MathF.Abs(p.invulnT - 0.6f) < 0.01f, p.invulnT);
+            p.invulnT = 0; var hv = Spawn("prey_heavy", 17); p.Hurt(2, hv); hv.gone = true;
+            t.Ok("a heavy blow knocks the wind out of her", p.Locked() && p.hp == 2, $"locked={p.Locked()} hp={p.hp}");
+            await t.Run(0.8f);
+            // the dodge is short and slow to come back
+            p.invulnT = 0; await t.Tap("dash");
+            t.Ok("the dash dodges for an instant and needs 0.75 s", p.dashInv <= 0.12f && p.dashCool > 0.6f, $"inv={p.dashInv:0.00} cool={p.dashCool:0.00}");
+            // a grab takes eight to break and bites every second
+            await t.Run(1f);
+            var g = Spawn("prey_grab", 16); await t.Run(0.05f);
+            p.invulnT = 0; p.hp = 5;
+            p.TryGrab(g); g.mode = "grab"; g.atkT = 0.4f;
+            t.Ok("breaking a grab takes eight", p.mash == 8, p.mash);
+            await t.Run(2.5f);
+            t.Ok("held, it bites every second", p.hp <= 3, $"hp={p.hp}");
+            p.grabbedBy = null; p.state = "normal"; g.gone = true; p.hp = 5;
+            await t.Run(0.2f);
+            // rivets are scarce: a scrap makes two
+            var rc = Data.Recipes.Find(r => r.S("id") == "rivets");
+            t.Ok("a scrap makes two rivets", rc.I("n") == 2, rc.I("n"));
+            // the Hollow: knots fill it, the sea only halfway, and a sung verse rings before it can be sung again
+            Hollow.owned = true; Hollow.verses = new() { "calling", "riptide" }; Hollow.verse = "riptide"; Hollow.resonance = 0;
+            var k = Spawn("prey_k", 18); await t.Run(0.05f);
+            k.DamageKnot(k.K("kneeL"), 99, "rivet");
+            t.Ok("a broken knot fills the Hollow a little (4)", MathF.Abs(Hollow.resonance - 4) < 0.01f, Hollow.resonance);
+            k.gone = true;
+            G.god = true;
+            t.Place("gulletmouth", 16, 11); await t.Run(0.2f);
+            Hollow.resonance = 40; Hollow.stillT = 0;
+            await t.Run(8f);
+            t.Ok("held in the sea it fills only halfway", Hollow.resonance >= Hollow.SEA_FILL - 0.5f && Hollow.resonance <= Hollow.SEA_FILL + 0.01f, Hollow.resonance);
+            Hollow.Hold(true); Hollow.resonance = 80; Hollow.stillT = 0;
+            t.AimAt(p.Cx() + 40, p.Cy());
+            await t.Click(); await t.Run(0.1f);
+            float after = Hollow.resonance;
+            t.Ok("the Riptide costs 35", MathF.Abs(after - 45) < 1, after);
+            await t.Run(0.8f); await t.Click(); await t.Run(0.1f);
+            t.Ok("and rings for seconds before it can be sung again", Hollow.Ringing("riptide") > 0 && Hollow.resonance <= after + 0.01f, $"ring={Hollow.Ringing("riptide"):0.0} res={Hollow.resonance:0.0}");
+            t.Ok("while it rings it drinks nothing from the sea", Hollow.stillT > 0 || Hollow.resonance <= after + 0.01f);
+            Hollow.Hold(false); G.god = false;
+        },
+
+        // The last night's weapons: Agathe's Glass, the Saint's Ear and the Tine, the sea's hold, and the fourth ending.
+        ["legend"] = async t =>
+        {
+            G.god = false;
+            var p = G.player; p.maxHp = 7; p.hp = 7;
+            p.weapons["harpoon"] = new WeaponState { tier = 1, mag = 1 }; p.weaponOrder.Add("harpoon");
+            Hollow.owned = true; Hollow.verses = new() { "calling", "riptide", "salting", "answer" }; Hollow.verse = "calling";
+            // before the spring tide neither is there to be had
+            t.Place("ribbell", 12, 16); await t.Run(0.2f);
+            t.Ok("before Act III there is no Glass in the Ribvault", !G.ents.OfType<GlassCase>().Any());
+            t.Place("gulletmouth", 16, 11); await t.Run(0.2f);
+            var ear = G.ents.OfType<EarSocket>().FirstOrDefault();
+            t.Ok("the Saint's Ear is in the Gullet's dome", ear != null);
+            p.x = ear.Cx() - p.w / 2; p.y = ear.y + ear.h + 2; p.vx = p.vy = 0;
+            await t.Run(0.05f); await t.Tap("interact"); await t.Run(0.2f);
+            t.Ok("before the spring tide it is dry, only letters", UI.Kind == "inscription" && !Legend.merged, UI.Kind);
+            t.Snap("legend_1_ear_dry");
+            UI.Close();
+            // the spring tide
+            G.StartAct(3); await t.Run(0.1f);
+            t.Place("ribbell", 12, 16); await t.Run(0.2f);
+            var gc = G.ents.OfType<GlassCase>().FirstOrDefault();
+            t.Ok("at the spring tide Agathe's Glass is waiting in the Ribvault Bell Room", gc != null);
+            p.x = gc.Cx() - p.w / 2; p.y = gc.y + gc.h - p.h; await t.Run(0.05f);
+            t.Snap("legend_2_glass_case");
+            await t.Tap("interact"); await t.Run(0.2f);
+            t.Ok("taking it shows her note and what it does", UI.Kind == "inscription" && Legend.glassOwned && p.weapons.ContainsKey("glass"), UI.Kind);
+            t.Snap("legend_3_glass_note");
+            UI.Close();
+            // the Glass burns knots, drinks oil, and must cool
+            var kilns = Data.Room["kilns"];
+            t.Place("kilns", 15, 18);
+            foreach (var b in G.ents.OfType<Body>()) b.gone = true;
+            Shucker Spawn(string key, int tx, RoomDef r, int ty = 19)
+            {
+                var sp = Props.Empty(); sp.Set("x", r.Px + tx * 16 + 8); sp.Set("y", r.Py + ty * 16); sp.Set("key", key); sp.Set("pose", "standing"); sp.Set("facing", -1);
+                var b = new Shucker(sp, r); G.ents.Add(b); return b;
+            }
+            var s1 = Spawn("glass_a", 19, kilns); s1.stun = 99;
+            await t.Run(0.1f);
+            p.SelectWeapon("glass"); p.oil = 90;
+            t.AimAt(s1.Cx(), s1.Cy());
+            t.Down("fire"); await t.Run(1.2f);
+            t.Snap("legend_4_glass_beam");
+            t.Ok("the beam burns", Legend.beaming && s1.knots.Any(k => k.hp < k.max), $"beaming={Legend.beaming}");
+            t.Ok("and drinks oil fast (15 a second)", p.oil < 90 - 15 && p.oil > 90 - 22, $"oil={p.oil:0}");
+            await t.Run(2.2f);
+            t.Ok("after three seconds the lens must cool", Legend.coolT > 0 && !Legend.beaming, $"cool={Legend.coolT:0.0}");
+            t.Release("fire"); await t.Run(0.1f);
+            // the fallen burn in it, and do not stand
+            foreach (var k in s1.knots) k.broken = true; s1.Down("rivet"); await t.Run(0.1f);
+            Legend.coolT = 0; Legend.heat = 0; p.oil = 90;
+            t.AimAt(s1.Cx(), s1.Cy() + 6);
+            t.Down("fire"); await t.Run(1.6f); t.Release("fire");
+            await t.Run(3.4f);
+            t.Ok("a fallen body in the beam burns away", s1.gone, s1.mode);
+            // the Ear runs with brine now
+            t.Place("gulletmouth", 16, 11); await t.Run(0.2f);
+            ear = G.ents.OfType<EarSocket>().First();
+            p.x = ear.Cx() - p.w / 2; p.y = ear.y + ear.h + 2; p.vx = p.vy = 0;
+            await t.Run(0.05f);
+            t.Snap("legend_5_ear_wet");
+            await t.Tap("interact"); await t.Run(0.2f);
+            t.Ok("at the spring tide the Ear runs with brine", UI.Kind == "inscription", UI.Kind);
+            await t.Tap("interact"); await t.Run(0.2f);
+            t.Ok("and asks for the Hollow and the harpoon", UI.Kind == "confirm", UI.Kind);
+            await t.ClickButton("Yes"); await t.Run(0.3f);
+            t.Ok("the bone grows them together into the Saint's Tine", Legend.merged && p.weapons.ContainsKey("tine") && !p.weapons.ContainsKey("harpoon") && p.cur == "tine", string.Join(",", p.weaponOrder));
+            t.Snap("legend_6_merged");
+            UI.Close();
+            Hollow.Hold(true);
+            t.Ok("grown together, the Hollow sings no verses", !Hollow.held);
+            // the Tine runs through every body in its way
+            t.Place("kilns", 15, 18);
+            foreach (var b in G.ents.OfType<Body>()) b.gone = true;
+            var a = Spawn("tine_a", 19, kilns); var b2 = Spawn("tine_b", 22, kilns);
+            a.stun = b2.stun = 99;
+            await t.Run(0.1f);
+            Hollow.resonance = 60;
+            p.SelectWeapon("tine");
+            t.AimAt(a.Cx() + 40, a.KnotPos(a.K("elbowL")).Value.Y);
+            await t.Click(); await t.Run(0.06f);
+            t.Snap("legend_7_tine_throw");
+            await t.Run(0.4f);
+            t.Ok("a throw costs a quarter of the Hollow", Hollow.resonance < 60 - 24 + 9, Hollow.resonance);
+            t.Ok("and runs through both, breaking knots in each", a.knots.Any(k => k.hp < k.max) && b2.knots.Any(k => k.hp < k.max), $"a={string.Join(",", a.knots.Select(k => k.hp))} b={string.Join(",", b2.knots.Select(k => k.hp))}");
+            // empty, it drinks from her
+            Hollow.resonance = 0; int hp0 = p.hp; float c0 = Legend.communion;
+            await t.Run(1f); await t.Click(); await t.Run(0.2f);
+            t.Ok("empty, it drinks from her", p.hp == hp0 - 1 && Legend.communion >= c0 + 19, $"hp {hp0}->{p.hp}");
+            // the sea's hold counts out in the island, not under the bells
+            float h0 = Legend.communion; await t.Run(2f);
+            t.Ok("the sea's hold grows while she carries it", Legend.communion > h0 + 1.8f, $"{h0:0.0} -> {Legend.communion:0.0}");
+            t.Place("chapel", 20, 16); await t.Run(0.3f);
+            float h1 = Legend.communion; Hollow.resonance = 40; await t.Run(2f);
+            t.Ok("under a bell it does not count, and the Hollow bleeds dry", MathF.Abs(Legend.communion - h1) < 0.01f && Hollow.resonance < 40, $"hold {h1:0.0}->{Legend.communion:0.0} res={Hollow.resonance:0}");
+            // it is kept
+            G.Save(); G.LoadGame(); await t.Run(0.3f); p = G.player;
+            t.Ok("the Tine and the sea's hold are saved", Legend.merged && p.weapons.ContainsKey("tine") && Legend.communion > 20, $"{Legend.merged} {Legend.communion:0}");
+            // a bench prises it apart: the harpoon comes back as it was
+            Legend.Unmerge();
+            t.Ok("prised free, the harpoon comes back as it was and the Hollow empty", !Legend.merged && p.weapons.TryGetValue("harpoon", out var hw) && hw.tier == 1 && Hollow.resonance == 0 && p.weaponOrder.Contains("harpoon"));
+            // grown long enough it roots, and tears her coming out
+            Legend.Merge(); UI.Close(); Legend.communion = Legend.HOST_SECONDS / 2 + 1; await t.Run(0.2f);
+            t.Ok("halfway, it has rooted", Legend.Rooted && Legend.stage >= 2, Legend.stage);
+            p.hp = 6; Legend.Unmerge();
+            t.Ok("and tears her coming out", p.hp == 4, p.hp);
+            // all the way, and the sea is at the lamp room's window
+            Legend.Merge(); UI.Close();
+            Legend.communion = Legend.HOST_SECONDS - 0.5f; await t.Run(1f);
+            t.Ok("all the way, she can hear the Saint", Legend.stage == 4 && Legend.HostReady && G.narr.thoughts.Contains("host4"), Legend.stage);
+            G.god = true;
+            t.Place("lamp", 33, 16); await t.Run(0.3f);
+            var win = G.ents.OfType<SeaWindow>().FirstOrDefault();
+            t.Ok("the sea is waiting at the lamp room's window", win != null);
+            t.Snap("legend_8_window");
+            p.x = win.Cx() - p.w / 2; await t.Run(0.05f);
+            await t.Tap("interact"); await t.Run(0.1f);
+            t.Ok("it asks if she will go down", UI.Kind == "confirm", UI.Kind);
+            await t.ClickButton("Yes");
+            t.Ok("the ending plays", UI.Kind == "cinematic", UI.Kind);
+            await t.Tap("pause"); await t.Run(0.15f);
+            string all = UI.Inst.AllText();
+            t.Ok("Host of the Mere, with its own fates", UI.Kind == "ending" && G.ended == "host" && all.Contains("There is no Maren Hult"), $"{UI.Kind} {G.ended}");
+            t.Snap("legend_9_ending");
+            G.god = false;
         },
     };
 }

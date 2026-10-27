@@ -11,8 +11,14 @@
 //                                                            limb), or rises from stone as a pillar
 //   The Answer    Sing to the bone and the bone will answer - one of the drowned turns on its own kind, then
 //                                                            falls apart for good
-// Breaking a knot lets out the brine that held it, and the Hollow drinks it in and rings louder (resonance), as it
-// does under the sea. Singing is loud: everything near hears it, and the sea it calls stands the dead up like any tide.
+// Its voice is a bar of energy, resonance, and every verse spends a share of it. Breaking a knot lets out the brine
+// that held it, and the Hollow drinks it in: that is how it fills. Held in the sea it drinks slowly, and only to
+// halfway (the sea gives back what it hears, and it has heard her less than the drowned). A sung verse rings in the
+// bone for a moment, so nothing is drunk from the sea until it stills, and each verse must ring itself out before it
+// can be sung again. Singing is loud: everything near hears it, the swell rises, and the sea it calls stands the dead
+// up like any tide. It is a last breath, not a weapon: Maren is still the thing being hunted.
+// At the spring tide the Hollow can be grown into the Harpoon Gun at the Saint's Ear (Legend.cs): then it sings no
+// verses at all, and its resonance feeds the Saint's Tine.
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -23,15 +29,18 @@ namespace Hollowmere;
 
 public static class Hollow
 {
-    public record Verse(string id, string name, string line, float cost);
+    // cost: resonance spent; ring: seconds before the same verse can be sung again
+    public record Verse(string id, string name, string line, float cost, float ring);
     public static readonly Verse[] VERSES =
     {
-        new("calling", "The Calling", "Sing to the sea", 35),
-        new("riptide", "The Riptide", "...and the sea will take you home", 20),
-        new("salting", "The Salting", "Sing to the salt and the salt will rise", 25),
-        new("answer", "The Answer", "Sing to the bone and the bone will answer", 50),
+        new("calling", "The Calling", "Sing to the sea", 30, 4),
+        new("riptide", "The Riptide", "...and the sea will take you home", 35, 6),
+        new("salting", "The Salting", "Sing to the salt and the salt will rise", 40, 7),
+        new("answer", "The Answer", "Sing to the bone and the bone will answer", 70, 30),
     };
     public const float MAX = 100;
+    public const float SEA_FILL = 50;      // the sea alone fills it this far
+    const float KNOT_GAIN = 4, CROWN_GAIN = 8, SEA_RATE = 2.5f, STILL_T = 2.5f;
     const int TS = H.TILE;
 
     public static bool owned, held;
@@ -39,6 +48,9 @@ public static class Hollow
     public static string verse = "calling";
     public static float resonance;
     public static float singCool, holdT, flash, verseShowT;
+    public static float stillT;            // the bone still ringing after a verse: it drinks nothing from the sea
+    public static readonly Dictionary<string, float> ringing = new();   // each verse ringing itself out
+    public static float Ringing(string id) => ringing.TryGetValue(id, out var t) ? MathF.Max(0, t) : 0;
     static bool pressing, turnedThisPress;
     // The Calling: the room's sea moved toward where Maren pointed, in tiles (positive is higher)
     public static string surgeRoom;
@@ -62,7 +74,7 @@ public static class Hollow
     public static void Reset()
     {
         owned = held = false; verses = new(); verse = "calling"; resonance = 0;
-        singCool = holdT = flash = verseShowT = 0; pressing = turnedThisPress = false;
+        singCool = holdT = flash = verseShowT = stillT = 0; pressing = turnedThisPress = false; ringing.Clear();
         surge = surgeTarget = surgeHold = 0; surgeRoom = null; rush = 0;
         RevertPillars(); wakes.Clear(); giftT = -1; onPier = 0; learnT = 0; Sung = 0;
     }
@@ -86,7 +98,7 @@ public static class Hollow
         if (owned) return;
         owned = true; held = true;
         var f = World.flags; f.Set("hollowTaken", true); f.O.Remove("hollowX"); f.O.Remove("hollowY");
-        resonance = MathF.Max(resonance, 60);
+        resonance = MathF.Max(resonance, 40);
         Snd.Pickup(); Snd.Verse("calling"); Score.Sting("discover", 0.8f);
         var L = Data.Lore.P("hollow");
         UI.Inscription(L.S("name"), L.S("reveal"), () =>
@@ -113,6 +125,7 @@ public static class Hollow
     public static void Hold(bool on)
     {
         if (!owned) return;
+        if (on && Legend.merged) { if (!held) { Snd.Deny(); H.ToastMsg("The Hollow is grown into the Tine. It has no voice of its own now.", 2); } held = false; return; }
         if (on && !held) { held = true; Snd.Ui(); verseShowT = 2.5f; Hints.Did("hollow"); }
         else if (!on) held = false;
     }
@@ -176,7 +189,9 @@ public static class Hollow
         var p = G.player;
         if (p == null || H.Dist(p.Cx(), p.Cy(), b.Cx(), b.Cy()) > 16 * TS) return;
         bool crown = b.knots.Any(k => k.type == "crown" && k.broken) && b.mode == "downed";
-        Gain(crown ? 15 : 9);
+        // grown into the Tine it drinks deeper: the Saint wants what is in them
+        float m = Legend.merged ? 1.75f : 1;
+        Gain((crown ? CROWN_GAIN : KNOT_GAIN) * m);
     }
     public static void Gain(float n)
     {
@@ -189,7 +204,7 @@ public static class Hollow
     // Called by the player every frame the Hollow is played: pressed this frame, still held down.
     public static void Play(Player p, bool down, bool pressed, float dt)
     {
-        if (!owned || verses.Count == 0) return;
+        if (!owned || verses.Count == 0 || Legend.merged) return;
         if (pressed) { pressing = true; holdT = 0; turnedThisPress = false; }
         if (!pressing) return;
         bool brim = verse == "calling" && resonance >= MAX && CanCall(G.room);
@@ -210,7 +225,9 @@ public static class Hollow
         if (singCool > 0) return false;
         var v = Cur;
         if (p.inBellRoom) { Deny("The bell drowns the Hollow out. Nothing answers in here."); return false; }
-        if (resonance < v.cost) { Deny("The Hollow is too quiet. Break their knots, or let it drink the sea."); return false; }
+        if (Legend.merged) { Deny("The Hollow is grown into the Tine. It has no voice of its own now."); return false; }
+        if (Ringing(v.id) > 0) { Deny($"{v.name} is still ringing in the bone ({MathF.Ceiling(Ringing(v.id))} s)."); return false; }
+        if (resonance < v.cost) { Deny(resonance < SEA_FILL ? "The Hollow is too quiet. Break their knots: it drinks the brine that held them." : "The Hollow is too quiet for that verse. Break more of their knots."); return false; }
         bool ok = verse switch
         {
             "calling" => SingCalling(p),
@@ -222,6 +239,9 @@ public static class Hollow
         if (!ok) return false;
         resonance -= v.cost;
         singCool = 0.6f; Sung++;
+        ringing[v.id] = v.ring; stillT = STILL_T;
+        // the sea hears it too
+        G.AddSwell(1.2f);
         Snd.Verse(verse);
         Hints.Did("sing");
         G.Shake(1.5f); Pad.Rumble(0.3f, 0.2f, 0.25f);
@@ -285,7 +305,7 @@ public static class Hollow
     {
         var o = new Vector2(p.Cx(), p.y + 9); float a = p.aim;
         var dir = new Vector2(MathF.Cos(a), MathF.Sin(a));
-        const float range = 150, cone = 0.5f;
+        const float range = 130, cone = 0.42f;
         foreach (var e0 in G.ents.ToArray())
         {
             if (e0 is not Body b || b.gone || b.boss || b.type is "undertow" or "driftling") continue;
@@ -293,8 +313,8 @@ public static class Hollow
             if (d > range || (d > 12 && MathF.Abs(H.AngleDiff(a, MathF.Atan2(to.Y, to.X))) > cone) || !Phys.Los(o.X, o.Y, b.Cx(), b.Cy())) continue;
             float k = 1 - d / (range * 1.4f);
             if (p.grabbedBy == b) b.ReleaseGrab();
-            b.vx = dir.X * 380 * k; b.vy = dir.Y * 240 * k - 170;
-            b.flungT = 0.7f; b.stun = MathF.Max(b.stun, 1.6f);
+            b.vx = dir.X * 330 * k; b.vy = dir.Y * 210 * k - 150;
+            b.flungT = 0.55f; b.stun = MathF.Max(b.stun, 0.9f);
             if (b.mode == "dormant") b.Wake(true);
             Voices.Hurt(b, false);
         }
@@ -337,7 +357,8 @@ public static class Hollow
     }
     public static void Encrust(Body b)
     {
-        b.saltT = 6; b.stun = MathF.Max(b.stun, 6); b.vx = 0;
+        // long enough for one blow, not for a walk round it
+        b.saltT = 3.5f; b.stun = MathF.Max(b.stun, 3.5f); b.vx = 0;
         if (b.mode == "grab") b.ReleaseGrab();
         FX.Salt(b.Cx(), b.Cy(), 30);
         Snd.Crystal(b.Pan());
@@ -423,7 +444,7 @@ public static class Hollow
         if (best.mode == "downed") best.StandUp();
         if (best.mode == "dormant") { best.mode = "hunt"; best.SetPose("stand"); }
         best.ReleaseGrab();
-        best.thrallT = 16; best.stun = 0; best.mode = "hunt"; best.spotted = false;
+        best.thrallT = 10; best.stun = 0; best.mode = "hunt"; best.spotted = false;
         FX.Salt(best.Cx(), best.Cy(), 16);
         wakes.Add(new Wake { a = o, b = new Vector2(best.Cx(), best.y + 4), t = 0.5f, max = 0.5f, kind = "answer" });
         Hints.Did("answer");
@@ -451,8 +472,9 @@ public static class Hollow
         if (bd < 24 && b.cool <= 0)
         {
             b.cool = 0.9f;
-            var ks = target.knots.Where(k => !k.broken && !k.plated && !target.IsSealed(k)).ToList();
-            if (ks.Count > 0) target.DamageKnot(H.Pick(ks), 1.5f, "thrall");
+            // it tears at one limb until it comes away, then the next
+            var ks = target.knots.Where(k => !k.broken && !k.plated && !target.IsSealed(k)).OrderBy(k => k.hp).ToList();
+            if (ks.Count > 0) target.DamageKnot(ks[0], 1.5f, "thrall");
             else target.DamageFlesh(1, target.Cx(), target.Cy(), "thrall");
             target.stun = MathF.Max(target.stun, 0.4f);
             int s = (int)H.Sign(target.Cx() - b.Cx()); if (s != 0) b.facing = s;
@@ -477,7 +499,8 @@ public static class Hollow
         var p = G.player; var r = G.room;
         if (p == null || r == null) return;
         UpdateGift(dt);
-        singCool -= dt; flash = MathF.Max(0, flash - dt * 1.5f); verseShowT -= dt;
+        singCool -= dt; flash = MathF.Max(0, flash - dt * 1.5f); verseShowT -= dt; stillT -= dt;
+        foreach (var k in ringing.Keys.ToArray()) { ringing[k] -= dt; if (ringing[k] <= 0) { ringing.Remove(k); if (owned && held && k == verse) Snd.Tine(k); } }
         // the sea it called rises toward the mark, holds, and settles back
         if (surgeRoom != null)
         {
@@ -511,8 +534,9 @@ public static class Hollow
         foreach (var w in wakes) w.t -= dt;
         wakes.RemoveAll(w => w.t <= 0);
         if (!owned) return;
-        // it drinks the sea it is held in
-        if (p.InWater() && !r.Brine) Gain(dt * 4);
+        // it drinks the sea it is held in, slowly, and only halfway; grown into the Tine, the sea fills it to the brim
+        float fill = Legend.merged ? MAX : SEA_FILL;
+        if (p.InWater() && !r.Brine && stillT <= 0 && resonance < fill) Gain(MathF.Min(fill - resonance, dt * SEA_RATE * (Legend.merged ? 1.6f : 1)));
         // and it hears what the island sings to it
         learnT += dt;
         if (learnT > 2.5f && !UI.IsOpen())
@@ -604,28 +628,60 @@ public static class Hollow
         if (glow > 0) c.Glow(x, y, 9 * k, new Color(0.45f, 0.95f, 0.85f, 0.35f * glow));
     }
 
-    // Under the lantern gauge: the Hollow's resonance, rising like water in glass, and the verse in hand.
+    // Under the lantern gauge: the Hollow's energy, sea rising in a glass. A mark shows how far the sea alone will
+    // fill it; the share the verse in hand would spend is lit at the top of the water (or, too quiet, the reach of it
+    // is drawn empty); while the bone still rings the water trembles. Grown into the Tine the glass goes dark as
+    // brine, the marks are its throws, and under it a thin vein shows how far the sea has grown into her.
     public static void DrawHud(Canvas c, float y)
     {
         if (!owned) return;
+        bool tine = Legend.merged;
         float f = resonance / MAX, pulse = 0.5f + 0.5f * MathF.Sin(G.Now * 3);
+        float cost = tine ? Legend.TINE_COST : Cur.cost;
+        bool can = resonance >= cost && (tine || Ringing(verse) <= 0);
         DrawIcon(c, 15, y, 11, f >= 1 ? 0.7f + 0.3f * pulse : f * 0.5f);
-        float gx = 24, gw = 56;
-        c.Fill = new Color(0, 0, 0, 0.55f); c.FillRect(gx - 1, y - 2.5f, gw + 2, 5);
-        c.Fill = H.Col("#5a6a62"); c.FillRect(gx - 1, y - 2.5f, gw + 2, 0.6f); c.FillRect(gx - 1, y + 1.9f, gw + 2, 0.6f);
+        float gx = 24, gw = 64, top = y - 2.3f, bh = 4.6f;
+        var rim = tine ? H.Col("#3c4a40") : H.Col("#5a6a62");
+        c.Fill = new Color(0, 0, 0, 0.6f); c.FillRect(gx - 1, y - 3.2f, gw + 2, 6.4f);
+        c.Fill = rim; c.FillRect(gx - 1, y - 3.2f, gw + 2, 0.7f); c.FillRect(gx - 1, y + 2.5f, gw + 2, 0.7f);
+        c.FillRect(gx - 1.5f, y - 3.2f, 0.8f, 6.4f); c.FillRect(gx + gw + 0.7f, y - 3.2f, 0.8f, 6.4f);
         if (f > 0)
         {
-            c.FillRectGradV(gx, y - 1.5f, gw * f, 3, H.Col("#b8f2e0"), H.Col("#2f8a7a"));
-            c.Glow(gx + gw * f, y, 5 + flash * 8, new Color(0.5f, 1.1f, 0.95f, 0.25f + flash * 0.4f));
+            var hi = tine ? H.Col("#7fb8a0") : H.Col("#b8f2e0"); var lo = tine ? H.Col("#16372f") : H.Col("#2f8a7a");
+            c.FillRectGradV(gx, top, gw * f, bh, hi, lo);
+            // the bone still ringing: the water trembles and drinks nothing
+            if (stillT > 0)
+                for (int i = 0; i < 6; i++)
+                {
+                    float sx = gx + (G.Now * 40 + i * 11) % MathF.Max(1, gw * f);
+                    c.Fill = new Color(1, 1, 1, 0.35f * MathF.Min(1, stillT)); c.FillRect(sx, top + 0.3f + MathF.Sin(G.Now * 20 + i) * 0.5f, 2.2f, 0.6f);
+                }
+            else { c.Fill = new Color(1, 1, 1, 0.3f); c.FillRect(gx, top + 0.2f, gw * f, 0.6f); }
+            c.Glow(gx + gw * f, y, 5 + flash * 8, tine ? new Color(0.3f, 0.75f, 0.55f, 0.2f + flash * 0.4f) : new Color(0.5f, 1.1f, 0.95f, 0.25f + flash * 0.4f));
         }
-        // a notch at what the verse in hand costs
-        float nx = gx + gw * Cur.cost / MAX;
-        c.Fill = resonance >= Cur.cost ? H.Col("#e8fff6") : new Color(0.6f, 0.6f, 0.55f, 0.8f); c.FillRect(nx - 0.4f, y - 3.2f, 0.8f, 6.4f);
-        if (held || verseShowT > 0)
+        // what the verse (or the throw) in hand would spend
+        if (can)
         {
-            float a = held ? 1 : MathF.Min(1, verseShowT);
-            c.Font = "6px caps"; c.Fill = new Color(0.7f, 0.92f, 0.85f, 0.9f * a);
-            c.FillText(Cur.name.ToLowerInvariant(), gx + gw + 6, y + 2);
+            float x0 = gx + gw * (resonance - cost) / MAX;
+            c.Fill = new Color(1, 1, 1, 0.22f + 0.12f * pulse); c.FillRect(x0, top, gw * cost / MAX, bh);
+            c.Fill = new Color(0.9f, 1, 0.97f, 0.9f); c.FillRect(x0 - 0.4f, y - 3.6f, 0.8f, 7.2f);
+        }
+        else
+        {
+            c.Stroke = new Color(0.82f, 0.48f, 0.42f, 0.65f); c.LineWidth = 0.5f; c.StrokeRect(gx + 0.3f, top + 0.3f, gw * MathF.Min(1, cost / MAX) - 0.6f, bh - 0.6f);
+        }
+        // how far the sea alone fills it, or the Tine's throws
+        if (!tine) { for (float dy = -2.6f; dy < 2.6f; dy += 1.4f) c.FillRect(gx + gw * SEA_FILL / MAX - 0.3f, y + dy, 0.6f, 0.7f, new Color(0.75f, 0.9f, 0.88f, 0.55f)); }
+        else for (int i = 1; i < 4; i++) c.FillRect(gx + gw * i * Legend.TINE_COST / MAX - 0.25f, top, 0.5f, bh, new Color(0, 0, 0, 0.45f));
+        if (tine || Legend.communion > 0) Legend.DrawVein(c, gx, y + 4.6f, gw);
+        if (held || verseShowT > 0 || tine)
+        {
+            float a = held || tine ? 1 : MathF.Min(1, verseShowT);
+            c.Font = "6px caps"; c.Fill = tine ? new Color(0.62f, 0.8f, 0.7f, 0.9f) : new Color(0.7f, 0.92f, 0.85f, 0.9f * a);
+            string label = tine ? "the tine" : Cur.name.ToLowerInvariant();
+            float rt = tine ? 0 : Ringing(verse);
+            if (rt > 0) { c.Fill = new Color(0.55f, 0.6f, 0.58f, 0.8f * a); label += "  " + MathF.Ceiling(rt); }
+            c.FillText(label, gx + gw + 6, y + 2);
         }
     }
 
@@ -642,8 +698,9 @@ public static class Hollow
             c.Save(); c.Translate(x + pw - 9 - (verses.Count - 1 - i) * 7, y + 10); c.Rotate(H.PI / 4);
             c.Fill = sel ? H.Col("#9fe8d4") : new Color(0.3f, 0.38f, 0.35f, 0.9f); c.FillRect(-1.8f, -1.8f, 3.6f, 3.6f); c.Restore();
         }
-        c.Font = "7px sans"; c.Fill = resonance >= Cur.cost ? H.Col("#cfeee4") : H.Col("#d07a6a"); c.TextAlign = 2;
-        c.FillText((int)Cur.cost + " / " + (int)resonance, x + pw - 7, y + 40);
+        float rt = Ringing(verse);
+        c.Font = "7px sans"; c.Fill = rt > 0 ? H.Col("#8a948e") : resonance >= Cur.cost ? H.Col("#cfeee4") : H.Col("#d07a6a"); c.TextAlign = 2;
+        c.FillText(rt > 0 ? "ringing " + MathF.Ceiling(rt) + " s" : (int)Cur.cost + " / " + (int)resonance, x + pw - 7, y + 40);
         c.TextAlign = 0;
     }
 }

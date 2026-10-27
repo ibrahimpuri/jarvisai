@@ -158,6 +158,13 @@ public static class Hud
         c.Fill = new Color(0, 0, 0, 0.45f); c.FillRect(x + 6, y + 6, 22, 22);
         c.Stroke = new Color(GOLD.R, GOLD.G, GOLD.B, 0.35f); c.LineWidth = 0.6f; c.StrokeRect(x + 6, y + 6, 22, 22);
         Icons.Draw(c, p.cur, x + 17, y + 17, 19);
+        if (Player.Legendary(p.cur))
+        {
+            Legend.DrawPanel(c, p, x, y, pw);
+            WeaponPips(c, p, x, pw, y);
+            Consumables(c, p, x, y + 36);
+            return;
+        }
         c.Font = "8px caps"; c.Fill = TEXT;
         c.FillText(def.S("name") + (w.tier > 0 ? "  " + new string('I', w.tier + 1) : ""), x + 33, y + 13);
         // magazine
@@ -173,15 +180,21 @@ public static class Hud
         c.Font = "8px sans"; c.Fill = MUTED; c.TextAlign = 2;
         c.FillText("+" + p.bag.Count(def.S("ammo")), x + pw - 7, y + 25);
         c.TextAlign = 0;
-        // other weapons carried
-        if (p.weaponOrder.Count > 1)
-            for (int i = 0; i < p.weaponOrder.Count; i++)
-            {
-                bool sel = p.weaponOrder[i] == p.cur;
-                c.Save(); c.Translate(x + pw - 9 - (p.weaponOrder.Count - 1 - i) * 7, y + 10); c.Rotate(H.PI / 4);
-                c.Fill = sel ? GOLD : new Color(0.35f, 0.3f, 0.22f, 0.9f); c.FillRect(-1.8f, -1.8f, 3.6f, 3.6f); c.Restore();
-            }
+        WeaponPips(c, p, x, pw, y);
         Consumables(c, p, x, y + 36);
+    }
+    // the other weapons carried, a diamond each; the legendary ones in their own colour
+    static void WeaponPips(Canvas c, Player p, float x, float pw, float y)
+    {
+        if (p.weaponOrder.Count <= 1) return;
+        for (int i = 0; i < p.weaponOrder.Count; i++)
+        {
+            string id = p.weaponOrder[i];
+            bool sel = id == p.cur;
+            var on = id == "tine" ? H.Col("#9fe8d4") : id == "glass" ? H.Col("#ffe0a0") : GOLD;
+            c.Save(); c.Translate(x + pw - 9 - (p.weaponOrder.Count - 1 - i) * 7, y + 10); c.Rotate(H.PI / 4);
+            c.Fill = sel ? on : Player.Legendary(id) ? new Color(on.R * 0.4f, on.G * 0.4f, on.B * 0.4f, 0.9f) : new Color(0.35f, 0.3f, 0.22f, 0.9f); c.FillRect(-1.8f, -1.8f, 3.6f, 3.6f); c.Restore();
+        }
     }
     static void Consumables(Canvas c, Player p, float x, float cy)
     {

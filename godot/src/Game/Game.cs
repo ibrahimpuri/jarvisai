@@ -137,7 +137,7 @@ public static class G
         Narr.Reset();
         Hints.Reset();
         FX.parts.Clear();
-        Gore.Reset(); Voices.Reset(); Hollow.Reset(); Dread.Reset();
+        Gore.Reset(); Voices.Reset(); Hollow.Reset(); Legend.Reset(); Dread.Reset();
         dialT = 0;
         // Maren comes ashore on the outer rocks; the tide holds at Low until she reaches the reef.
         EnterRoom(Data.Room["breakers"], true);
@@ -190,6 +190,9 @@ public static class G
         if (t == "abbot") return f.B("abbotDead") ? null : new Abbot(spec, r);
         if (t == "shoal") return act >= 3 && !f.B("shoalDead") ? new Shoal(spec, r) : null;
         if (t == "grafted") return act >= 3 ? new Grafted(spec, r) : null;
+        // the last night's weapons: Agathe's Glass is left for Maren at the spring tide; the Ear is always there
+        if (t == "burningglass") return act >= 3 && !Legend.glassOwned ? new GlassCase(spec, r) : null;
+        if (t == "earsocket") return new EarSocket(spec, r);
         if (t == "choirmember")
         {
             if (quests.B("hesperDead") && f.B("choirDrained")) return null;
@@ -251,6 +254,7 @@ public static class G
         if (satchelDrop != null && satchelDrop.room == r.Id) ents.Add(MakeSatchel(r));
         RoomEvents(r, firstVisit);
         Hollow.OnRoomEnter(r);
+        Legend.OnRoomEnter(r);
         sinceLoad = 0;
         if (firstVisit || prevRegion != r.Region) titleT = 2.5f;
         if (Narr.EnterRegion(r.Region)) titleT = 6;
@@ -504,6 +508,7 @@ public static class G
         act = n;
         if (n == 2) Narr.Think("actTwo");
         if (n == 3) Narr.Think("actThree");
+        Legend.OnActStart(n);
         if (n == 2) H.ToastMsg("Act II. The Undertow begins to hunt at High tide." + (best != null ? $" New Brine bodies grow salt plates over the {best}." : ""), 6);
         if (n == 3)
         {
@@ -703,11 +708,13 @@ public static class G
     public static void Rest(Bell bell)
     {
         var p = player;
-        int heal = p.grafts.Contains("lung") ? (int)MathF.Ceiling((p.maxHp - p.hp) / 2f) : p.maxHp - p.hp;
-        if (p.grafts.Contains("lung") && heal < p.maxHp - p.hp) H.ToastMsg("The bell's resonance grinds at the salt in your chest. Healing is halved.", 3);
+        // the bell hurts what carries the sea: the Tide Lung, or the Tine grown in her hand
+        bool salted = p.grafts.Contains("lung") || Legend.merged;
+        int heal = salted ? (int)MathF.Ceiling((p.maxHp - p.hp) / 2f) : p.maxHp - p.hp;
+        if (salted && heal < p.maxHp - p.hp) H.ToastMsg(Legend.merged ? "The bell's note grinds at the bone in your hand. Healing is halved." : "The bell's resonance grinds at the salt in your chest. Healing is halved.", 3);
         p.hp = Math.Min(p.maxHp, p.hp + heal);
-        // the bell's long note fills the Hollow while she sleeps
-        if (Hollow.owned) Hollow.resonance = Hollow.MAX;
+        // the bell's long note fills the Hollow halfway while she sleeps (the Tine it bleeds dry)
+        if (Hollow.owned) Hollow.resonance = Legend.merged ? 0 : MathF.Max(Hollow.resonance, Hollow.SEA_FILL);
         SetRespawn(bell);
         SaveRoomState();
         Tide.AdvanceTo("low");
@@ -743,7 +750,7 @@ public static class G
             ["respawn"] = new JsonObject { ["room"] = respawn.room, ["x"] = respawn.x, ["y"] = respawn.y },
             ["satchelDrop"] = satchelDrop == null ? null : new JsonObject { ["room"] = satchelDrop.room, ["x"] = satchelDrop.x, ["y"] = satchelDrop.y, ["tidal"] = satchelDrop.tidal, ["bag"] = satchelDrop.bag.ToJson() },
             ["difficulty"] = difficulty, ["encrustedType"] = encrustedType, ["freeGraft"] = freeGraft, ["tips"] = SA(tips),
-            ["undertowDead"] = undertow.dead, ["narr"] = narr.ToJson(), ["hollow"] = Hollow.ToJson(),
+            ["undertowDead"] = undertow.dead, ["narr"] = narr.ToJson(), ["hollow"] = Hollow.ToJson(), ["legend"] = Legend.ToJson(),
         };
         using var fa = Godot.FileAccess.Open(SAVE_PATH, Godot.FileAccess.ModeFlags.Write);
         if (fa == null) { H.ToastMsg("Could not save (storage unavailable)."); return; }
@@ -778,7 +785,7 @@ public static class G
         titheFlood = null; breachT = 0;
         Narr.Reset();
         Hints.Reset();
-        Gore.Reset(); Voices.Reset(); Hollow.Load(d.P("hollow"));
+        Gore.Reset(); Voices.Reset(); Hollow.Load(d.P("hollow")); Legend.Load(d.P("legend"));
         player.hp = player.maxHp;
         EnterRoom(Data.Room[respawn.room], true);
         player.x = respawn.x; player.y = respawn.y;
@@ -789,7 +796,8 @@ public static class G
     public static string StatsSummary()
     {
         int k = stats.knots.Values.Sum();
-        return $"Knots broken: {k} · Deaths: {stats.deaths} · Time: {H.FmtTime(stats.time)} · Agathe's pages: {pages.Count}/9 · Grafts: {player.grafts.Count} · Difficulty: {difficulty}";
+        string held = Legend.communion > 0 ? $" · The Tine in hand: {H.FmtTime(Legend.communion)}" : "";
+        return $"Knots broken: {k} · Deaths: {stats.deaths} · Time: {H.FmtTime(stats.time)} · Agathe's pages: {pages.Count}/9 · Grafts: {player.grafts.Count}{held} · Difficulty: {difficulty}";
     }
 
     // ------------------------------------------------------------------ camera
@@ -915,6 +923,7 @@ public static class G
         Voices.Update(dt);
         Dread.Update(dt);
         Hollow.Update(dt);
+        Legend.Update(dt);
         AmbientOneShots(dt);
         Narr.UpdateWhispers(dt);
         undertow.Update(dt);
@@ -979,6 +988,7 @@ public static class G
         foreach (var e in ents) { var l = e.Light(); if (l != null) lights.Add(l); }
         foreach (var pr in projectiles) { var l = pr.Light(); if (l != null) lights.Add(l); }
         StoryFocus.AddLights(lights);
+        Legend.AddLights(lights);
         frameLights = lights;
 
         promptText = ComputePrompt();

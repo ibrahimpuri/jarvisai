@@ -76,6 +76,10 @@ off the edge of the screen), placed in the room and sent through its reverb:
 - and once in a long while, after long calm in the dark, **a slam right beside her**, with the `scare` stinger, the
   screen shaking and Maren gasping
 
+With the Saint's Tine grown in her hand it talks to her more, and more again as the sea's hold grows; once the Tine
+has rooted, the whisper sometimes says *come down*. While she carries it the drowned choir under the water (the `tide`
+layer) follows her into every room, louder as the hold grows.
+
 It paces itself like a horror film: nothing in a fight or in a Bell Room (fear needs quiet), then every 20 to 50
 seconds divided by a pressure that grows as the tide rises, when her lamp is shuttered, the longer it has been
 calm, and with each act. The big scare needs seventy seconds of calm, is likelier in the dark, and then waits four
@@ -127,6 +131,12 @@ to the next: close enough, in the dark, to be heard as words.
   bone and a tearing; a limb coming away is the rip, the bone going splinter by splinter, the skin tearing, the weight
   of it and spatter.
 - The menus tick softly, bone on wood.
+- The last night's weapons (`Legend.cs`): the Saint's Tine throws with a wet crack and the sea tearing past, and
+  under it something very large sings the hymn's lowest note through several throats; empty, it drinks from her with
+  a pull of wet breath and her heart answering out of time. The bone growing through the harpoon at the Saint's Ear is
+  grinding and cracking, something swallowing, and the hymn's chord swelling in the walls; prising it free is a wet
+  tearing and a ringing out of tune. The Burning Glass catches with a thump of air and a high glassy whine, hisses on
+  what it burns, and ticks and steams when the lens overheats. The Ear itself hums at the spring tide.
 
 ## The mix
 

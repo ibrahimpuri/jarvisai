@@ -166,7 +166,9 @@ public static class Narr
     }
     public static string NpcLore(string id)
     {
-        // the first time they see what Maren is carrying, they say what they know of it
+        // the first time they see what Maren is carrying, they say what they know of it (the Tine first: it is worse)
+        var tl = L.P("legend")?.P("npc")?.S(id);
+        if (Legend.merged && tl != null && !St.lore.ContainsKey("legend:" + id)) { St.lore["legend:" + id] = 1; return tl; }
         var hl = L.P("hollow")?.P("npc")?.S(id);
         if (Hollow.owned && hl != null && !St.lore.ContainsKey("hollow:" + id)) { St.lore["hollow:" + id] = 1; return hl; }
         var lines = L.P("npcLore")?.Strings(id);
@@ -183,13 +185,14 @@ public static class Narr
         string tables = q.S("tables");
         if (kind == "relight") o.Add(tables == "sold" ? F.P("ansel").S("sold") : F.P("ansel").S("burned"));
         else if (kind == "hymn") o.Add(tables == "sold" ? F.P("ansel").S("sold") : F.P("ansel").S("sunk"));
+        else if (kind == "host") o.Add(tables == "sold" ? F.P("ansel").S("sold") : F.P("ansel").S("host"));
         else o.Add(tables == "sold" ? F.P("ansel").S("sold") : F.P("ansel").S("alive"));
-        o.Add(q.B("odileLost") ? F.P("odile").S("lost") : F.P("odile").S("alive"));
+        o.Add(q.B("odileLost") ? F.P("odile").S("lost") : F.P("odile").S(kind == "host" ? "host" : "alive"));
         string te = q.S("teodor");
         if (te == "saved") o.Add(F.P("teodor").S("saved"));
         else if (te == "killed" || te == "tags" || te == "dead") o.Add(F.P("teodor").S("dead"));
         if (q.B("hesperDead") || flags.B("choirDrained")) o.Add(F.P("hesper").S("dead"));
-        else o.Add(kind == "relight" ? F.P("hesper").S("burned") : kind == "hymn" ? F.P("hesper").S("sunk") : F.P("hesper").S("alive"));
+        else o.Add(kind == "relight" ? F.P("hesper").S("burned") : kind == "hymn" ? F.P("hesper").S("sunk") : kind == "host" ? F.P("hesper").S("host") : F.P("hesper").S("alive"));
         o.Add(F.P("agathe").S(kind));
         o.Add(kind == "relight" && G.player.grafts.Count >= 2 ? F.P("maren").S("relightGrafted") : F.P("maren").S(kind));
         return o.Where(x => x != null).ToList();

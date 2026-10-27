@@ -42,7 +42,8 @@ public static class Dread
         if (Fight() || p.inBellRoom) { calm = 0; nextT = MathF.Max(nextT, 10); return; }
         calm += dt; nextT -= dt; bigT -= dt;
         if (nextT > 0) return;
-        float pressure = 0.35f + Tide.Level01() * 0.45f + (p.LanternLit() ? 0 : 0.45f) + MathF.Min(calm / 150, 0.5f) + (G.act - 1) * 0.15f;
+        float pressure = 0.35f + Tide.Level01() * 0.45f + (p.LanternLit() ? 0 : 0.45f) + MathF.Min(calm / 150, 0.5f) + (G.act - 1) * 0.15f
+            + (Legend.merged ? 0.15f + Legend.stage * 0.1f : 0);   // the sea in her hand: the dark talks to her more
         nextT = H.Rand(20, 48) / pressure;
         if (bigT <= 0 && calm > 70 && !r.Outdoor && (!p.LanternLit() || H.Rand() < 0.35f)) { Play("slam"); bigT = H.Rand(240, 420); return; }
         Play(Pick(r));
@@ -100,7 +101,8 @@ public static class Dread
                 var at = Spot(50);
                 Snd.At("dread:whisper", 2.0f, s =>
                 {
-                    if (H.Rand() < 0.65f) s.Whisper(1, 0.05f, ("m", 0.16f), ("a", 0.3f), ("r", 0.1f), ("e", 0.24f), ("n", 0.3f));
+                    if (Legend.merged && Legend.stage >= 2 && H.Rand() < 0.5f) { s.Whisper(1, 0.05f, ("k", 0.06f), ("uh", 0.2f), ("m", 0.3f)); s.Whisper(0.8f, 0.7f, ("d", 0.05f), ("a", 0.3f), ("n", 0.3f)); }
+                    else if (H.Rand() < 0.65f) s.Whisper(1, 0.05f, ("m", 0.16f), ("a", 0.3f), ("r", 0.1f), ("e", 0.24f), ("n", 0.3f));
                     else s.Whisper(1, 0.05f, ("m", 0.14f), ("a", 0.28f), ("m", 0.14f), ("a", 0.4f));
                     s.Whisper(0.5f, 1.1f, ("h", 0.2f), ("e", 0.15f), ("l", 0.08f), ("p", 0.05f));
                 }, at.X, at.Y, 0.5f, 3);

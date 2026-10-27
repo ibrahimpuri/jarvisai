@@ -159,6 +159,24 @@ public static class Icons
                 Disc(c, -1, 1, 1.2f, C("#3a3a3a"), 0.5f);
                 c.Stroke = C("#dfe3e6"); c.LineWidth = 0.7f; c.Line(4.5f, 1, 8, -6);
                 break;
+            // ---- the legendary weapons
+            case "tine":
+                // the harpoon with the ear-bone grown through it, curled at the head like a shell
+                c.Stroke = INK; c.LineWidth = 3.6f; c.Line(-8, 4, 6, -3);
+                c.Stroke = C("#d8ccae"); c.LineWidth = 2.2f; c.Line(-8, 4, 6, -3);
+                c.Stroke = C("#8a7c5c"); c.LineWidth = 0.6f; for (int i = 0; i < 4; i++) { float t = -5 + i * 2.6f; c.Line(t, 2.6f - i * 1.3f - 1.2f, t + 0.8f, 2.6f - i * 1.3f + 1.2f); }
+                c.BeginPath(); c.MoveTo(6, -3); c.QuadraticCurveTo(10, -7, 8, -8); c.QuadraticCurveTo(5, -8, 6.5f, -5.5f); c.ClosePath(); Shape(c, C("#efe6cf"), 0.7f);
+                c.BeginPath(); c.MoveTo(-6, 3); c.LineTo(-3, 3); c.LineTo(-4, 7.5f); c.LineTo(-7, 7.5f); c.ClosePath(); Shape(c, C("#5a3e2a"));
+                c.Glow(7, -5, 5, new Color(0.4f, 1f, 0.85f, 0.45f));
+                break;
+            case "glass":
+                // a brass lantern hood with the ivory lens in its mouth
+                c.BeginPath(); c.MoveTo(-6, -4); c.LineTo(2, -4); c.LineTo(6, -6.5f); c.LineTo(6, 6.5f); c.LineTo(2, 4); c.LineTo(-6, 4); c.ClosePath(); Shape(c, C("#b08840"));
+                Box(c, -6, -4, 8, 1.4f, C("#e0c070"), 0.5f);
+                c.BeginPath(); c.Ellipse(6, 0, 1.8f, 6, 0, 0, H.PI * 2); c.ClosePath(); Shape(c, C("#f4ecd8"), 0.7f);
+                c.Glow(7, 0, 7, new Color(1.4f, 1.1f, 0.7f, 0.55f));
+                Shine(c, -5, -3, 6, 0.5f, 0.4f);
+                break;
             // ---- abilities
             case "swing":
                 c.Stroke = INK; c.LineWidth = 3.2f; c.BeginPath(); c.MoveTo(-6, 7); c.LineTo(2, -3); c.Arc(3.5f, -4.5f, 3, H.PI * 0.75f, H.PI * 2.1f); c.StrokePath();

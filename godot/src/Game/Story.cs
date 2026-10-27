@@ -177,6 +177,9 @@ public static class Story
             lines.Add("Light the lamp: the great lamp at the centre. The Brine burns out of the island, and everyone carrying a graft dies with it.");
             lines.Add("Ring the Saint's bell: the hymn can only be finished by someone with three grafts and the Choir beside her. The island goes home to the sea.");
             lines.Add("Or fire the old red beacon and leave the lamp dark: ships are warned off and no one is burned. But we need my whole log to know the ferry's tides, and at least two others alive to row it.");
+            // the Tine in her hand, grown all the way: Agathe sees it, and the window
+            if (Legend.HostReady) { var L = Data.Lore.P("legend"); lines.Add(L.S("agathe")); lines.Add(L.S("choice")); }
+            else if (Legend.merged) lines.Add("And put down whatever that is in your hand. It is breathing, Maren.");
             Say(lines);
         }
     }
@@ -260,7 +263,7 @@ public static class Story
         if (q.S("teodor") == "saved") list.Add("Teodor");
         return list;
     }
-    static readonly Dictionary<string, string> TITLES = new() { ["relight"] = "Relight the Lamp", ["hymn"] = "The Saint's Hymn", ["dark"] = "Keeper's Dark" };
+    static readonly Dictionary<string, string> TITLES = new() { ["relight"] = "Relight the Lamp", ["hymn"] = "The Saint's Hymn", ["dark"] = "Keeper's Dark", ["host"] = "Host of the Mere" };
     public static void Ending(string kind)
     {
         var p = G.player; var q = G.quests;
@@ -282,7 +285,12 @@ public static class Story
                 return;
             }
         }
-        UI.Confirm($"{TITLES[kind]}. This ends the night. Are you sure?", () => Finish(kind));
+        if (kind == "host" && !Legend.HostReady)
+        {
+            UI.Say(null, "The window is only a window. Far below, the reef, and the sea where the sea should be.");
+            return;
+        }
+        UI.Confirm(kind == "host" ? "Go down to the sea at the window? There is no coming back from it." : $"{TITLES[kind]}. This ends the night. Are you sure?", () => Finish(kind));
     }
     public static void Finish(string kind)
     {
@@ -304,6 +312,15 @@ public static class Story
             text.Add("You ring the Saint's bell and the Choir answers from below. The hymn comes out of you in a voice that is not yours.");
             text.Add("The ribs groan. The skull tilts. Slowly, with the patience of something very large and very old, the Mere-Saint rolls over and slides into the deep, and the island goes with it.");
             text.Add("You go too, singing. Agathe watches from the rope ferry. The reef is clear forever.");
+        }
+        else if (kind == "host")
+        {
+            // the sea's new host: she does what the Abbot could not
+            text.Add("You do not go to the lamp. You go to the window, and the sea is waiting under it, up to the sill, two hundred and twelve steps above the reef, where the tide tables say it cannot be.");
+            text.Add("The Tine opens in your hand like a flower made of bone. It was never a weapon. It was an ear, and it has been listening to you since the pier. Now you hear what it heard: the Saint under the island, three hundred years into dying, so tired, and so glad that someone came.");
+            text.Add("It asks. You say yes. Under the island something vast lets go at last, the Skull settles on its bones, and in every flooded room on Hollowmere the drowned turn their faces toward the lamp.");
+            text.Add("Your mother says your name. You hear it the way the sea hears it. You take her hand, and she does not let go, and you walk down into the water together, and she stops struggling before the second stair.");
+            text.Add("The lamp is never lit again. That winter the reef takes forty ships, and at every High tide their crews come up the Long Pier with knots at their joints, singing in D, to the one who called them home.");
         }
         else
         {

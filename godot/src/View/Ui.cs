@@ -676,6 +676,18 @@ public partial class UiRoot : CanvasLayer
             foreach (var id in p.weaponOrder)
             {
                 var w = p.weapons[id]; var def = Data.Weapons.P(id);
+                if (Player.Legendary(id))
+                {
+                    // the legendary weapons are not improved on; the Tine can be prised apart again
+                    if (id == "tine")
+                    {
+                        var U = Data.Lore.P("legend").P("unmerge");
+                        var lr = ItemRow(c, def.S("name"), Legend.Rooted ? "It has rooted. Prising the Hollow free will tear you (2 pips)." : "Prise the Hollow free: the Harpoon Gun comes back as it was, the Hollow comes back empty.", "legendary");
+                        Btn(lr, "Prise free", () => Confirm(U.S(Legend.Rooted ? "rooted" : "ask"), () => { Legend.Unmerge(); Again(); }));
+                    }
+                    else ItemRow(c, def.S("name"), "Agathe's lens. Nothing at a bench improves on it.", "legendary");
+                    continue;
+                }
                 var next = w.tier + 1 < Data.UpgradeCost.Count ? Data.UpgradeCost[w.tier + 1] : null;
                 var tiers = def.Strings("tiers");
                 string cost = next != null ? string.Join(", ", next.Select(kv => $"{kv.Value} {Data.ItemName(kv.Key).ToLowerInvariant()} ({p.bag.Count(kv.Key)})")) : "";

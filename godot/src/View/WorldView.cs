@@ -588,6 +588,7 @@ public partial class WorldView : Node2D
         c.Flash = 0;
         Gore.DrawPieces(c);
         Hollow.DrawWorld(c);
+        Legend.DrawWorld(c);
         foreach (var pr in G.projectiles) pr.Draw(c);
         foreach (var s in G.enemyShots) { c.StrokeStyle = "#a0b0b8"; c.LineWidth = 1.5f; c.Line(s.x, s.y, s.x - s.vx * 0.02f, s.y - s.vy * 0.02f); }
         foreach (var m in motes)

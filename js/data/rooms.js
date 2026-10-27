@@ -878,6 +878,10 @@ room({
     '3': { type: 'reliquary' },
     '4': { type: 'bench' },
   },
+  ents2: [
+    // Agathe's spare lamp lens, left here for Maren at the spring tide (Act III; Legend.cs)
+    { type: 'burningglass', tx: 14, ty: 16, id: 'burning_glass' },
+  ],
 });
 
 room({
@@ -982,6 +986,8 @@ room({
   ents2: [
     { type: 'driftnest', tx: 20, ty: 10, n: 8, always: true },
     { type: 'wrackpool', tx: 30, ty: 17 },
+    // the Saint's Ear: a hollow in the roof of the dome, where the Hollow was grown (Legend.cs)
+    { type: 'earsocket', tx: 16, ty: 8, id: 'saints_ear' },
   ],
 });
 

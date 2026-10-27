@@ -32,6 +32,7 @@ public class Player : Mover
     public string state = "normal";
     float coyote, jumpBuf;
     public float invulnT, dashT, dashCool, dashInv, dashVy;
+    float hazardT;   // a dash carries her clean over crystals and through fire, though not past the drowned
     bool airDashed, dashAir;
     float gaffCool, fireCool;
     public float reloadT, healT, craftT;
@@ -56,10 +57,14 @@ public class Player : Mover
     public Player() { w = 10; h = 22; stepUp = true; bag.Add("rivets", 12); bag.Add("poultice", 1); }
 
     public bool Has(string a) => abilities.Contains(a);
+    // She is the prey here. On the gentlest crossing (Pilgrim) she keeps the old margins: longer grace after a hit,
+    // a longer dodge.
+    static bool Gentle => G.difficulty == "pilgrim";
     public bool HasFitting(string f) => fittings.Contains(f);
     public bool Invuln() => invulnT > 0 || (dashT > 0 && dashInv > 0);
     public int WeaponTier(string wn) => weapons.TryGetValue(wn, out var ws) ? ws.tier : 0;
     public int MagSize(string wn) => wn == "driver" ? (HasFitting("feeder") ? 5 : 6) : Data.Weapons.P(wn).I("mag");
+    public static bool Legendary(string wn) => wn is "tine" or "glass";
     public float BreathMax()
     {
         if (grafts.Contains("lung")) return float.PositiveInfinity;
@@ -95,7 +100,7 @@ public class Player : Mover
         if (HasFitting("lead") && n >= 2) n -= 1;
         if (G.difficulty == "drowned" && n >= 1 && H.Rand() < 0.15f) n += 1;
         hp -= n;
-        invulnT = 0.9f;
+        invulnT = Gentle ? 0.9f : 0.6f;
         Snd.Hurt(); G.Shake(3); G.flash = 0.25f; G.HitStop(0.07f);
         Gore.Bleed(Cx(), Cy(), src?.Cx() ?? Cx() - facing);
         // A hit cancels the remainder of a poultice; interrupts a Stitch Kit.
@@ -106,7 +111,9 @@ public class Player : Mover
             bool fromBehind = H.Sign(src.Cx() - Cx()) == -facing;
             if (grafts.Contains("ear") && fromBehind) { staggerT = 1; H.ToastMsg("The salt on your neck cracks. You stagger.", 1.5f); }
             if (grafts.Contains("arm") && n >= 2) { gaffLooseT = 2; H.ToastMsg("The crusted wrist jolts. The gaff slips loose!", 1.5f); }
-            vx = H.Sign(Cx() - src.Cx()) * 120; if (!InWater()) vy = -150;
+            vx = H.Sign(Cx() - src.Cx()) * (n >= 2 ? 190 : 140); if (!InWater()) vy = -150;
+            // a heavy blow knocks the wind out of her
+            if (n >= 2 && !Gentle) staggerT = MathF.Max(staggerT, 0.3f);
         }
         G.AddSwell(0.5f);
         if (hp <= 0) { hp = 0; G.OnPlayerDeath(); }
@@ -116,7 +123,7 @@ public class Player : Mover
         if (grabbedBy != null || Invuln() || dead || state == "swing" || G.god) return false;
         grabbedBy = enemy; state = "grabbed";
         bool cracked = enemy.knots.Any(k => (k.type == "elbow" || k.type == "arm") && k.hp < k.max);
-        mash = cracked ? 3 : 6;
+        mash = Gentle ? (cracked ? 3 : 6) : (cracked ? 4 : 8);
         healT = 0; reloadT = 0; craftT = 0;
         if (dragging != null) StopDrag();
         H.ToastMsg("Grabbed! Mash {mash} to break free.", 2);
@@ -129,7 +136,7 @@ public class Player : Mover
     public void Update(float dt)
     {
         if (dead) return;
-        invulnT -= dt; dashCool -= dt; gaffCool -= dt; fireCool -= dt;
+        invulnT -= dt; dashCool -= dt; gaffCool -= dt; fireCool -= dt; hazardT -= dt;
         staggerT -= dt; gaffLooseT -= dt;
         if (lastRing != null) lastRing.t -= dt;
         var r = G.room;
@@ -223,7 +230,7 @@ public class Player : Mover
             if (healKind == "poultice")
             {
                 healTick -= dt;
-                if (healTick <= 0 && healLeft > 0) { healTick = 3f / healTotal; healLeft--; hp = Math.Min(maxHp, hp + 1); }
+                if (healTick <= 0 && healLeft > 0) { healTick = 4f / healTotal; healLeft--; hp = Math.Min(maxHp, hp + 1); }
             }
             else if (healKind == "stitch" && healT <= 0) { bag.Remove("stitchkit", 1); hp = maxHp; Snd.Heal(); H.ToastMsg("Stitched. Full health."); }
         }
@@ -235,13 +242,14 @@ public class Player : Mover
         if (Inp.Hit("shutter")) { shut = !shut; Snd.Ui(); Hints.Did("shutter"); H.ToastMsg(shut ? "Lantern shuttered. You are nearly invisible, and blind to weak points." : "Lantern open.", 2); }
         if (Inp.Hit("boots") && Has("boots")) { boots = !boots; Snd.Thud(); Hints.Did("boots"); H.ToastMsg(boots ? "Ballast Boots: on. You sink." : "Ballast Boots: off.", 1.5f); }
         for (int i = 1; i <= 4; i++) if (Inp.Hit("w" + i) && weaponOrder.Count >= i) { Hollow.Hold(false); SelectWeapon(weaponOrder[i - 1]); }
-        if (Inp.Hit("w5")) Hollow.Hold(true);
+        if (Inp.Hit("w5")) { if (Legend.merged) SelectWeapon("tine"); else Hollow.Hold(true); }
+        if (Inp.Hit("w6") && weaponOrder.Count >= 5) { Hollow.Hold(false); SelectWeapon(weaponOrder[4]); }
         int cycle = Inp.mouse.wheel + (Inp.Hit("wnext") ? 1 : 0) - (Inp.Hit("wprev") ? 1 : 0);
         if (cycle != 0)
         {
             // the Mere's Hollow sits after the weapons in the cycle
             var order = new List<string>(weaponOrder);
-            if (Hollow.owned) order.Add("hollow");
+            if (Hollow.owned && !Legend.merged) order.Add("hollow");
             int n = order.Count, i = Hollow.held ? n - 1 : order.IndexOf(cur);
             if (n > 1)
             {
@@ -256,7 +264,8 @@ public class Player : Mover
             if (Hollow.held) Hollow.Play(this, Inp.mouse.l || Inp.Held("fire") || Inp.Held("sing"), Inp.mouse.lp || Inp.Hit("fire") || Inp.Hit("sing"), dt);
             else
             {
-                if (Inp.mouse.l || Inp.Held("fire")) Fire();
+                if (cur == "glass") Legend.Beam(this, Inp.mouse.l || Inp.Held("fire"), Inp.mouse.lp || Inp.Hit("fire"), dt);
+                else if (Inp.mouse.l || Inp.Held("fire")) Fire();
                 if (Hollow.owned) Hollow.Play(this, Inp.Held("sing"), Inp.Hit("sing"), dt);
             }
             if (Inp.Hit("gaff")) GaffStrike();
@@ -343,6 +352,7 @@ public class Player : Mover
         float speed = sneak ? SNEAK : RUN;
         if (dragging != null) speed = 32;
         if (healT > 0 && healKind == "poultice") speed *= 0.4f;
+        if (Legend.beaming) speed = MathF.Min(speed, 55);
         if (boots && InWater()) speed = 85;
         if (Locked()) speed = 0;
         int dir = Dir();
@@ -592,8 +602,9 @@ public class Player : Mover
         Hints.Did(inAir || water ? "jet" : "dash");
         dashVy = dy * sp; dashAir = inAir || water;
         dashT = inAir || water ? 0.22f : 0.15f;
-        dashInv = 0.2f;
-        dashCool = 0.5f;
+        // the suit is heavy: a short window, and a long breath before the next
+        dashInv = Gentle ? 0.2f : 0.12f; hazardT = 0.3f;
+        dashCool = Gentle ? 0.5f : 0.75f;
         if (!inAir && !water) FX.Dust(Cx(), y + h, 6, -dx);
         Snd.Jump();
     }
@@ -661,7 +672,7 @@ public class Player : Mover
             if (d < 90 && MathF.Abs(H.AngleDiff(aim, a)) < 0.5f && Phys.Los(Cx(), Cy(), e.Cx(), e.Cy()))
             {
                 if (e is Gullet gl && gl.mode == "hang") gl.Drop(true);
-                else { e.vx = -MathF.Cos(a) * 220; e.vy = -140; e.stun = 1.0f; }
+                else { e.vx = -MathF.Cos(a) * 220; e.vy = -140; e.stun = 0.7f; }
                 Snd.Hook(); H.ToastMsg("Gaff pull!", 0.8f);
                 return;
             }
@@ -699,7 +710,7 @@ public class Player : Mover
     {
         if (gaffCool > 0) return;
         if (gaffLooseT > 0) { Snd.Deny(); return; }
-        gaffCool = 0.38f;
+        gaffCool = 0.48f;
         gaffAnim = 0.18f;
         Snd.Gaff();
         const float reach = 26;
@@ -735,7 +746,7 @@ public class Player : Mover
                 {
                     e.DamageFlesh(1 * fleshMul, hx, hy, "gaff");
                     // Gaff shove knocks light enemies back.
-                    if (e.type == "shucker" || e.type == "driftling" || e.type == "grafted") { e.vx = H.Sign(e.Cx() - Cx()) * 140; e.stun = MathF.Max(e.stun, 0.35f); }
+                    if (e.type == "shucker" || e.type == "driftling" || e.type == "grafted") { e.vx = H.Sign(e.Cx() - Cx()) * 120; e.stun = MathF.Max(e.stun, 0.25f); }
                     if (grafts.Contains("arm")) { var k = e.knots.Find(k => !k.broken); if (k != null) e.crust[k.id] = 3; e.stun = MathF.Max(e.stun, 1.5f); }
                     hitSomething = true; break;
                 }
@@ -754,6 +765,7 @@ public class Player : Mover
     public void SelectWeapon(string wn) { if (wn != null && weapons.ContainsKey(wn) && wn != cur) { cur = wn; reloadT = 0; Snd.Ui(); Hints.Did("weapon"); } }
     void StartReload()
     {
+        if (Legendary(cur)) return;
         var ws = weapons[cur]; var def = Data.Weapons.P(cur);
         if (reloadT > 0 || ws.mag >= MagSize(cur)) return;
         string ammo = def.S("ammo");
@@ -771,6 +783,13 @@ public class Player : Mover
     {
         if (fireCool > 0) return;
         var ws = weapons[cur]; var def = Data.Weapons.P(cur);
+        if (cur == "glass") return;   // the Glass burns while held (Legend.Beam)
+        if (cur == "tine")
+        {
+            fireCool = def.F("cooldown");
+            Legend.FireTine(this, new Vector2(Cx() + MathF.Cos(aim) * 8, y + 9 + MathF.Sin(aim) * 8));
+            return;
+        }
         if (ws.mag <= 0)
         {
             if (Inp.mouse.lp || Inp.Hit("fire")) { Snd.Empty(); StartReload(); }
@@ -877,9 +896,9 @@ public class Player : Mover
         if (bag.Count("poultice") <= 0) { H.ToastMsg("No poultices.", 1.5f); Snd.Deny(); return; }
         if (hp >= maxHp) { H.ToastMsg("You are not hurt.", 1); return; }
         bag.Remove("poultice", 1);
-        healKind = "poultice"; healT = 3;
+        healKind = "poultice"; healT = 4;
         healTotal = healLeft = 2 + (HasFitting("bilge") ? 1 : 0);
-        healTick = 3f / healTotal;
+        healTick = 4f / healTotal;
         Snd.Heal(); Hints.Did("poultice");
     }
     void UseStitch()
@@ -983,8 +1002,8 @@ public class Player : Mover
         }
         else pressureT = 0.5f;
         // salt crystals and fire
-        if (World.CharAt(H.FloorI(Cx() / TS), H.FloorI((y + h - 2) / TS)) == 'x') { Hurt(1); vy = -260; Hints.Cut(); }
-        if (Hollowmere.Fire.BurnsAt(Cx(), y + h - 4)) Hurt(1);
+        if (hazardT <= 0 && World.CharAt(H.FloorI(Cx() / TS), H.FloorI((y + h - 2) / TS)) == 'x') { Hurt(1); vy = -260; Hints.Cut(); }
+        if (hazardT <= 0 && Hollowmere.Fire.BurnsAt(Cx(), y + h - 4)) Hurt(1);
         // splash in/out
         bool inW = InWater();
         if (inW != wasIn)
@@ -1306,6 +1325,29 @@ public class Player : Mover
                 c.Fill = H.Col("#c8d0d4"); c.Poly(new[] { new Vector2(15, -1.4f), new Vector2(17.5f, 0), new Vector2(15, 1.4f) });
                 c.Fill = H.Col("#4a3626"); c.FillRect(0, 1, 1.6f, 2.4f);
                 break;
+            case "tine":
+            {
+                // the harpoon gun with the bone grown through it: ribbed and pale, the prod become a long curled tine
+                float g = Hollow.resonance >= Legend.TINE_COST ? 0.6f + 0.3f * MathF.Sin(G.Now * 3) : 0.15f;
+                c.Fill = H.Col("#4a3626"); c.FillRect(-3, -1, 5, 2.2f);
+                c.Fill = H.Col("#d8ccae"); c.FillRect(1, -1.6f, 9, 3);
+                c.Fill = H.Col("#8a7c5c"); for (int i = 0; i < 4; i++) c.FillRect(2 + i * 2.2f, -1.6f, 0.6f, 3);
+                c.Fill = H.Col("#efe6cf"); c.Poly(new[] { new Vector2(10, -1.4f), new Vector2(18, -0.6f), new Vector2(19.5f, 0.6f), new Vector2(10, 1.2f) });
+                c.Stroke = H.Col("#9a8a64"); c.LineWidth = 0.4f; c.BeginPath(); c.Arc(4.5f, 0, 1.2f, 0.3f, H.PI * 1.7f); c.StrokePath();
+                c.Glow(15, 0, 6, new Color(0.4f, 0.95f, 0.85f, 0.3f * g));
+                break;
+            }
+            case "glass":
+            {
+                // the lantern's brass hood with the lens screwed in, glowing as it heats
+                float hot = Legend.coolT > 0 ? 1 : Legend.heat / Legend.GLASS_HEAT;
+                c.Fill = H.Col("#6a5226"); c.FillRect(-1.5f, -2.2f, 6, 4.4f);
+                c.Fill = H.Col("#c09a50"); c.FillRect(-1.5f, -2.2f, 6, 0.8f);
+                c.Fill = H.Col("#8a6a2a"); c.Poly(new[] { new Vector2(4.5f, -2.2f), new Vector2(8, -3.2f), new Vector2(8, 3.2f), new Vector2(4.5f, 2.2f) });
+                c.Fill = new Color(1, 0.95f - hot * 0.5f, 0.8f - hot * 0.6f, 0.95f); c.FillRect(7.6f, -2.6f, 1.2f, 5.2f);
+                if (hot > 0.05f) c.Glow(8, 0, 4 + hot * 3, new Color(1.2f, 0.5f, 0.2f, 0.3f * hot));
+                break;
+            }
             case "sling":
                 c.Stroke = H.Col("#7a5a3a"); c.LineWidth = 1.3f;
                 c.Line(0, 0, 4, 0); c.Line(4, 0, 7, -2.6f); c.Line(4, 0, 7, 2.6f);
