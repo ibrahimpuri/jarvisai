@@ -30,6 +30,7 @@ public partial class WorldView : Node2D
     const int VW = H.VIEW_W, VH = H.VIEW_H;
 
     CanvasModulate modulate;
+    bool silhouettes = true;
     LightingManager lighting;
     DirectionalLight2D keyLight;
     ShaderMaterial fogBackMat, fogFrontMat;
@@ -126,9 +127,9 @@ public partial class WorldView : Node2D
         // a thin haze in front of the world, so a lamp carried through the hall glows in the air around it
         haze = Add(new DrawLayer { Paint = c => { c.Fill = Colors.White; c.FillRect(G.cam.X - 8, G.cam.Y - 8, VW + 16, VH + 16); }, Material = fogFrontMat });
         lighting.RegisterFog(fogFrontMat);
-        // HM_GFX_OFF=fog,haze hides the fog planes, to judge each one's part in a frame
+        // HM_GFX_OFF=fog,haze,rim hides the fog planes or the characters' ink and rim, to judge each one's part
         var off = (System.Environment.GetEnvironmentVariable("HM_GFX_OFF") ?? "").Split(',');
-        fogLayer.Visible = !off.Contains("fog"); haze.Visible = !off.Contains("haze");
+        fogLayer.Visible = !off.Contains("fog"); haze.Visible = !off.Contains("haze"); silhouettes = !off.Contains("rim");
         dyn = Add(new DrawLayer { Paint = c => { c.Encode = true; c.EncGain = 1.0f; PaintDynamic(c); }, Material = dynMat });
         var fxMat = new ShaderMaterial { Shader = entShader };
         fxShaded = Add(new DrawLayer { Paint = PaintFxShaded, Material = fxMat });
@@ -241,6 +242,9 @@ public partial class WorldView : Node2D
         if (!decorCache.TryGetValue(r.Id, out decor))
             decorCache[r.Id] = decor = Decor.Build(r, (lx, ly) => SolidAt(r, lx, ly), G.ents);
         ambient = new Color(AMBIENT, AMBIENT, AMBIENT);
+        // the room's surfaces: its back wall and its rock, each its own material (art/materials)
+        var (wallSurface, rockSurface) = Art.SurfacesFor(r);
+        Art.ApplySurface(backMat, wallSurface); Art.ApplySurface(solidMat, rockSurface);
         farArea = Strata.Area(r, FAR_F); midArea = Strata.Area(r, MID_F); nearArea = Strata.Area(r, NEAR_F); foreArea = Strata.Area(r, FORE_F);
         var room = new Rect2(r.Px, r.Py, r.Pw, r.Ph);
         foreach (var (vp, art, area, scale) in new[] { (backBake, backArt, room, BAKE), (solidBake, solidArt, room, BAKE), (farBake, farArt, farArea, 1.5f), (midBake, midArt, midArea, 1.5f), (nearBake, nearArt, nearArea, 1f), (foreBake, foreArt, foreArea, 1f) })
@@ -293,7 +297,7 @@ public partial class WorldView : Node2D
         UpdateLights(p);
         UpdatePost(p, dt);
         UpdatePalettes(dt);
-        lighting.Step(dt, G.room, tideW, lightningFlash);
+        lighting.Step(G.stepDt, G.room, tideW, lightningFlash);   // game time, so a test's fixed step and a real frame blend alike
         modulate.Color = lighting.Ambient;
         // depth of field on the planes, with any focus pull StoryFocus asks for
         farMat.SetShaderParameter("blur", lighting.FarBlur);
@@ -313,7 +317,8 @@ public partial class WorldView : Node2D
         var r = G.room;
         tideW = Palettes.TideW(dt);
         float lit = 1 / AMBIENT;
-        Palettes.Apply(farMat, r, tideW, 0.42f, 0.3f, 0.03f, 1, r.Outdoor ? 0 : 0.5f);
+        // a painted vista carries its own aerial perspective, so it takes less of the fog
+        Palettes.Apply(farMat, r, tideW, Strata.Vista(r) != null ? 0.2f : 0.42f, 0.3f, 0.03f, 1, r.Outdoor ? 0 : 0.5f);
         Palettes.Apply(midMat, r, tideW, 0.22f, 0.35f, 0.025f, 1, r.Outdoor ? 0 : 0.35f);
         Palettes.Apply(nearMat, r, tideW, 0.05f, 0.14f, 0.015f);
         Palettes.Apply(backMat, r, tideW, 0.12f, 0.25f, 0.015f, lit);
@@ -565,11 +570,20 @@ public partial class WorldView : Node2D
         if (G.room == null) return;
         foreach (var e in G.ents) if (!e.isBody) e.Draw(c);
         foreach (var s in G.sawlines) s.Draw(c);
-        foreach (var e in G.ents) if (e.isBody && !e.gone) { c.Flash = e is Body b && b.hitFlash > 0 ? MathF.Min(1, b.hitFlash / 0.08f) * 0.85f : 0; e.Draw(c); }
+        foreach (var e in G.ents)
+            if (e.isBody && !e.gone)
+            {
+                c.Flash = e is Body b && b.hitFlash > 0 ? MathF.Min(1, b.hitFlash / 0.08f) * 0.85f : 0;
+                var mark = c.Mark();
+                e.Draw(c);
+                if (silhouettes && OnScreen(e)) Silhouette(c, mark, e.Cx(), e.Cy());
+            }
         c.Flash = 0;
         Gore.DrawPieces(c);
         Hollow.DrawWorld(c);
+        var pm = c.Mark();
         G.player.Draw(c);
+        if (silhouettes && !G.player.dead) Silhouette(c, pm, G.player.Cx(), G.player.Cy());
         foreach (var pr in G.projectiles) pr.Draw(c);
         foreach (var s in G.enemyShots) { c.StrokeStyle = "#a0b0b8"; c.LineWidth = 1.5f; c.Line(s.x, s.y, s.x - s.vx * 0.02f, s.y - s.vy * 0.02f); }
         foreach (var m in motes)
@@ -584,6 +598,35 @@ public partial class WorldView : Node2D
             }
         }
     }
+
+    // Characters stand off the world the way they do in Hollow Knight: a crisp dark edge on the side away from the
+    // light, and a rim in the nearest light's colour along the side that faces it. Both are the character itself,
+    // drawn in one colour a fraction of a pixel to either side, behind the real drawing.
+    void Silhouette(Canvas c, (int, int, int) mark, float cx, float cy)
+    {
+        var (dir, col, k) = RimLight(cx, cy);
+        var ink = (new Vector2(-dir.X * 0.85f, -dir.Y * 0.85f + 0.25f), new Color(0.015f, 0.015f, 0.02f, 1));
+        if (k <= 0.12f) { c.EchoBehind(mark, new[] { ink }); return; }
+        float g = MathF.Min(1, 0.3f + k);
+        var rim = (dir * 0.75f, new Color(MathF.Min(1, col.R * g), MathF.Min(1, col.G * g), MathF.Min(1, col.B * g), 1));
+        c.EchoBehind(mark, new[] { ink, rim });
+    }
+    // the light a character's rim comes from: the strongest lamp near it, or the region's key light
+    (Vector2 dir, Color col, float k) RimLight(float x, float y)
+    {
+        LightSrc best = null; float bw = 0;
+        foreach (var l in lighting.Sources)
+        {
+            float d = H.Dist(x, y, l.x, l.y);
+            float w = l.i * Math.Clamp(1 - d / (l.r * 3 + 40), 0, 1);
+            if (w > bw && d > 2) { bw = w; best = l; }
+        }
+        var m = lighting.Cur;
+        if (best != null && bw > m.keyEnergy * 0.5f)
+            return (new Vector2(best.x - x, best.y - y).Normalized(), best.color == null ? new Color(1, 0.8f, 0.55f) : ParseRgb(best.color), Math.Clamp(bw * 1.1f, 0, 0.9f));
+        return (new Vector2(-MathF.Sin(m.keyAngle), -MathF.Cos(m.keyAngle)), m.key, m.keyEnergy * 0.9f);
+    }
+    static bool OnScreen(Ent e) => e.x + e.w > G.cam.X - 40 && e.x < G.cam.X + VW + 40 && e.y + e.h > G.cam.Y - 60 && e.y < G.cam.Y + VH + 40;
 
     // Water spans across the visible part of the room, filled with the water shader.
     void PaintWater(Canvas c)

@@ -961,8 +961,11 @@ public static class Scenarios
                 t.Place(d.room, (m.x - r.Px) / 16 - 3, (m.floor - r.Py) / 16 - 1);
                 foreach (var b in G.ents.OfType<Body>()) b.gone = true;
                 G.player.invulnT = 0; G.player.facing = 1;
+                // the Gullet's driftlings swarm a lit lamp: shutter it, and they leave her to look in peace
+                G.player.shut = d.id == "swallowed";
                 await t.Run(3.5f);
-                t.Ok($"lingering by the {d.id} brings the focus up", StoryFocus.Active?.id == d.id && StoryFocus.W > 0.5f, $"{StoryFocus.Active?.id} {StoryFocus.W:0.00}");
+                t.Ok($"lingering by the {d.id} brings the focus up", StoryFocus.Active?.id == d.id && StoryFocus.W > 0.5f,
+                    $"{StoryFocus.Active?.id} {StoryFocus.W:0.00} calm {StoryFocus.Calm:0.00} inv {G.player.invulnT:0.00} boss {G.bossBar?.type} hp {G.player.hp} near {G.ents.OfType<Body>().Where(b => !b.gone && b.Alive()).Select(b => H.Dist(b.Cx(), b.Cy(), G.player.Cx(), G.player.Cy())).DefaultIfEmpty(-1).Min():0} lit {G.player.LanternLit()} at {(G.player.Cx() - r.Px) / 16:0},{(G.player.Cy() - r.Py) / 16:0} mon {(m.x - r.Px) / 16:0},{(m.floor - r.Py) / 16:0}");
                 t.Snap("monument_" + d.id);
             }
         },

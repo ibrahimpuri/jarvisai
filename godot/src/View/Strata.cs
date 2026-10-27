@@ -44,6 +44,9 @@ public static class Strata
     public static void PaintFar(Canvas c, RoomDef r, Rect2 a)
     {
         if (r.Outdoor) return;
+        // a painted vista for the region, if there is one (art/vistas); the drawn architecture below otherwise
+        var vista = Vista(r);
+        if (vista != null) { PaintVista(c, r, a, vista); return; }
         var rng = new Random(Seed(r) + 1);
         float x0 = a.Position.X, y0 = a.Position.Y, w = a.Size.X, h = a.Size.Y;
         c.FillRectGradV(x0, y0, w, h, V(0.55f), V(0.28f));
@@ -62,6 +65,20 @@ public static class Strata
             case "bone": FarBone(c, r, a, rng); break;
             case "flesh": FarFlesh(c, a, rng); break;
         }
+    }
+
+    public static Texture2D Vista(RoomDef r) => r.Outdoor ? null : Art.Tex("vistas/" + r.Region);
+    // The vista covers the far plane; each room of the region looks at a different part of the same great space.
+    static void PaintVista(Canvas c, RoomDef r, Rect2 a, Texture2D t)
+    {
+        float tw = t.GetWidth(), th = t.GetHeight();
+        float s = MathF.Max(a.Size.X / tw, a.Size.Y / th);
+        float w = tw * s, h = th * s;
+        float ox = (w - a.Size.X) * (Math.Abs(Seed(r)) % 1000 / 1000f), oy = (h - a.Size.Y) * 0.5f;
+        bool enc = c.Encode; c.Encode = false;   // the vista is already in the palette encoding
+        c.Fill = Colors.White;
+        c.Texture(t, a.Position.X - ox, a.Position.Y - oy, w, h);
+        c.Encode = enc;
     }
 
     static void PointedArch(Canvas c, float xl, float xr, float spring, float apex, float thick, Color col)

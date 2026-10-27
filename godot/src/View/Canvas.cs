@@ -55,6 +55,7 @@ public class Canvas
     // sent with Flush: thousands of small shapes cost one call into the engine instead of thousands.
     public bool Batch;
     readonly List<Vector2> bv = new(); readonly List<Color> bc = new(); readonly List<int> bi = new();
+    int flushes;
     public void Flush()
     {
         if (bi.Count == 0) return;
@@ -62,6 +63,29 @@ public class Canvas
         RenderingServer.CanvasItemAddTriangleArray(rid, bi.ToArray(), bv.ToArray(), bc.ToArray());
         bv.Clear(); bc.Clear(); bi.Clear();
         transformDirty = true;
+        flushes++;
+    }
+    // Echoes: copies of what was just batched, put behind it, shifted and in one colour (each vertex keeps its alpha).
+    // A character's ink edge and rim cost two array copies this way instead of drawing it three times. Returns
+    // false if anything was sent in between, in which case nothing is echoed.
+    public (int v, int i, int f) Mark() => (bv.Count, bi.Count, flushes);
+    readonly List<Vector2> ev = new(); readonly List<Color> ec = new(); readonly List<int> ei = new();
+    public bool EchoBehind((int v, int i, int f) m, ReadOnlySpan<(Vector2 off, Color col)> echoes)
+    {
+        if (!Batch || m.f != flushes) return false;
+        int vn = bv.Count - m.v, n = bi.Count - m.i;
+        if (vn <= 0 || n <= 0) return true;
+        ev.Clear(); ec.Clear(); ei.Clear();
+        foreach (var (off, col) in echoes)
+        {
+            int b = m.v + ev.Count;
+            for (int k = 0; k < vn; k++) { ev.Add(bv[m.v + k] + off); ec.Add(new Color(col.R, col.G, col.B, bc[m.v + k].A * col.A)); }
+            for (int k = 0; k < n; k++) ei.Add(bi[m.i + k] - m.v + b);
+        }
+        int shift = ev.Count;
+        for (int k = m.i; k < bi.Count; k++) bi[k] += shift;
+        bv.InsertRange(m.v, ev); bc.InsertRange(m.v, ec); bi.InsertRange(m.i, ei);
+        return true;
     }
     void AddTris(IReadOnlyList<Vector2> pts, int[] idx, Color col)
     {

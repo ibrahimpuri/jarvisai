@@ -74,6 +74,7 @@ public partial class Main : Node2D
         Inp.Poll(GetViewport(), dt);
         Pad.UpdateGyro(dt);
         tester?.BeforeStep();
+        G.stepDt = dt;
         try { G.Step(dt); }
         catch (Exception e) { GD.PushError(e.ToString()); if (tester != null) tester.Errors.Add(e.ToString()); }
         Inp.EndFrame();

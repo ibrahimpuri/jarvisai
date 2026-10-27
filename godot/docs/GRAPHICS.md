@@ -34,8 +34,11 @@ each rendering its own sorting layers, with a render texture in between for blur
  layer  plane                     parallax   what is on it                                      lit by
  -----  ------------------------  --------   -------------------------------------------------  -----------------------------
   -10   sky                        screen    night sky, moon, clouds, sea (Backdrop.cs)          nothing (painted light)
-   -8   far depth                  0.30      the region's vista: arcades, rose window, gears,    region palette + fog,
-                                             ribs, the Gullet's throat (Strata.PaintFar)         depth-of-field blur
+   -8   far depth                  0.30      the region's painted vista (art/vistas): the        region palette + fog,
+                                             drowned chapel, the rose window over the flooded    depth-of-field blur
+                                             Choir, the ribcage, the Gullet's throat; or the
+                                             drawn architecture where there is none
+                                             (Strata.PaintFar)
    -7   mid depth                  0.62      columns, gantries, crags (Strata.PaintMid)          palette + fog, slight blur
    -6   back fog                   0.75      drifting fog, lit from inside by every lamp,        radiance buffer (scatter),
                                              light shafts at the key light's angle, dust motes    key light colour
@@ -78,8 +81,10 @@ The planes are kept apart by what reaches them, not only by draw order:
    vault), so the openings read as deep space lit from below rather than flat paper. The near plane is the
    opposite: almost black, almost no fog, so it reads as something close and dark in front of something pale and
    far, which is where a Hollow Knight room gets its depth. The gameplay plane keeps full contrast.
-   Characters are drawn in their own colours with one bright note (Maren's helmet, a body's knots), so they read
-   against any background.
+   Characters are drawn in their own colours with one bright note (Maren's helmet, a body's knots), and each
+   gets a crisp ink edge on the side away from the light and a rim in the nearest lamp's colour on the side that
+   faces it (copies of its own triangles, shifted a fraction of a pixel, behind it in the same batch), so they
+   stand off any background the way Hollow Knight's figures do.
 3. **Focus.** Far and mid are blurred (a rotated 12-tap Poisson disc in `palette.gdshader`); the gameplay plane is
    always sharp; the foreground is blurred hardest. StoryFocus can pull the background further out of focus.
 4. **Atmosphere between them.** The back fog plane hangs between the depths and the play, so the vista always sits
@@ -165,7 +170,7 @@ Every frame the nearest thing in reach is weighed by distance and by how still M
 is not looking at it). The focus `W` rises at 0.9 per second and falls at 2.2 per second; when the subject
 changes, the old one fades out before the new one rises, so the frame never jumps from one thing to another.
 
-**Combat safety.** Anything hostile within 260 px, a recent hit or a boss in the room drops `Calm` to 0 at 5 per
+**Combat safety.** Anything hostile within 260 px (40 px for the driftlings that always swim the Gullet; a lit lamp draws them in, so shutter it to look in peace), a recent hit or a boss in the room drops `Calm` to 0 at 5 per
 second, and with it the whole focus: the camera never drifts toward a statue while something is coming for her.
 Peace brings it back over a couple of seconds.
 
@@ -213,12 +218,20 @@ stretch of floor to a hint, so the art and the focus always agree.
   faint storm line far higher, from the night the light went out.
 - **Relief**: the value channel doubles as a height map, so every painted brick takes light from the side the lamp
   is on.
+- **Materials** (`art/materials`, `Art.cs`): each room's back wall and rock carry a tiling surface material, a
+  detail map (grain, where the accent grows, cavities) and a normal map, sampled in world space by
+  `world.gdshader`: limestone ashlar and bedrock in the abbey, fired brick and salt-rotted rock in the Saltworks,
+  the Saint's bone, the Gullet's flesh, sea-worn basalt on the shore. The grain moves the drawing's value, the
+  moss or salt shows in the region's accent, and the normal adds to the relief, so a lamp rakes across the stone
+  itself, not only across the shapes drawn on it. See [ART.md](ART.md) for how art is added.
 
 ---
 
 ## 5. Tools
 
-- `HM_GFX_OFF=fog,haze` hides the back fog or the front haze, to judge each one's part in a frame.
+- `HM_GFX_OFF=fog,haze,rim` hides the back fog, the front haze or the characters' ink and rim, to judge each one's
+  part in a frame; `HM_ART=off` draws everything from code alone, without the made art.
+- `tools/paint_materials.py` and `tools/paint_vistas.py [--preview dir]` repaint the materials and vistas.
 - `--test storyfocus`: every monument is placed; lingering by the Abbot brings up each cue; walking away and a
   hostile arriving let it go; crossing regions blends the light.
 - `--test monuments --out dir`: a screenshot tour with Maren beside each monument.

@@ -42,6 +42,8 @@ public static class StoryFocus
     public static bool Enabled = true;
 
     const float DANGER_R = 260;
+    // the driftlings are always somewhere in the Gullet's water; only one actually on her counts
+    static float DangerR(Body b) => b.type == "driftling" ? 40 : DANGER_R;
     static bool Hostile(Body b) => b.Alive() && !b.corpse && !b.passive && b.mode != "dormant" && b.knots.Any(k => !k.broken);
 
     static int entCount;
@@ -81,7 +83,7 @@ public static class StoryFocus
 
         // a fight lets everything go, quickly; peace brings it back slowly
         bool danger = pl.dead || G.bossBar != null || pl.invulnT > 0
-            || G.ents.OfType<Body>().Any(b => !b.gone && Hostile(b) && H.Dist(b.Cx(), b.Cy(), px, py) < DANGER_R);
+            || G.ents.OfType<Body>().Any(b => !b.gone && Hostile(b) && H.Dist(b.Cx(), b.Cy(), px, py) < DangerR(b));
         Calm = Approach(Calm, danger ? 0 : 1, dt * (danger ? 5f : 0.6f));
 
         // the nearest thing worth looking at, by how near she is and how much it matters

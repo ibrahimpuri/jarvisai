@@ -224,7 +224,7 @@ public partial class LightingManager : Node
             post.SetShaderParameter("lift", m.lift); post.SetShaderParameter("gamma", m.gamma); post.SetShaderParameter("gain", m.gain);
             post.SetShaderParameter("shadow_tint", m.shadowTint); post.SetShaderParameter("high_tint", m.highTint);
             post.SetShaderParameter("focus_vignette", FocusVignette);
-            post.SetShaderParameter("bloom", m.bloom * (r.Outdoor && lightning > 0 ? 1 + lightning : 1));
+            post.SetShaderParameter("bloom", Settings.Bloom ? m.bloom * (r.Outdoor && lightning > 0 ? 1 + lightning : 1) : 0);
             post.SetShaderParameter("lean", G.leanZoom); post.SetShaderParameter("lean_focal", G.leanFocal / new Vector2(H.VIEW_W, H.VIEW_H));
         }
         if (KeyLight != null)

@@ -42,7 +42,7 @@ public static class Monuments
         new() { id = "roper", room = "nave", kind = "roper", hint = 14, w = 3, h = 7, tint = new Color(0.9f, 0.96f, 1.12f) },
         new() { id = "bell", room = "choir", kind = "bell", hint = 30, w = 5, h = 4, tint = new Color(1.16f, 1.04f, 0.82f) },
         new() { id = "mitten", room = "ribshaft", kind = "mitten", hint = 24, hintY = 26, w = 3, h = 8, tint = new Color(1.14f, 0.96f, 0.92f) },
-        new() { id = "swallowed", room = "gulletmouth", kind = "swallowed", hint = 26, w = 6, h = 5, tint = new Color(0.86f, 1.1f, 1.06f) },
+        new() { id = "swallowed", room = "gulletmouth", kind = "swallowed", hint = 18, hintY = 14, w = 6, h = 5, tint = new Color(0.86f, 1.1f, 1.06f) },
         new() { id = "lens", room = "lamp", kind = "lens", hint = 24, w = 4, h = 5, tint = new Color(1.1f, 1.06f, 0.96f) },
     };
 

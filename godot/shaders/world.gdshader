@@ -45,6 +45,18 @@ uniform float shininess = 28.0;
 uniform float spec_amt = 0.6;
 uniform float rim_amt = 0.35;
 
+// ---- the surface's own material (art/materials, set per region by Art.cs) ----
+// A tiling map of the stone's grain (red, around 0.5), where the accent grows on it (green) and its crevices (blue),
+// and its normal map: what turns a flat painted wall into stone that a lamp rakes across.
+uniform sampler2D mat_detail : filter_linear_mipmap, repeat_enable, hint_default_white;
+uniform sampler2D mat_normal : filter_linear_mipmap, repeat_enable, hint_normal;
+uniform float mat_amt = 0.0;            // 0: no material
+uniform float mat_scale = 256.0;        // world px per tile
+uniform float mat_grain = 0.5;
+uniform float mat_bump = 1.0;
+uniform float mat_accent = 0.4;
+uniform float mat_cavity = 0.5;
+
 varying vec2 wp;
 varying vec3 alb;
 varying float wet;
@@ -91,6 +103,19 @@ void fragment() {
 		n = normalize(vec3((hl - hr) * relief, (hu - hd) * relief, 1.0));
 		// a crevice is lower than what surrounds it, and holds the dark
 		cavity = clamp(((hl + hr + hu + hd) * 0.25 - hc) * 6.0, 0.0, 1.0);
+	}
+
+	// the surface's own material: its grain in the value, its moss or salt in the accent, its pits in the dark,
+	// and its normal on top of the drawing's relief
+	if (mat_amt > 0.0) {
+		vec2 muv = wp / mat_scale;
+		vec3 md = texture(mat_detail, muv).rgb;
+		vec3 mn = texture(mat_normal, muv).xyz * 2.0 - 1.0;
+		float g = (md.r - 0.5) * 2.0;
+		v = clamp(v * (1.0 + g * mat_grain * mat_amt) + g * 0.015 * mat_amt, 0.0, 1.0);
+		acc = clamp(acc + md.g * mat_accent * mat_amt * (1.0 - acc), 0.0, 1.0);
+		cavity = clamp(cavity + md.b * mat_cavity * mat_amt, 0.0, 1.0);
+		n = normalize(vec3(n.xy + mn.xy * mat_bump * mat_amt, n.z));
 	}
 
 	// the region's palette

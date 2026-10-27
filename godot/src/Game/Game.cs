@@ -63,6 +63,7 @@ public static class G
     public static NarrState narr;
     public static float? titheFlood;
     public static float breachT, glimpseT, frameDt = 1 / 60f;
+    public static float stepDt = 1 / 60f;   // this frame's step, set by Main whatever the mode (the view's blends run on it)
     public static bool gusting;
     public static float Now;                       // seconds since start (real time)
     public static float shakeX, shakeY;            // this frame's camera shake offset
