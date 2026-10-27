@@ -35,14 +35,15 @@ public static class UI
 
 public partial class UiRoot : CanvasLayer
 {
-    static readonly Color TEXT = H.Col("#e6dcc0"), MUTED = H.Col("#9a8f78"), GOLD = H.Col("#d2aa5a"), WARM = H.Col("#ffd27a"), BAD = H.Col("#d07a6a"), GOOD = H.Col("#8fbf8f");
+    static readonly Color TEXT = H.Col("#e6dcc0"), MUTED = H.Col("#9a8f78"), GOLD = H.Col("#d9b36a"), WARM = H.Col("#ffd27a"), BAD = H.Col("#d07a6a"), GOOD = H.Col("#8fd0a8"), INK = H.Col("#2a1c10"), INK_SOFT = H.Col("#5a4630");
+    public static bool Instant;          // tests: text appears at once, no typewriter
     Control root;
-    ColorRect dim;
+    MenuBackdrop dim;
     public bool Open;
     public string kind = "";
     Theme theme;
     // dialogue state
-    List<string> dlgLines; int dlgI; string dlgWho; Action dlgDone;
+    List<string> dlgLines; int dlgI; string dlgWho; Action dlgDone; Label dlgLabel; float dlgShown;
     // cinematic state
     public class Cine { public List<string> lines; public int i = -1; public Action done; public string first; public double timer; public Label label; public float fade; }
     public Cine cine;
@@ -63,120 +64,144 @@ public partial class UiRoot : CanvasLayer
     }
 
     // ---- theme ----------------------------------------------------------------------------------
-    static StyleBoxFlat Box(Color bg, Color border, int bw = 1, float pad = 6)
-    {
-        var s = new StyleBoxFlat { BgColor = bg, BorderColor = border };
-        s.SetBorderWidthAll(bw);
-        s.ContentMarginLeft = s.ContentMarginRight = pad; s.ContentMarginTop = s.ContentMarginBottom = pad * 0.6f;
-        return s;
-    }
-    static StyleBoxFlat Tab(StyleBoxFlat b) { b.BorderWidthLeft = 3; return b; }
-    // Menu panels share the HUD's look: a dark plate, a double gold rule, brackets at the corners.
-    static void Ornate(PanelContainer pc)
-    {
-        var empty = new StyleBoxEmpty { ContentMarginLeft = 11, ContentMarginRight = 11, ContentMarginTop = 9, ContentMarginBottom = 9 };
-        pc.AddThemeStyleboxOverride("panel", empty);
-        var cv = new Canvas();
-        pc.Draw += () =>
-        {
-            var c = cv.Begin(pc); var sz = pc.Size;
-            c.Fill = new Color(0, 0, 0, 0.45f); c.FillRect(3, 4, sz.X, sz.Y);
-            c.FillRectGradV(0, 0, sz.X, sz.Y, new Color(0.085f, 0.075f, 0.06f, 0.97f), new Color(0.04f, 0.035f, 0.03f, 0.97f));
-            c.Glow(sz.X / 2, 0, sz.X * 0.6f, 40, new Color(1, 0.8f, 0.45f, 0.05f));
-            var g = new Color(GOLD.R, GOLD.G, GOLD.B, 0.75f); var gd = new Color(GOLD.R, GOLD.G, GOLD.B, 0.3f);
-            c.Fill = gd; c.FillRect(0, 0, sz.X, 0.8f); c.FillRect(0, sz.Y - 0.8f, sz.X, 0.8f); c.FillRect(0, 0, 0.8f, sz.Y); c.FillRect(sz.X - 0.8f, 0, 0.8f, sz.Y);
-            c.Fill = new Color(GOLD.R, GOLD.G, GOLD.B, 0.18f); c.FillRect(3, 3, sz.X - 6, 0.5f); c.FillRect(3, sz.Y - 3.5f, sz.X - 6, 0.5f); c.FillRect(3, 3, 0.5f, sz.Y - 6); c.FillRect(sz.X - 3.5f, 3, 0.5f, sz.Y - 6);
-            c.Fill = g;
-            foreach (var (cx, cy, dx, dy) in new[] { (0f, 0f, 1, 1), (sz.X, 0f, -1, 1), (0f, sz.Y, 1, -1), (sz.X, sz.Y, -1, -1) })
-            {
-                c.FillRect(dx > 0 ? cx : cx - 9, dy > 0 ? cy : cy - 1.2f, 9, 1.2f);
-                c.FillRect(dx > 0 ? cx : cx - 1.2f, dy > 0 ? cy : cy - 9, 1.2f, 9);
-                c.Save(); c.Translate(cx + dx * 4.5f, cy + dy * 4.5f); c.Rotate(H.PI / 4); c.FillRect(-1.2f, -1.2f, 2.4f, 2.4f); c.Restore();
-            }
-            c.Save(); c.Translate(sz.X / 2, 0.4f); c.Rotate(H.PI / 4); c.FillRect(-2.2f, -2.2f, 4.4f, 4.4f); c.Restore();
-        };
-    }
+    // Every surface is painted (MenuArt): the theme only gives the words their colours and the controls their room.
+    static StyleBoxEmpty Room(float l, float t, float r, float b) => new() { ContentMarginLeft = l, ContentMarginTop = t, ContentMarginRight = r, ContentMarginBottom = b };
     Theme BuildTheme()
     {
         var t = new Theme { DefaultFont = Canvas.GetFont(false, false, false), DefaultFontSize = 7 };
-        var panel = Box(new Color(18 / 255f, 16 / 255f, 13 / 255f, 0.95f), H.Col("#5a4c36"), 1, 9);
-        panel.ShadowColor = new Color(0, 0, 0, 0.6f); panel.ShadowSize = 8;
-        t.SetStylebox("panel", "PanelContainer", panel);
-        t.SetStylebox("normal", "Button", Box(new Color(0.11f, 0.095f, 0.075f, 0.9f), H.Col("#4a3e2c"), 1, 5));
-        t.SetStylebox("hover", "Button", Tab(Box(H.Col("#2e2619"), GOLD, 1, 5)));
-        t.SetStylebox("pressed", "Button", Tab(Box(H.Col("#3d3020"), GOLD, 1, 5)));
-        t.SetStylebox("focus", "Button", Tab(Box(new Color(1, 0.85f, 0.5f, 0.05f), WARM, 1, 5)));
-        t.SetStylebox("disabled", "Button", Box(new Color(36 / 255f, 31 / 255f, 24 / 255f, 0.4f), new Color(90 / 255f, 76 / 255f, 54 / 255f, 0.4f), 1, 5));
+        t.SetStylebox("panel", "PanelContainer", Room(11, 9, 11, 9));
+        foreach (var st in new[] { "normal", "hover", "pressed", "focus", "disabled", "hover_pressed" }) t.SetStylebox(st, "Button", Room(11, 2.5f, 7, 2.5f));
         t.SetColor("font_color", "Button", TEXT);
         t.SetColor("font_hover_color", "Button", H.Col("#fff3d0"));
-        t.SetColor("font_focus_color", "Button", H.Col("#fff3d0"));
-        t.SetColor("font_pressed_color", "Button", H.Col("#fff3d0"));
-        t.SetColor("font_disabled_color", "Button", new Color(TEXT, 0.4f));
-        t.SetFontSize("font_size", "Button", 6);
+        t.SetColor("font_focus_color", "Button", H.Col("#fff6dc"));
+        t.SetColor("font_pressed_color", "Button", H.Col("#fff6dc"));
+        t.SetColor("font_hover_pressed_color", "Button", H.Col("#fff6dc"));
+        t.SetColor("font_disabled_color", "Button", new Color(TEXT, 0.35f));
+        t.SetFontSize("font_size", "Button", 7);
         t.SetColor("font_color", "Label", TEXT);
         t.SetConstant("separation", "VBoxContainer", 3);
         t.SetConstant("separation", "HBoxContainer", 4);
-        var sb = new StyleBoxFlat { BgColor = new Color(0.35f, 0.3f, 0.21f, 0.8f) };
+        var sb = new StyleBoxFlat { BgColor = new Color(MenuArt.BRASS.R, MenuArt.BRASS.G, MenuArt.BRASS.B, 0.6f) };
         t.SetStylebox("grabber", "VScrollBar", sb);
         t.SetStylebox("grabber_highlight", "VScrollBar", sb);
-        t.SetStylebox("scroll", "VScrollBar", new StyleBoxFlat { BgColor = new Color(0, 0, 0, 0.2f) });
+        t.SetStylebox("grabber_pressed", "VScrollBar", sb);
+        t.SetStylebox("scroll", "VScrollBar", new StyleBoxFlat { BgColor = new Color(0, 0, 0, 0.3f), ContentMarginLeft = 2, ContentMarginRight = 2 });
         return t;
     }
+    static int SeedOf(string s) { int h = 17; foreach (var ch in s ?? "") h = h * 31 + ch; return Math.Abs(h % 9973); }
 
     // ---- building blocks ---------------------------------------------------------------------------
     void Show(string k, bool clear = false)
     {
         foreach (var c in root.GetChildren()) { root.RemoveChild(c); c.QueueFree(); }
-        kind = k; Open = true; root.Visible = true; backAction = null;
-        dim = new ColorRect { Color = clear ? new Color(0, 0, 0, 0) : new Color(0, 0, 0, 0.45f), MouseFilter = clear ? Control.MouseFilterEnum.Ignore : Control.MouseFilterEnum.Stop };
+        kind = k; Open = true; root.Visible = true; backAction = null; dlgLabel = null;
+        dim = new MenuBackdrop { Dim = clear ? 0 : 0.6f, Kelp = !clear, Shafts = !clear, MouseFilter = clear ? Control.MouseFilterEnum.Ignore : Control.MouseFilterEnum.Stop };
         dim.SetAnchorsPreset(Control.LayoutPreset.FullRect);
         root.MouseFilter = clear ? Control.MouseFilterEnum.Ignore : Control.MouseFilterEnum.Stop;
         root.AddChild(dim);
         Inp.Clear();
         Input.MouseMode = Input.MouseModeEnum.Visible;
     }
+    // A panel framed in one of the island's materials, the sea's growth over its edges.
+    static void Ornate(PanelContainer pc, MenuArt.Look look = MenuArt.Look.Slate, int seed = 7, float growth = 1)
+    {
+        pc.AddThemeStyleboxOverride("panel", Room(13, 11, 13, 11));
+        var cv = new Canvas();
+        pc.Draw += () => { var c = cv.Begin(pc); MenuArt.Frame(c, pc.Size.X, pc.Size.Y, look, seed); };
+        if (growth > 0) Callable.From(() => { if (GodotObject.IsInstanceValid(pc)) pc.AddChild(new FrameGrowth { Seed = seed, Amount = growth, Drips = look != MenuArt.Look.Parchment }); }).CallDeferred();
+    }
     // A centred panel; returns its content column.
-    VBoxContainer Panel(float width, float maxHeight = 340)
+    VBoxContainer Panel(float width, float maxHeight = 340, MenuArt.Look look = MenuArt.Look.Slate, float growth = 1)
     {
         var center = new CenterContainer();
         center.SetAnchorsPreset(Control.LayoutPreset.FullRect);
         root.AddChild(center);
         var pc = new PanelContainer { CustomMinimumSize = new Vector2(width, 0) };
-        Ornate(pc);
+        Ornate(pc, look, SeedOf(kind) + (int)width, growth);
         center.AddChild(pc);
-        var scroll = new ScrollContainer { HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled, CustomMinimumSize = new Vector2(width - 18, 0), FollowFocus = true };
+        var scroll = new ScrollContainer { HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled, CustomMinimumSize = new Vector2(width - 26, 0), FollowFocus = true };
         pc.AddChild(scroll);
         var col = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
         scroll.AddChild(col);
         // size the scroll area to content, up to the max height
-        col.Resized += () => scroll.CustomMinimumSize = new Vector2(width - 18, MathF.Min(col.Size.Y, maxHeight - 20));
+        col.Resized += () => scroll.CustomMinimumSize = new Vector2(width - 26, MathF.Min(col.Size.Y, maxHeight - 24));
         return col;
     }
-    static Label Lbl(Control parent, string text, int size = 7, Color? color = null, bool italic = false, bool center = false, bool bold = false)
+    static Label Lbl(Control parent, string text, int size = 7, Color? color = null, bool italic = false, bool center = false, bool bold = false, bool caps = false)
     {
         var l = new Label { Text = text, AutowrapMode = TextServer.AutowrapMode.WordSmart, HorizontalAlignment = center ? HorizontalAlignment.Center : HorizontalAlignment.Left };
         l.AddThemeFontSizeOverride("font_size", size);
-        if (italic || bold) l.AddThemeFontOverride("font", Canvas.GetFont(false, italic, bold));
+        if (italic || bold || caps) l.AddThemeFontOverride("font", Canvas.GetFont(false, italic, bold, caps));
         l.AddThemeColorOverride("font_color", color ?? TEXT);
         l.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
         parent.AddChild(l);
         return l;
     }
     static Label H1(Control p, string t) { var l = Lbl(p, t, 14, GOLD, center: true); return l; }
-    static Label H2(Control p, string t) => Lbl(p, t, 9, GOLD);
-    static Label H3(Control p, string t) => Lbl(p, t, 6, WARM);
+    static Label H2(Control p, string t) { var l = Lbl(p, t, 10, GOLD); l.AddThemeColorOverride("font_shadow_color", new Color(0, 0, 0, 0.8f)); l.AddThemeConstantOverride("shadow_offset_y", 1); return l; }
+    static Label H3(Control p, string t) => Lbl(p, t, 6, WARM, caps: true);
     static Label Small(Control p, string t, bool muted = true) => Lbl(p, t, 5, muted ? MUTED : TEXT);
-    Button Btn(Control parent, string text, Action onPress, bool primary = false, bool selected = false, bool disabled = false)
+    // A rule with a diamond, between sections.
+    static void Rule(Control p, float w = 0)
+    {
+        p.AddChild(new Painted((c, sz, t) =>
+        {
+            float cx = sz.X / 2, y = sz.Y / 2, half = (w > 0 ? w : sz.X) / 2 - 4;
+            var g = new Color(MenuArt.BRASS.R, MenuArt.BRASS.G, MenuArt.BRASS.B, 0.55f);
+            c.FillRectGradH(cx - half, y, half - 5, 0.7f, new Color(g.R, g.G, g.B, 0), g);
+            c.FillRectGradH(cx + 5, y, half - 5, 0.7f, g, new Color(g.R, g.G, g.B, 0));
+            c.Save(); c.Translate(cx, y + 0.3f); c.Rotate(H.PI / 4); c.Fill = g; c.FillRect(-1.8f, -1.8f, 3.6f, 3.6f); c.Restore();
+        }, new Vector2(0, 7)) { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill });
+    }
+    Button Btn(Control parent, string text, Action onPress, bool primary = false, bool selected = false, bool disabled = false, MenuArt.Btn? style = null)
     {
         var b = new Button { Text = text, Disabled = disabled, FocusMode = Control.FocusModeEnum.All, ClipText = false };
         // Buttons in a full-width column wrap long labels; buttons in a row size to their text.
-        if (parent is VBoxContainer) { b.AutowrapMode = TextServer.AutowrapMode.WordSmart; b.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; }
+        bool column = parent is VBoxContainer;
+        if (column) { b.AutowrapMode = TextServer.AutowrapMode.WordSmart; b.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; b.Alignment = HorizontalAlignment.Left; }
         else b.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
-        if (primary || selected) b.AddThemeStyleboxOverride("normal", Box(selected ? H.Col("#33291c") : H.Col("#241f18"), GOLD, 1, 5));
-        if (selected) b.AddThemeColorOverride("font_color", H.Col("#fff3d0"));
+        var st = style ?? (primary ? MenuArt.Btn.Primary : column ? MenuArt.Btn.List : MenuArt.Btn.Chip);
+        Dress(b, st, selected);
         b.Pressed += () => { Snd.Ui(); onPress(); };
         parent.AddChild(b);
         return b;
+    }
+    // Give a button its look and the right colours for the surface it is drawn on.
+    static ButtonArt Dress(Button b, MenuArt.Btn st, bool on = false)
+    {
+        var art = new ButtonArt { Style = st, On = on, Seed = SeedOf(b.Text) };
+        b.AddChild(art);
+        switch (st)
+        {
+            case MenuArt.Btn.Primary:
+                b.Alignment = HorizontalAlignment.Center;
+                b.AddThemeFontOverride("font", Canvas.GetFont(false, false, false, true));
+                b.AddThemeFontSizeOverride("font_size", 8);
+                foreach (var k in new[] { "font_color", "font_hover_color", "font_focus_color", "font_pressed_color", "font_hover_pressed_color" }) b.AddThemeColorOverride(k, H.Col("#1a0e04"));
+                b.AddThemeColorOverride("font_disabled_color", new Color(0.1f, 0.06f, 0.02f, 0.5f));
+                foreach (var s0 in new[] { "normal", "hover", "pressed", "focus", "disabled", "hover_pressed" }) b.AddThemeStyleboxOverride(s0, Room(14, 3.5f, 14, 3.5f));
+                break;
+            case MenuArt.Btn.Chip:
+                if (on) foreach (var k in new[] { "font_color", "font_hover_color", "font_focus_color", "font_pressed_color", "font_hover_pressed_color" }) b.AddThemeColorOverride(k, H.Col("#140a02"));
+                foreach (var s0 in new[] { "normal", "hover", "pressed", "focus", "disabled", "hover_pressed" }) b.AddThemeStyleboxOverride(s0, Room(6, 2, 6, 2));
+                b.AddThemeFontSizeOverride("font_size", 6);
+                break;
+            case MenuArt.Btn.Tab:
+                b.AddThemeFontOverride("font", Canvas.GetFont(false, false, false, true));
+                b.AddThemeFontSizeOverride("font_size", 7);
+                foreach (var s0 in new[] { "normal", "hover", "pressed", "focus", "disabled", "hover_pressed" }) b.AddThemeStyleboxOverride(s0, Room(9, on ? 5 : 3, 9, on ? 7 : 5));
+                if (!on) b.AddThemeColorOverride("font_color", H.Col("#c0a888"));
+                break;
+            case MenuArt.Btn.Danger:
+                b.AddThemeColorOverride("font_color", H.Col("#d8a090")); b.AddThemeColorOverride("font_focus_color", H.Col("#ffc8b8")); b.AddThemeColorOverride("font_hover_color", H.Col("#ffc8b8"));
+                break;
+            case MenuArt.Btn.Title:
+                b.AddThemeFontSizeOverride("font_size", 9);
+                b.AddThemeColorOverride("font_color", H.Col("#cdbf9f"));
+                foreach (var s0 in new[] { "normal", "hover", "pressed", "focus", "disabled", "hover_pressed" }) b.AddThemeStyleboxOverride(s0, Room(16, 3, 14, 3));
+                break;
+        }
+        return art;
     }
     static HBoxContainer Row(Control parent, bool center = false)
     {
@@ -190,25 +215,15 @@ public partial class UiRoot : CanvasLayer
         parent.AddChild(v);
         return v;
     }
-    // A listing row: name + description on the left, controls on the right.
-    HBoxContainer ItemRow(Control parent, string name, string desc = null, string mutedSuffix = null)
-    {
-        var h = new HBoxContainer();
-        parent.AddChild(h);
-        var left = Col(h);
-        var l = Lbl(left, name + (mutedSuffix != null ? "  " + mutedSuffix : ""), 6);
-        if (desc != null) Lbl(left, desc, 5, MUTED);
-        parent.AddChild(new HSeparator { Modulate = new Color(1, 1, 1, 0.25f) });
-        return h;
-    }
     void FocusFirst()
     {
         Callable.From(() =>
         {
-            var b = FindButtons(root).FirstOrDefault(x => !x.Disabled);
+            var b = FindButtons(root).FirstOrDefault(x => !x.Disabled && x.IsVisibleInTree());
             b?.GrabFocus();
         }).CallDeferred();
     }
+    void FocusOn(Button b) => Callable.From(() => { if (GodotObject.IsInstanceValid(b) && b.IsInsideTree()) b.GrabFocus(); }).CallDeferred();
     static IEnumerable<Button> FindButtons(Node n)
     {
         foreach (var c in n.GetChildren())
@@ -234,7 +249,7 @@ public partial class UiRoot : CanvasLayer
         var after = kind == "inscription" ? inscDone : null; inscDone = null;
         if (after != null) Callable.From(after).CallDeferred();
         foreach (var c in root.GetChildren()) { root.RemoveChild(c); c.QueueFree(); }
-        root.Visible = false; Open = false; kind = ""; dlgLines = null;
+        root.Visible = false; Open = false; kind = ""; dlgLines = null; dlgLabel = null;
         if (cine != null) { var d = cine.done; cine = null; if (d != null) Callable.From(d).CallDeferred(); }
         Inp.Clear();
         Input.MouseMode = G.mode == "play" ? Input.MouseModeEnum.Hidden : Input.MouseModeEnum.Visible;
@@ -254,6 +269,8 @@ public partial class UiRoot : CanvasLayer
         if (kind is "title" or "ending" or "death") return;
         Close();
     }
+    // What Esc or B does on this screen.
+    public void TestBack() { if (backAction != null) backAction(); else Close(); }
     public bool TestClick(string textStart)
     {
         var b = FindButtons(root).FirstOrDefault(x => x.Text.StartsWith(textStart) && !x.Disabled && x.IsVisibleInTree());
@@ -317,7 +334,7 @@ public partial class UiRoot : CanvasLayer
         else if (b == JoyButton.Start)
         {
             if (cine != null) FinishCine();
-            else if (kind is "pause" or "satchel" or "controls" or "controller") Close();
+            else if (kind is "pause" or "satchel" or "controls" or "controller" or "settings") Close();
         }
     }
     public override void _Process(double delta)
@@ -329,9 +346,19 @@ public partial class UiRoot : CanvasLayer
             cine.timer -= delta;
             if (cine.timer <= 0) NextCine();
         }
+        // the typewriter: the words come at the pace of speech
+        if (dlgLabel != null && GodotObject.IsInstanceValid(dlgLabel) && dlgLabel.VisibleRatio < 1)
+        {
+            dlgShown += (float)delta * 55;
+            int total = Math.Max(1, dlgLabel.GetTotalCharacterCount());
+            dlgLabel.VisibleCharacters = Math.Min(total, (int)dlgShown);
+            if (dlgLabel.VisibleCharacters >= total) dlgLabel.VisibleRatio = 1;
+        }
     }
 
     // ---- dialogue ------------------------------------------------------------------------
+    // A plank of driftwood across the foot of the view, the speaker's name on a brass plate, their likeness in a
+    // medallion, the words coming at the pace of speech.
     public void Dialogue(string who, List<string> lines, Action done)
     {
         dlgWho = who; dlgLines = lines.Where(l => !string.IsNullOrEmpty(l)).ToList(); dlgI = 0; dlgDone = done;
@@ -343,656 +370,272 @@ public partial class UiRoot : CanvasLayer
         var lines = dlgLines; int i = dlgI; string who = dlgWho;
         Show("dialogue", true);
         dlgLines = lines; dlgI = i; dlgWho = who;
-        var pc = new PanelContainer { CustomMinimumSize = new Vector2(253, 0) };
-        Ornate(pc);
+        string npc = Story.NpcIdFor(who);
+        var pc = new PanelContainer { CustomMinimumSize = new Vector2(420, 66) };
+        Ornate(pc, MenuArt.Look.Slate, SeedOf(who ?? "page") + 3, 0.8f);
         pc.SetAnchorsPreset(Control.LayoutPreset.CenterBottom);
         pc.GrowHorizontal = Control.GrowDirection.Both; pc.GrowVertical = Control.GrowDirection.Begin;
-        pc.OffsetLeft = -126; pc.OffsetRight = 126; pc.OffsetBottom = -14;
+        pc.OffsetLeft = -210; pc.OffsetRight = 210; pc.OffsetBottom = -12;
         root.AddChild(pc);
-        var col = new VBoxContainer();
-        pc.AddChild(col);
-        if (who != null) Lbl(col, who, 6, GOLD);
-        Lbl(col, Glyphs.Plain(lines[i], Glyphs.Current), 6).CustomMinimumSize = new Vector2(0, 16);
-        Footer(col, ("confirm", i < lines.Count - 1 ? "continue" : "close"));
-    }
-    void Advance()
-    {
-        if (dlgLines == null) return;
-        dlgI++;
-        if (dlgI >= dlgLines.Count) { var d = dlgDone; dlgLines = null; Close(); d?.Invoke(); return; }
-        RenderDlg();
-    }
-    public void Confirm(string text, Action yes)
-    {
-        Show("confirm");
-        var c = Panel(190);
-        Lbl(c, text, 6);
-        var r = Row(c, true);
-        Btn(r, "Yes", () => { Close(); yes(); }, primary: true);
-        Btn(r, "No", Close);
-        Footer(c, ("confirm", "choose"), ("cancel", "no"));
-        FocusFirst();
-    }
-
-    // ---- title -------------------------------------------------------------------------------
-    public void Title()
-    {
-        Show("title");
-        G.mode = "title";
-        var vista = new TitleVista();
-        vista.SetAnchorsPreset(Control.LayoutPreset.FullRect);
-        root.AddChild(vista);
-        var col = new VBoxContainer { Position = new Vector2(52, 150), CustomMinimumSize = new Vector2(170, 0) };
-        col.AddThemeConstantOverride("separation", 1);
-        root.AddChild(col);
-        if (G.HasSave()) TitleBtn(col, "Continue from the last Bell Room", () => { Close(); G.LoadGame(); Input.MouseMode = Input.MouseModeEnum.Hidden; });
-        TitleBtn(col, "Row out to the lighthouse", Voyage);
-        TitleBtn(col, "Controls", () => Controls(Title));
-        TitleBtn(col, "Controller settings", () => ControllerSettings(Title));
-        TitleBtn(col, "Toggle fullscreen (F11)", Settings.ToggleFullscreen);
-        TitleBtn(col, "Quit to desktop", () => GetTree().Quit());
-        var foot = new VBoxContainer { Position = new Vector2(52, 318), CustomMinimumSize = new Vector2(260, 0) };
-        root.AddChild(foot);
-        Lbl(foot, "Keyboard and mouse, or an Xbox, PlayStation or Switch controller. Best with headphones.", 4, MUTED);
-        Lbl(foot, PadLine(), 4, MUTED);
-        FocusFirst();
-    }
-    // Borderless menu entries for the title screen: a gold tab and a warmer glow mark the one in focus.
-    void TitleBtn(Control parent, string text, Action onPress)
-    {
-        var b = Btn(parent, text, onPress);
-        b.Alignment = HorizontalAlignment.Left;
-        b.AddThemeFontSizeOverride("font_size", 9);
-        var normal = new StyleBoxEmpty { ContentMarginLeft = 8, ContentMarginTop = 2, ContentMarginBottom = 2 };
-        StyleBoxFlat Lit(float a) { var sb = new StyleBoxFlat { BgColor = new Color(1, 0.8f, 0.45f, a), BorderColor = WARM, BorderWidthLeft = 2 }; sb.ContentMarginLeft = 8; sb.ContentMarginTop = sb.ContentMarginBottom = 2; return sb; }
-        b.AddThemeStyleboxOverride("normal", normal);
-        b.AddThemeStyleboxOverride("hover", Lit(0.06f));
-        b.AddThemeStyleboxOverride("focus", Lit(0.09f));
-        b.AddThemeStyleboxOverride("pressed", Lit(0.14f));
-        b.AddThemeColorOverride("font_color", H.Col("#c9bc9c"));
-    }
-    // Choices for a new game, asked once the player has decided to set out.
-    public void Voyage()
-    {
-        Show("voyage");
-        backAction = Title;
-        var vista = new TitleVista { ShowName = false };
-        vista.SetAnchorsPreset(Control.LayoutPreset.FullRect);
-        root.AddChild(vista);
-        var c = Panel(210);
-        H2(c, "The crossing");
-        Lbl(c, "The tide redraws the map every ten minutes, and brings the dead back with it.", 5, MUTED, italic: true);
-        H3(c, "Difficulty");
-        var r = Row(c);
-        foreach (var (id, name) in new[] { ("pilgrim", "Pilgrim"), ("keeper", "Keeper"), ("drowned", "Drowned") })
-            Btn(r, name, () => { difficulty = id; Voyage(); }, selected: difficulty == id);
-        Small(c, difficulty switch { "pilgrim" => "More scrap and a slower tide.", "keeper" => "As designed.", _ => "Saving costs 1 tallow, fewer lifeline drops, harder hits." });
-        H3(c, "Tide length");
-        var r2 = Row(c);
-        foreach (var v in new[] { 1f, 1.5f, 2f }) Btn(r2, (v * 100) + "%", () => { tide = v; Voyage(); }, selected: tide == v);
-        Small(c, "More time between tides, without softening combat.");
-        var col = Col(c);
-        Btn(col, "Cast off", () => { Close(); G.NewGame(difficulty, tide); }, primary: true);
-        Btn(col, "Back", Title);
-        Footer(c, ("confirm", "choose"), ("cancel", "back"));
-        FocusFirst();
-    }
-
-    Action controlsBack; string controlsTab = "keys";
-    static string PadLine()
-    {
-        if (Pad.Device < 0) return "No controller connected.";
-        string kind = Pad.Kind switch { PadKind.PlayStation => "PlayStation", PadKind.Switch => "Switch", _ => "Xbox" };
-        return $"Controller: {Pad.Name} ({kind} layout).";
-    }
-    public void Controls(Action back, string tab = null)
-    {
-        controlsBack = back;
-        controlsTab = tab ?? (Pad.Using ? "pad" : "keys");
-        Show("controls");
-        backAction = () => (back ?? Close)();
-        var c = Panel(250);
-        H2(c, "Controls");
-        var tr = Row(c);
-        Btn(tr, "Keyboard and mouse", () => Controls(back, "keys"), selected: controlsTab == "keys");
-        Btn(tr, "Controller", () => Controls(back, "pad"), selected: controlsTab == "pad");
-        if (controlsTab == "pad") Small(c, PadLine() + " Prompts follow the controller in your hands.");
-        var grid = new GridContainer { Columns = 2 };
-        grid.AddThemeConstantOverride("h_separation", 6); grid.AddThemeConstantOverride("v_separation", 2);
-        c.AddChild(grid);
-        if (controlsTab == "keys")
+        var row = new HBoxContainer(); row.AddThemeConstantOverride("separation", 9);
+        pc.AddChild(row);
+        if (npc != null || who != null)
+            row.AddChild(new Painted((c, sz, t) => Portrait(c, sz, npc, who, t), new Vector2(50, 50)) { SizeFlagsVertical = Control.SizeFlags.ShrinkBegin });
+        var col = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
+        row.AddChild(col);
+        if (who != null)
         {
-            var k = new (string, string)[]
+            var name = Lbl(col, who, 7, GOLD, caps: true);
+            name.AddThemeColorOverride("font_shadow_color", new Color(0, 0, 0, 0.8f)); name.AddThemeConstantOverride("shadow_offset_y", 1);
+        }
+        var text = Lbl(col, Glyphs.Plain(lines[i], Glyphs.Current), 7);
+        text.CustomMinimumSize = new Vector2(0, 26);
+        text.AddThemeConstantOverride("line_spacing", 1);
+        dlgShown = 0; dlgLabel = text;
+        if (Instant) text.VisibleRatio = 1; else text.VisibleCharacters = 0;
+        var foot = Row(col);
+        Footer(foot, ("confirm", i < lines.Count - 1 ? "continue" : "close"));
+        foot.AddChild(new Painted((c, sz, t) =>
+        {
+            if (dlgLabel == null || !GodotObject.IsInstanceValid(dlgLabel) || dlgLabel.VisibleRatio < 1) return;
+            float y = sz.Y / 2 + MathF.Sin(t * 4) * 1.2f;
+            c.Fill = new Color(MenuArt.AMBER.R, MenuArt.AMBER.G, MenuArt.AMBER.B, 0.85f);
+            c.Poly(new[] { new Vector2(sz.X - 8, y - 2), new Vector2(sz.X - 2, y - 2), new Vector2(sz.X - 5, y + 2) });
+        }, new Vector2(12, 8)));
+    }
+    // A likeness in a brass medallion: the speaker's robe or cowl, their face, their hat, the lamp if they carry one; for a
+    // page with no speaker, the page itself. Everything is cut to the round of the glass.
+    static void Portrait(Canvas c, Vector2 sz, string npc, string who, float t)
+    {
+        float cx = sz.X / 2, cy = sz.Y / 2, r = MathF.Min(sz.X, sz.Y) / 2 - 2;
+        c.Fill = new Color(0, 0, 0, 0.6f); c.FillCircle(cx + 1, cy + 1.5f, r + 2);
+        c.Fill = MenuArt.BRASS_DARK; c.FillCircle(cx, cy, r + 2);
+        c.Fill = MenuArt.BRASS; c.FillCircle(cx, cy, r + 1);
+        c.Fill = H.Col("#0b1214"); c.FillCircle(cx, cy, r - 0.5f);
+        c.Glow(cx - r * 0.3f, cy - r * 0.4f, r * 1.1f, new Color(0.3f, 0.5f, 0.5f, 0.22f));
+        float ri = r - 0.6f;
+        void Clip(float ex, float ey, float rx, float ry, Color col)
+        {
+            var pts = EllipseInCircle(ex, ey, rx, ry, cx, cy, ri);
+            if (pts.Length >= 3) { c.Fill = col; c.Poly(pts); }
+        }
+        if (npc != null)
+        {
+            var look = Story.NpcLook(npc);
+            var robe = H.Col(look.robe); var skin = H.Col(look.skin);
+            if (look.lamp) c.Glow(cx + r * 0.6f, cy + r * 0.5f, r * 0.9f, new Color(1, 0.72f, 0.35f, 0.3f + 0.08f * MathF.Sin(t * 6)));
+            // a cowl behind the head if there is no hat
+            if (look.hat == null) Clip(cx, cy - r * 0.02f, r * 0.46f, r * 0.52f, robe.Darkened(0.35f));
+            // shoulders
+            Clip(cx, cy + r * 0.98f, r * 0.82f, r * 0.62f, robe);
+            Clip(cx + r * 0.25f, cy + r * 1.02f, r * 0.6f, r * 0.55f, robe.Darkened(0.25f));
+            c.Fill = skin.Darkened(0.35f); c.FillRect(cx - r * 0.11f, cy + r * 0.22f, r * 0.22f, r * 0.2f);
+            // the face, lit from the left
+            c.Fill = skin.Darkened(0.2f); c.BeginPath(); c.Ellipse(cx, cy - r * 0.02f, r * 0.29f, r * 0.35f, 0, 0, H.PI * 2); c.FillPath();
+            c.Fill = skin; c.BeginPath(); c.Ellipse(cx - r * 0.04f, cy - r * 0.05f, r * 0.24f, r * 0.31f, 0, 0, H.PI * 2); c.FillPath();
+            c.Fill = new Color(1, 1, 1, 0.12f); c.BeginPath(); c.Ellipse(cx - r * 0.12f, cy - r * 0.15f, r * 0.08f, r * 0.12f, 0, 0, H.PI * 2); c.FillPath();
+            // sockets, eyes, a brow, the nose's shadow, the mouth
+            c.Fill = new Color(0, 0, 0, 0.35f);
+            c.BeginPath(); c.Ellipse(cx - r * 0.11f, cy - r * 0.06f, r * 0.08f, r * 0.05f, 0, 0, H.PI * 2); c.FillPath();
+            c.BeginPath(); c.Ellipse(cx + r * 0.11f, cy - r * 0.06f, r * 0.08f, r * 0.05f, 0, 0, H.PI * 2); c.FillPath();
+            bool blink = (t % 4.3f) < 0.12f;
+            c.Fill = H.Col("#0b0807");
+            if (blink) { c.FillRect(cx - r * 0.16f, cy - r * 0.06f, r * 0.1f, 0.5f); c.FillRect(cx + r * 0.06f, cy - r * 0.06f, r * 0.1f, 0.5f); }
+            else
             {
-                ("A / D", "Move"), ("W / S", "Climb ladders, swim, shorten / lengthen swing rope"), ("Space", "Jump (down + Space drops through planks)"),
-                ("Shift (hold)", "Sneak: footsteps 2 m instead of 6 m"), ("C", "Dash (0.2 s invulnerable). Jet Valve: air and water bursts in any direction"),
-                ("Mouse", "Aim"), ("Left click / J", "Fire the selected weapon"), ("Right click / K (hold)", "Focused beam: makes knots glint, double oil"),
-                ("F", "Gaff strike (melee, pry plates, kick barrels)"), ("Q (hold)", "Gaff Swing from an iron ring / hook-pull a light enemy"),
-                ("E", "Interact, talk, drag a downed body"), ("X", "Burn a downed body with lantern oil"), ("R", "Reload (locks you in place)"),
-                ("T", "Shutter the lantern (nearly invisible, blind to weak points)"), ("Z", "Poultice (2 pips over 3 s)"), ("G", "Stitch Kit (full heal, kneel 4 s)"),
-                ("V", "Quick-craft 3 rivets from 1 scrap (2 s, crouched)"), ("B", "Ballast Boots on / off"), ("1-4 / wheel", "Select weapon"),
-                ("I", "Satchel, crafting, logbook"), ("Tab / M", "Map"), ("Esc / P", "Pause"), ("F11", "Fullscreen"),
-            };
-            if (Hollow.owned) k = k.Concat(new[] { ("5", "Take the Mere's Hollow in hand"), ("H", "Sing the verse (brimming, hold the Calling to turn the tide)"), ("Y", "Change verse") }).ToArray();
-            foreach (var (a, b) in k)
+                c.FillCircle(cx - r * 0.11f, cy - r * 0.06f, r * 0.04f); c.FillCircle(cx + r * 0.11f, cy - r * 0.06f, r * 0.04f);
+                // salt has taken one of the crusted ones' eyes
+                c.Fill = look.crust ? new Color(0.85f, 0.9f, 0.88f, 0.9f) : new Color(1, 0.95f, 0.85f, 0.8f);
+                if (look.crust) c.FillCircle(cx + r * 0.11f, cy - r * 0.06f, r * 0.035f);
+                c.FillRect(cx - r * 0.12f, cy - r * 0.08f, 0.6f, 0.6f);
+            }
+            c.Fill = new Color(0, 0, 0, 0.3f); c.FillRect(cx - r * 0.17f, cy - r * 0.14f, r * 0.12f, r * 0.03f); c.FillRect(cx + r * 0.05f, cy - r * 0.14f, r * 0.12f, r * 0.03f);
+            c.FillRect(cx + r * 0.01f, cy - r * 0.02f, r * 0.04f, r * 0.12f);
+            c.Fill = new Color(0.2f, 0.08f, 0.06f, 0.7f); c.FillRect(cx - r * 0.08f, cy + r * 0.16f, r * 0.16f, r * 0.025f);
+            if (look.crust)
             {
-                var key = Lbl(grid, a, 5, WARM); key.SizeFlagsHorizontal = Control.SizeFlags.Fill; key.CustomMinimumSize = new Vector2(60, 0);
-                Lbl(grid, b, 5);
+                for (int i = 0; i < 9; i++) { c.Fill = new Color(0.9f, 0.95f, 0.95f, 0.5f + 0.4f * TileArt.Hash(i, 5)); c.FillRect(cx + r * 0.04f + TileArt.Hash(i, 3) * r * 0.22f, cy - r * 0.3f + TileArt.Hash(i, 4) * r * 0.5f, 0.8f, 0.8f); }
+                MenuArt.Barnacles(c, cx + r * 0.2f, cy + r * 0.22f, r * 0.08f, 6, 3);
+            }
+            if (look.hat != null)
+            {
+                var hat = H.Col(look.hat);
+                Clip(cx, cy - r * 0.3f, r * 0.55f, r * 0.09f, hat.Darkened(0.2f));
+                c.Fill = hat; c.BeginPath(); c.Ellipse(cx, cy - r * 0.32f, r * 0.3f, r * 0.22f, 0, H.PI, H.PI * 2); c.FillPath();
+                c.Fill = new Color(1, 1, 1, 0.12f); c.FillRect(cx - r * 0.28f, cy - r * 0.36f, r * 0.56f, r * 0.03f);
             }
         }
         else
         {
-            var rows = new (string, string)[]
-            {
-                ("{move}", "Move, climb ladders, swim. A light tilt creeps quietly"), ("{sneak}", "Sneak on / off"),
-                ("{drop}", "Drop through planks"), ("{aim}", "Aim. With the stick left alone, Maren aims where she walks"),
-                ("{jump}", "Jump"), ("{dash}", "Dash (0.2 s invulnerable)"), ("{gaff}", "Gaff strike: melee, pry plates, kick barrels"),
-                ("{interact}", "Interact, talk, drag a downed body"), ("{burn}", "Burn a downed body with lantern oil"),
-                ("{swing}", "Gaff Swing from an iron ring / hook-pull a light enemy"),
-                ("{fire}", "Fire the selected weapon"), ("{focus}", "Focused beam: makes knots glint, double oil"),
-                ("{reload}", "Reload"), ("{quickcraft}", "Quick-craft 3 rivets from 1 scrap"),
-                ("{poultice}", "Poultice"), ("{stitch}", "Stitch Kit"), ("{boots}", "Ballast Boots on / off"),
-                ("{weapon}", "Change weapon"), ("{shutter}", "Shutter the lantern"),
-                ("{journal}", "Map, satchel and logbook; the bumpers turn the page"), ("{pause}", "Pause"),
-            };
-            if (Hollow.owned) rows = rows.Concat(new[] { ("{hollow}", "Take the Mere's Hollow in hand (it sits after your weapons)"), ("{sing}", "With the Hollow in hand: sing the verse. Brimming, hold the Calling to turn the tide"), ("{verse}", "With the Hollow in hand: change verse") }).ToArray();
-            foreach (var (a, b) in rows)
-            {
-                var g = new RichLabel(() => a, 6, WARM) { MinWidth = 50 };
-                grid.AddChild(g);
-                Lbl(grid, b, 5);
-            }
+            // no face: the page itself
+            c.Fill = MenuArt.PAPER; c.Save(); c.Translate(cx, cy); c.Rotate(-0.12f); c.FillRect(-r * 0.45f, -r * 0.55f, r * 0.9f, r * 1.1f); c.Restore();
+            c.Stroke = new Color(MenuArt.PAPER_INK.R, MenuArt.PAPER_INK.G, MenuArt.PAPER_INK.B, 0.6f); c.LineWidth = 0.5f;
+            for (int i = 0; i < 5; i++) c.Line(cx - r * 0.3f, cy - r * 0.35f + i * r * 0.18f, cx + r * 0.3f, cy - r * 0.38f + i * r * 0.18f);
         }
-        H3(c, "How Hollowmere works");
-        Small(c, "Every Brine body is held up by salt knots at its joints. Rivets on flesh barely scratch; hit the knots. The Crown knot in the chest is sealed until two limb knots break. A dropped body lying in water when the next Rising tide reaches it will stand again at High tide: haul it above the tide line or burn it.", false);
-        Small(c, "The tide dial (top right) runs a 10-minute cycle: Low, Rising, High, Ebbing. Painted tide marks on pillars show where the water will reach. Bell Rooms are safe; resting there advances the tide to the next Low.", false);
-        var br = Row(c, true);
-        Btn(br, "Back", () => (back ?? Close)());
-        Btn(br, "Controller settings", () => ControllerSettings(() => Controls(back, controlsTab)));
-        Footer(c, ("tabs", "switch list"), ("cancel", "back"));
-        FocusFirst();
+        // the glass over it, and a barnacle on the rim
+        c.Glow(cx - r * 0.35f, cy - r * 0.4f, r * 0.4f, new Color(1, 1, 1, 0.08f));
+        c.Stroke = new Color(0, 0, 0, 0.5f); c.LineWidth = 1; c.BeginPath(); c.Arc(cx, cy, r - 0.5f, 0, H.PI * 2); c.StrokePath();
+        MenuArt.Barnacles(c, cx + r * 0.75f, cy + r * 0.7f, 3, 5, 4);
     }
-
-    public void ControllerSettings(Action back)
+    // The part of an ellipse inside a circle, as a polygon: both are convex, so their overlap is too.
+    static Vector2[] EllipseInCircle(float ex, float ey, float rx, float ry, float cx, float cy, float r)
     {
-        Show("controller");
-        backAction = () => (back ?? Close)();
-        var c = Panel(220);
-        H2(c, "Controller");
-        Small(c, PadLine());
-        void Again() { Settings.Save(); ControllerSettings(back); }
-        H3(c, "Vibration");
-        var r = Row(c);
-        foreach (var (v, n) in new[] { (0f, "Off"), (0.5f, "Gentle"), (1f, "Full") })
-            Btn(r, n, () => { Settings.Vibration = v; Again(); Pad.Rumble(0.5f * v, 0.5f * v, 0.25f); }, selected: MathF.Abs(Settings.Vibration - v) < 0.01f);
-        H3(c, "Aim");
-        var r2 = Row(c);
-        Btn(r2, Settings.AimAssist ? "Aim assist: on" : "Aim assist: off", () => { Settings.AimAssist = !Settings.AimAssist; Again(); }, selected: Settings.AimAssist);
-        bool gyro = Pad.HasGyro;
-        Btn(r2, Settings.Gyro ? "Gyro aim: on" : "Gyro aim: off", () => { Settings.Gyro = !Settings.Gyro; Again(); if (Settings.Gyro) H.ToastMsg("Hold the controller still for a moment.", 2); }, selected: Settings.Gyro, disabled: !gyro && !Settings.Gyro);
-        if (gyro) Btn(r2, "Recalibrate gyro", () => { Pad.Calibrate(); H.ToastMsg("Hold the controller still for a moment.", 2); });
-        Small(c, gyro ? "Gyro aim tilts the aim like a mouse; the right stick still works alongside it." : "Gyro aim needs a PlayStation or Switch controller.");
-        H3(c, "Button prompts");
-        var r3 = Row(c);
-        foreach (var (v, n) in new[] { ("auto", "Match controller"), ("xbox", "Xbox"), ("playstation", "PlayStation"), ("switch", "Switch") })
-            Btn(r3, n, () => { Settings.Prompts = v; Pad.ApplyUiMap(); Again(); }, selected: Settings.Prompts == v);
-        H3(c, "Switch controllers: confirm in menus with");
-        var r4 = Row(c);
-        Btn(r4, "A (right button)", () => { Settings.NintendoConfirm = true; Pad.ApplyUiMap(); Again(); }, selected: Settings.NintendoConfirm);
-        Btn(r4, "B (bottom button)", () => { Settings.NintendoConfirm = false; Pad.ApplyUiMap(); Again(); }, selected: !Settings.NintendoConfirm);
-        Btn(Row(c, true), "Back", () => (back ?? Close)());
-        Footer(c, ("confirm", "choose"), ("cancel", "back"));
-        FocusFirst();
+        var pts = new List<Vector2>();
+        var cc = new Vector2(cx, cy);
+        for (int i = 0; i < 48; i++)
+        {
+            float a = i / 48f * H.PI * 2;
+            var p = new Vector2(ex + MathF.Cos(a) * rx, ey + MathF.Sin(a) * ry);
+            if (p.DistanceTo(cc) <= r) pts.Add(p);
+            var q = new Vector2(cx + MathF.Cos(a) * r, cy + MathF.Sin(a) * r);
+            float u = (q.X - ex) / rx, v = (q.Y - ey) / ry;
+            if (u * u + v * v <= 1) pts.Add(q);
+        }
+        if (pts.Count < 3) return Array.Empty<Vector2>();
+        var m = new Vector2(pts.Average(p => p.X), pts.Average(p => p.Y));
+        return pts.OrderBy(p => MathF.Atan2(p.Y - m.Y, p.X - m.X)).ToArray();
     }
-
-    public void Pause(string note = null)
+    void Advance()
     {
-        Show("pause");
-        var c = Panel(190);
-        H2(c, "Paused");
-        if (note != null) Lbl(c, note, 6, BAD);
-        Small(c, $"{G.room.Name} · {Data.Regions.P(G.room.Region).S("name")} · Act {new string('I', G.act)}");
-        H3(c, "Volume");
-        var r = Row(c);
-        foreach (var v in new[] { 0f, 0.35f, 0.7f, 1f })
-            Btn(r, v == 0 ? "Off" : Mathf.RoundToInt(v * 100) + "%", () => { Snd.SetVolume(v); Settings.Save(); Pause(); }, selected: MathF.Abs(Snd.Volume - v) < 0.01f);
-        H3(c, "Music");
-        var rm = Row(c);
-        foreach (var v in new[] { 0f, 0.4f, 0.8f, 1f })
-            Btn(rm, v == 0 ? "Off" : Mathf.RoundToInt(v * 100) + "%", () => { Score.SetMusicVolume(v); Settings.Save(); Pause(); }, selected: MathF.Abs(Score.MusicVolume - v) < 0.01f);
-        H3(c, "Display");
-        var r2 = Row(c);
-        Btn(r2, "Fullscreen (F11)", Settings.ToggleFullscreen);
-        Btn(r2, Settings.Bloom ? "Glow: on" : "Glow: off", () => { Settings.Bloom = !Settings.Bloom; Settings.Apply(); Settings.Save(); Pause(); }, selected: Settings.Bloom);
-        Btn(r2, Settings.Shake ? "Shake: on" : "Shake: off", () => { Settings.Shake = !Settings.Shake; Settings.Save(); Pause(); }, selected: Settings.Shake);
-        Btn(r2, Settings.Hints ? "Hints: on" : "Hints: off", () => { Settings.Hints = !Settings.Hints; Settings.Save(); Pause(); }, selected: Settings.Hints);
-        Btn(r2, Settings.Guide ? "Guide: on" : "Guide: off", () => { Settings.Guide = !Settings.Guide; Settings.Save(); Pause(); }, selected: Settings.Guide);
-        H3(c, "Gore");
-        var r3 = Row(c);
-        foreach (var (v, label) in new[] { ("full", "Full"), ("reduced", "Reduced"), ("off", "Off (salt only)") })
-            Btn(r3, label, () => { Settings.Gore = v; Settings.Save(); Pause(); }, selected: Settings.Gore == v);
-        var col = Col(c);
-        Btn(col, "Resume", Close, primary: true);
-        Btn(col, "Controls", () => Controls(() => Pause()));
-        Btn(col, "Controller settings", () => ControllerSettings(() => Pause()));
-        Btn(col, "Quit to title (progress since the last save is lost)", () => { Close(); G.ToTitle(); });
-        Btn(col, "Quit to desktop (progress since the last save is lost)", () => GetTree().Quit());
-        Footer(c, ("confirm", "choose"), ("cancel", "resume"));
-        FocusFirst();
+        if (dlgLines == null) return;
+        // still coming: show it all first
+        if (dlgLabel != null && GodotObject.IsInstanceValid(dlgLabel) && dlgLabel.VisibleRatio < 1) { dlgLabel.VisibleRatio = 1; return; }
+        dlgI++;
+        if (dlgI >= dlgLines.Count) { var d = dlgDone; dlgLines = null; Close(); d?.Invoke(); return; }
+        RenderDlg();
     }
-
-    // ---- Bell Room ------------------------------------------------------------------------------
-    bool PayDrowned()
+    public void Confirm(string text, Action yes, Action no = null)
     {
-        var p = G.player;
-        if (G.difficulty != "drowned") return true;
-        if (p.bag.Count("tallow") < 1) { H.ToastMsg("Saving on Drowned costs 1 tallow."); Snd.Deny(); return false; }
-        p.bag.Remove("tallow", 1);
-        return true;
-    }
-    public void BellMenu(Bell bell)
-    {
-        var p = G.player;
-        Show("bell");
-        var c = Panel(200);
-        H2(c, (bell.spec.S("name") ?? G.room.Name) + " Bell Room");
-        Small(c, $"No Brine body will ever enter while the bell rings. Tide: {Tide.PhaseName()}, {H.FmtTime(Tide.PhaseRemaining())} left.");
-        var col = Col(c);
-        Btn(col, "Save" + (G.difficulty == "drowned" ? " (1 tallow)" : ""), () => { if (!PayDrowned()) return; G.SetRespawn(bell); G.Save(); H.ToastMsg("Saved."); BellMenu(bell); });
-        Btn(col, "Rest: full health" + (p.grafts.Contains("lung") ? " (halved: Tide Lung)" : "") + ", save, and wait for the next Low tide", () => { if (!PayDrowned()) return; Close(); G.Rest(bell); }, primary: true);
-        Btn(col, "Reliquary chest (shared by every Bell Room)", () => Reliquary(() => BellMenu(bell)));
-        Btn(col, "Bench: craft, upgrades, fittings" + (bell.room.Id == "chapel" ? ", surgery" : ""), () => Bench(bell.room.Id == "chapel", () => BellMenu(bell)));
-        Btn(col, "Leave", Close);
-        Small(c, "Resting skips time. Every body left lying in water re-knots on the way.");
-        Footer(c, ("confirm", "choose"), ("cancel", "leave"));
-        FocusFirst();
-    }
-
-    public void Reliquary(Action back)
-    {
-        var p = G.player; var chest = G.reliquary;
-        Show("reliquary");
-        backAction = () => (back ?? Close)();
-        var c = Panel(270);
-        H2(c, "Reliquary");
-        var cols = Row(c);
-        void Rows(VBoxContainer col, Bag bag, bool put)
-        {
-            var list = bag.List();
-            if (list.Count == 0) Small(col, "Empty.");
-            foreach (var (i, n) in list)
-            {
-                var row = ItemRow(col, Data.ItemName(i), null, "x" + n);
-                Btn(row, "1", () => Move(i, false, put));
-                Btn(row, "All", () => Move(i, true, put));
-            }
-        }
-        void Move(string i, bool all, bool put)
-        {
-            if (put) { int n = Math.Min(p.bag.Count(i), all ? 999 : 1); int moved = n - chest.Add(i, n); p.bag.Remove(i, moved); }
-            else { int n = Math.Min(chest.Count(i), all ? 999 : 1); int left = p.bag.Add(i, n); chest.Remove(i, n - left); if (left > 0) H.ToastMsg("Satchel full."); }
-            Reliquary(back);
-        }
-        var a = Col(cols, 120); H3(a, $"Satchel ({p.bag.Used()}/{p.bag.size} slots)"); Rows(a, p.bag, true);
-        var b = Col(cols, 120); H3(b, "Reliquary chest"); Rows(b, chest, false);
-        Btn(Row(c), "Back", () => (back ?? Close)());
-        Footer(c, ("confirm", "move"), ("cancel", "back"));
-        FocusFirst();
-    }
-
-    void RecipeRows(VBoxContainer c, string where, Action after)
-    {
-        var p = G.player;
-        foreach (var r in Data.Recipes.Where(r => where == "bench" || r.S("where") == "any"))
-        {
-            var cost = r.Counts("cost");
-            bool ok = p.bag.Has(cost) && p.bag.Room(r.S("makes")) >= r.I("n");
-            string costs = string.Join(", ", cost.Select(kv => $"{kv.Value} {Data.ItemName(kv.Key).ToLowerInvariant()} ({p.bag.Count(kv.Key)})"));
-            var row = ItemRow(c, $"{r.I("n")} {Data.ItemName(r.S("makes"))}", costs + " · " + (r.S("where") == "any" ? "anywhere, " + r.F("time") + " s crouched" : "bench, instant"));
-            Btn(row, "Craft", () =>
-            {
-                if (where == "any") { Close(); p.QuickCraft(r.S("id")); return; }
-                if (!p.bag.Has(cost)) return;
-                p.bag.Pay(cost); p.bag.Add(r.S("makes"), r.I("n")); Snd.Craft(); after();
-            }, disabled: !ok);
-        }
-    }
-
-    public void Bench(bool chapel, Action back)
-    {
-        var p = G.player;
-        Show("bench");
-        benchChapel = chapel; benchBack = back;
-        backAction = () => (back ?? Close)();
-        var c = Panel(270);
-        H2(c, "Bench");
-        var tabs = BenchTabs(chapel);
-        if (!tabs.Contains(benchTab)) benchTab = "craft";
-        var tr = Row(c);
-        foreach (var t in tabs) Btn(tr, char.ToUpper(t[0]) + t[1..], () => { benchTab = t; Bench(chapel, back); }, selected: t == benchTab);
-        void Again() => Bench(chapel, back);
-        if (benchTab == "craft") RecipeRows(c, "bench", Again);
-        if (benchTab == "upgrade")
-        {
-            foreach (var id in p.weaponOrder)
-            {
-                var w = p.weapons[id]; var def = Data.Weapons.P(id);
-                if (Player.Legendary(id))
-                {
-                    // the legendary weapons are not improved on; the Tine can be prised apart again
-                    if (id == "tine")
-                    {
-                        var U = Data.Lore.P("legend").P("unmerge");
-                        var lr = ItemRow(c, def.S("name"), Legend.Rooted ? "It has rooted. Prising the Hollow free will tear you (2 pips)." : "Prise the Hollow free: the Harpoon Gun comes back as it was, the Hollow comes back empty.", "legendary");
-                        Btn(lr, "Prise free", () => Confirm(U.S(Legend.Rooted ? "rooted" : "ask"), () => { Legend.Unmerge(); Again(); }));
-                    }
-                    else ItemRow(c, def.S("name"), "Agathe's lens. Nothing at a bench improves on it.", "legendary");
-                    continue;
-                }
-                var next = w.tier + 1 < Data.UpgradeCost.Count ? Data.UpgradeCost[w.tier + 1] : null;
-                var tiers = def.Strings("tiers");
-                string cost = next != null ? string.Join(", ", next.Select(kv => $"{kv.Value} {Data.ItemName(kv.Key).ToLowerInvariant()} ({p.bag.Count(kv.Key)})")) : "";
-                var row = ItemRow(c, def.S("name"), next != null ? "Next: " + tiers[w.tier + 1] + " · " + cost : "Fully upgraded.", "tier " + (w.tier + 1));
-                if (next != null) Btn(row, "Upgrade", () =>
-                {
-                    if (!p.bag.Has(next)) return;
-                    p.bag.Pay(next); w.tier++; Snd.Craft(); H.ToastMsg(def.S("name") + ": " + tiers[w.tier].Split(':')[0]); Again();
-                }, disabled: !p.bag.Has(next));
-            }
-            Small(c, "Tiers add behaviours, not just damage. Mere-ivory comes from bosses and hidden vaults.");
-        }
-        if (benchTab == "fittings")
-        {
-            int used = p.fittings.Sum(k => Data.Fittings.P(k).I("p"));
-            Small(c, $"Pressure Rating: {used} / {p.pressure}. Fittings are swapped only at Bell Rooms, so a loadout is a commitment for the next push.", false);
-            if (p.fittingsOwned.Count == 0) Small(c, "You have not found any fittings yet. Search containers.");
-            foreach (var f in p.fittingsOwned)
-            {
-                var d = Data.Fittings.P(f); bool on = p.fittings.Contains(f);
-                var row = ItemRow(c, d.S("name"), $"{d.S("effect")}. Trade-off: {d.S("trade")}.", $"({d.I("p")})");
-                Btn(row, on ? "Equipped" : "Equip", () =>
-                {
-                    if (p.fittings.Contains(f)) p.fittings.Remove(f);
-                    else
-                    {
-                        int u = p.fittings.Sum(k => Data.Fittings.P(k).I("p"));
-                        if (u + d.I("p") > p.pressure) { H.ToastMsg("Not enough Pressure Rating for that fitting."); Snd.Deny(); return; }
-                        p.fittings.Add(f);
-                    }
-                    if (p.oil > p.OilMax()) p.oil = p.OilMax();
-                    var wd = p.weapons["driver"]; if (wd.mag > p.MagSize("driver")) { p.bag.Add("rivets", wd.mag - p.MagSize("driver")); wd.mag = p.MagSize("driver"); }
-                    Again();
-                }, selected: on);
-            }
-            Small(c, "Diver: Cork Lining, Muffled Soles, Tallow Reservoir. Rigger: Rivet Feeder, Bilge Pump. Breaker: Knot Splitter, Lead Plates.");
-        }
-        if (benchTab == "surgery")
-        {
-            if (G.quests.B("surgeryUsed")) Lbl(c, "Ansel has already used his one good scalpel on you.", 6);
-            else if (p.grafts.Count == 0) Small(c, "You carry no grafts.");
-            else foreach (var k in p.grafts.ToList())
-                {
-                    var gd = Data.Grafts.P(k);
-                    var row = ItemRow(c, gd.S("name"), $"{gd.S("power")}. Cost: {gd.S("cost")}.");
-                    Btn(row, "Cut out (-1 pip)", () => Confirm($"Cut out the {gd.S("name")}? You lose 1 health pip permanently. Ansel can do this only once.", () =>
-                    {
-                        p.grafts.Remove(k); p.maxHp = Math.Max(3, p.maxHp - 1); p.hp = Math.Min(p.hp, p.maxHp); G.quests.Set("surgeryUsed", true);
-                        Snd.Hurt(); H.ToastMsg("The graft is cut out. You will carry the scar.");
-                        Again();
-                    }));
-                }
-        }
-        Btn(Row(c), "Back", () => (back ?? Close)());
-        Footer(c, ("tabs", "change page"), ("cancel", "back"));
-        FocusFirst();
-    }
-    static List<string> BenchTabs(bool chapel) { var t = new List<string> { "craft", "upgrade", "fittings" }; if (chapel) t.Add("surgery"); return t; }
-
-    // ---- satchel / logbook ----------------------------------------------------------------------
-    static readonly string[] SAT_TABS = { "map", "log", "satchel", "craft", "gear" };
-    public void Satchel(string tab = null)
-    {
-        var p = G.player;
-        if (tab != null) satTab = tab;
-        Show("satchel");
-        var c = Panel(satTab == "map" ? 610 : 270);
-        var tr = Row(c);
-        foreach (var (t, n) in new[] { ("map", "Map"), ("log", "Journal"), ("satchel", "Satchel"), ("craft", "Craft"), ("gear", "Gear") })
-            Btn(tr, n, () => Satchel(t), selected: t == satTab);
-        if (satTab == "map")
-        {
-            Hints.Did("map");
-            var mapCtl = new MapView { CustomMinimumSize = new Vector2(590, 262) };
-            c.AddChild(mapCtl);
-        }
-        if (satTab == "satchel")
-        {
-            Small(c, $"{p.bag.Used()} / {p.bag.size} slots. Rivets 18 per slot, bolts 6, flasks and poultices 3, raw materials 10. Key items take 2 slots.");
-            var grid = new GridContainer { Columns = 5 };
-            grid.AddThemeConstantOverride("h_separation", 3); grid.AddThemeConstantOverride("v_separation", 3);
-            c.AddChild(grid);
-            int count = 0;
-            foreach (var (i, n) in p.bag.List())
-            {
-                var def = Data.Item(i);
-                int s = Bag.SlotsFor(i, n), left = n;
-                for (int k = 0; k < s; k++)
-                {
-                    int here = def.B("key") ? n : Math.Min(def.I("perSlot"), left); left -= here;
-                    var slot = new PanelContainer { CustomMinimumSize = new Vector2(48, 22), TooltipText = def.S("desc") };
-                    slot.AddThemeStyleboxOverride("panel", Box(H.Col("#1b1813"), H.Col("#5a4c36"), 1, 3));
-                    grid.AddChild(slot);
-                    var v = new VBoxContainer(); slot.AddChild(v);
-                    // the item's picture and how many sit in this slot, then its name
-                    var top = new HBoxContainer(); v.AddChild(top);
-                    if (Icons.Has(i)) top.AddChild(new IconView(i) { CustomMinimumSize = new Vector2(13, 13) });
-                    var cnt = Lbl(top, def.B("key") ? "key" : here.ToString(), 5, WARM); cnt.HorizontalAlignment = HorizontalAlignment.Right; cnt.VerticalAlignment = VerticalAlignment.Center;
-                    var nm = Lbl(v, def.S("name"), 5);
-                    nm.AutowrapMode = TextServer.AutowrapMode.Off; nm.ClipText = true;
-                    var col = H.Col(def.S("color")); nm.AddThemeColorOverride("font_color", col.Lerp(TEXT, 0.4f));
-                    string item = i; int all = n;
-                    if (k == 0) Btn(v, "Drop", () => { p.bag.Remove(item, all); G.SpawnLoose(item, p.Cx(), p.y + p.h - 4, all); Satchel(); });
-                    count++;
-                }
-            }
-            for (; count < p.bag.size; count++)
-            {
-                var slot = new PanelContainer { CustomMinimumSize = new Vector2(48, 22), Modulate = new Color(1, 1, 1, 0.35f) };
-                slot.AddThemeStyleboxOverride("panel", Box(H.Col("#1b1813"), H.Col("#5a4c36"), 1, 3));
-                grid.AddChild(slot);
-                Lbl(slot, "—", 5, MUTED, center: true);
-            }
-        }
-        if (satTab == "craft")
-        {
-            Small(c, "Simple recipes work anywhere but take time with Maren crouched and exposed. Complex ones need a Bell Room bench.");
-            RecipeRows(c, "any", () => Satchel());
-        }
-        if (satTab == "gear")
-        {
-            var cols = Row(c);
-            var a = Col(cols, 120);
-            H3(a, $"Health {p.hp}/{p.maxHp} · Pressure {p.pressure}");
-            foreach (var ab in p.abilities) { var d = Data.Abilities.P(ab); ItemRow(a, d.S("name"), Glyphs.Plain(d.S("desc"), Glyphs.Current)); }
-            H3(a, "Weapons");
-            foreach (var id in p.weaponOrder) { var d = Data.Weapons.P(id); ItemRow(a, d.S("name"), d.Strings("tiers")[p.weapons[id].tier], "tier " + (p.weapons[id].tier + 1)); }
-            var b = Col(cols, 120);
-            H3(b, "Fittings");
-            if (p.fittings.Count == 0) Small(b, "None equipped.");
-            foreach (var f in p.fittings) { var d = Data.Fittings.P(f); ItemRow(b, d.S("name"), d.S("effect") + " / " + d.S("trade")); }
-            H3(b, "Brine Grafts");
-            if (p.grafts.Count == 0) Small(b, "None. The Choir offers them.");
-            foreach (var k in p.grafts) { var d = Data.Grafts.P(k); ItemRow(b, d.S("name"), d.S("power") + ". " + d.S("cost") + ".", "(" + d.S("knot") + " knot)"); }
-            if (Hollow.owned)
-            {
-                // the verses Maren has learned, each a line of the Choir's hymn
-                var hl = Data.Lore.P("hollow");
-                H3(b, hl.S("name") + $" · resonance {(int)Hollow.resonance}/{(int)Hollow.MAX}");
-                foreach (var v in Hollow.VERSES.Where(v => Hollow.Has(v.id)))
-                    ItemRow(b, v.name + "  \u201c" + v.line + "\u201d", Glyphs.Plain(hl.P("verses").P(v.id).S("desc"), Glyphs.Current).Split("\n\n")[0], "costs " + (int)v.cost);
-                if (Hollow.verses.Count < Hollow.VERSES.Length) Small(b, "The hymn has more verses. The Hollow learns them by listening.");
-            }
-        }
-        if (satTab == "log")
-        {
-            // the journal: where the story goes next, and how to do it, then everything else worth doing
-            var step = Guide.Current;
-            if (step != null)
-            {
-                Small(c, Guide.ActName(step.act), false);
-                H2(c, step.title);
-                Lbl(c, Guide.WhereLine(step), 6, MUTED, italic: true);
-                var now = step.now?.Invoke();
-                if (now != null) Lbl(c, now, 7, WARM);
-                Lbl(c, Glyphs.Plain(step.how, Glyphs.Current), 7);
-                Btn(Row(c), "Show on the map", () => Satchel("map"));
-                var before = Guide.Steps.Where(s0 => s0.act == step.act && Guide.Index(s0) < Guide.Index(step) && s0.done()).ToList();
-                if (before.Count > 0)
-                {
-                    H3(c, "The way so far");
-                    foreach (var s0 in before) Lbl(c, "✓  " + s0.title, 6, MUTED);
-                }
-            }
-            else H2(c, "The night is over.");
-            var also = Guide.Also();
-            if (also.Count > 0)
-            {
-                H3(c, "Also");
-                foreach (var (t0, d0) in also) ItemRow(c, t0, d0);
-            }
-            H3(c, $"Agathe's log ({G.pages.Count}/9)");
-            if (G.pages.Count < 9) Small(c, "Your mother's pages are scattered across the island. All nine show the ferry's tides: the Keeper's Dark ending needs them, and two others alive to row.");
-            var pr = Row(c);
-            if (G.pages.Count == 0) Small(pr, "No pages yet.");
-            foreach (var n in G.pages.OrderBy(x => x)) Btn(pr, "Page " + n, () => Dialogue("Agathe's log", new List<string> { Story.PAGES[n] }, () => Satchel("log")));
-            H3(c, $"Prior's tide tables ({G.tables.Count}/4)");
-            var tr2 = Row(c);
-            if (G.tables.Count == 0) Small(tr2, "No tables yet.");
-            foreach (var n in G.tables.OrderBy(x => x)) Btn(tr2, "Table " + n, () => Dialogue("Prior's tide table", new List<string> { Story.TABLES[n] }, () => Satchel("log")));
-            Small(c, $"Stitches: {G.collected.Count(k => k.StartsWith("stitch"))}/4 · Brass Seals: {G.collected.Count(k => k.StartsWith("seal"))}/6 · Knots broken: {G.stats.knots.Values.Sum()}");
-        }
-        Btn(Row(c), "Close", Close);
-        Footer(c, ("tabs", "change page"), ("cancel", "close"));
-        FocusFirst();
-    }
-    partial class MapView : Control
-    {
-        readonly Canvas cv = new();
-        public override void _Draw()
-        {
-            var c = cv.Begin(this);
-            Chart.Draw(c, Size.X, Size.Y);
-        }
-        public override void _Process(double delta) => QueueRedraw();
-    }
-
-    // ---- Choir menus ---------------------------------------------------------------------------
-    public void SluiceMenu()
-    {
-        var f = World.flags;
-        if (f.B("choirDrained")) { Dialogue(null, new List<string> { "The shrine is drained. The sluice is jammed open with silt; it will never hold water again." }, null); return; }
-        Show("sluice");
-        var c = Panel(200);
-        H2(c, "Choir sluice");
-        Small(c, "The Tide Key turns in the wave-shaped lock. The Choir's water does not answer the moon; it answers the key.", false);
-        var col = Col(c);
-        string lvl = f.S("choirLevelName");
-        Btn(col, "Raise the water to the vault (swim up to the Ribvault)", () => { G.SetChoirLevel("raised"); Close(); }, disabled: lvl == "raised");
-        Btn(col, "Return the water to the shrine line", () => { G.SetChoirLevel("mid"); Close(); }, disabled: lvl == null || lvl == "mid");
-        var drain = Btn(col, "Drain the shrine (permanent)", () => Confirm("Drain the Sunken Choir for good? Hesper wants the shrine kept flooded for the Saint's hymn. The Choir will turn on you.", () => G.SetChoirLevel("drained")));
-        drain.AddThemeColorOverride("font_color", BAD);
-        Btn(col, "Leave it", Close);
-        Footer(c, ("confirm", "choose"), ("cancel", "leave"));
-        FocusFirst();
-    }
-    public void FontMenu()
-    {
-        var p = G.player;
-        Show("font");
-        var c = Panel(210);
-        H2(c, "The Brine font");
-        Small(c, "Each graft gives a strong power but grows a knot on Maren herself, which enemies can strike. Grafts change how others treat you, and which endings are open. A graft can be cut out once, at a Keeper's surgery.", false);
-        foreach (var k in Data.Grafts.Keys)
-        {
-            var d = Data.Grafts.P(k);
-            var row = ItemRow(c, d.S("name"), $"{d.S("power")}. Cost: {d.S("cost")}.", "(" + d.S("knot") + ")");
-            if (p.grafts.Contains(k)) Lbl(row, "Taken", 5, MUTED);
-            else Btn(row, G.freeGraft ? "Take (free)" : "Take (1 Mere-ivory)", () =>
-            {
-                if (!G.freeGraft && p.bag.Count("ivory") < 1) { H.ToastMsg("The font asks an offering of Mere-ivory for each graft."); Snd.Deny(); return; }
-                Confirm($"Take the {d.S("name")}? {d.S("power")}. It grows a knot at your {d.S("knot").ToLowerInvariant()}: {d.S("cost")}.", () =>
-                {
-                    p.grafts.Add(k);
-                    if (G.freeGraft) G.freeGraft = false; else p.bag.Remove("ivory", 1);
-                    Snd.Crack(); Snd.Bell(220, 0.4f); G.flash = 0.2f;
-                    if (k == "lung") p.breath = 30;
-                    G.After(0.4f, () => Narr.Think("firstGraft"));
-                    H.ToastMsg($"The {d.S("name")} takes root. Salt crawls under your skin.");
-                });
-            });
-        }
-        Btn(Row(c), "Step back", Close);
-        Footer(c, ("confirm", "choose"), ("cancel", "step back"));
+        Show("confirm");
+        backAction = no;
+        var c = Panel(230, look: MenuArt.Look.Slate, growth: 0.6f);
+        Lbl(c, text, 7, TEXT, center: true);
+        Rule(c);
+        var r = Row(c, true); r.AddThemeConstantOverride("separation", 10);
+        Btn(r, "Yes", () => { Close(); yes(); }, primary: true);
+        Btn(r, "No", () => (no ?? Close)(), style: MenuArt.Btn.Chip);
+        Footer(c, ("confirm", "choose"), ("cancel", "no"));
         FocusFirst();
     }
 
     // ---- end screens -----------------------------------------------------------------------------
+    // After the last line of an ending: an epitaph on a page of the Keeper's log.
     public void Ending(string title, List<string> paras, string stats, List<string> fates)
     {
         void PanelView()
         {
             Show("ending");
-            var c = Panel(200);
-            Lbl(c, title, 11, GOLD, center: true);
-            foreach (var t in paras) Lbl(c, t, 6);
-            if (fates != null && fates.Count > 0) { H3(c, "Afterwards"); foreach (var t in fates) Small(c, t, false); }
-            Small(c, stats);
+            dim.Dim = 0.92f; dim.Tint = new Color(0.01f, 0.015f, 0.02f);
+            var c = Panel(320, 340, MenuArt.Look.Parchment, 0.9f);
+            Lbl(c, "From the Keeper's log", 5, INK_SOFT, caps: true, center: true);
+            Lbl(c, title, 13, INK, center: true);
+            InkRule(c);
+            foreach (var t in paras) Lbl(c, t, 6, INK);
+            if (fates != null && fates.Count > 0) { InkRule(c); Lbl(c, "Afterwards", 6, INK_SOFT, caps: true); foreach (var t in fates) Lbl(c, t, 5, INK); }
+            InkRule(c);
+            Lbl(c, stats, 5, INK_SOFT, italic: true, center: true);
             Btn(Row(c, true), "Return to title", () => { Close(); G.ToTitle(); }, primary: true);
             FocusFirst();
         }
         var lines = new List<string> { title }; lines.AddRange(paras); if (fates != null) lines.AddRange(fates);
         Cinematic(lines, PanelView, "title");
     }
+    // The sea has her: black water, her last breath going up past the sinking lantern, the words, and above, the bell.
     public void Death(string title, string line, string detail, Action onWake)
     {
         Show("death");
-        var c = Panel(190);
-        H2(c, title);
-        Lbl(c, line, 7, TEXT, italic: true);
-        Small(c, detail);
-        Btn(Row(c, true), "Wake at the bell", () => { Close(); onWake(); Input.MouseMode = Input.MouseModeEnum.Hidden; }, primary: true);
+        dim.Dim = 0.88f; dim.Tint = new Color(0.005f, 0.02f, 0.03f);
+        var deep = new Painted(DeathDeep, Vector2.Zero);
+        deep.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+        root.AddChild(deep);
+        var center = new CenterContainer();
+        center.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+        root.AddChild(center);
+        var col = new VBoxContainer { CustomMinimumSize = new Vector2(330, 0) };
+        col.AddThemeConstantOverride("separation", 5);
+        center.AddChild(col);
+        col.AddChild(new Control { CustomMinimumSize = new Vector2(0, 40) });
+        var h = Lbl(col, title, 16, H.Col("#c8604c"), center: true, caps: true);
+        h.AddThemeColorOverride("font_shadow_color", new Color(0.4f, 0, 0, 0.7f)); h.AddThemeConstantOverride("shadow_outline_size", 4);
+        Rule(col);
+        Lbl(col, line, 8, H.Col("#d8d0bc"), italic: true, center: true);
+        Lbl(col, detail, 5, MUTED, center: true);
+        col.AddChild(new Control { CustomMinimumSize = new Vector2(0, 8) });
+        Btn(Row(col, true), "Wake at the bell", () => { Close(); onWake(); Input.MouseMode = Input.MouseModeEnum.Hidden; }, primary: true);
         FocusFirst();
     }
+    static void DeathDeep(Canvas c, Vector2 sz, float t)
+    {
+        // light from the surface, far above, and the bell somewhere up there
+        c.FillRectGradV(0, 0, sz.X, 70, new Color(0.25f, 0.4f, 0.42f, 0.22f), new Color(0.25f, 0.4f, 0.42f, 0));
+        for (int i = 0; i < 9; i++)
+        {
+            float x = (TileArt.Hash(i, 2) * sz.X + MathF.Sin(t * 0.7f + i) * 12) % sz.X, w = 20 + TileArt.Hash(i, 3) * 40;
+            c.FillRect(x, 2 + MathF.Sin(t * 1.3f + i * 2) * 1.5f, w, 0.6f, new Color(0.7f, 0.9f, 0.9f, 0.18f));
+        }
+        for (int i = 0; i < 3; i++)
+        {
+            float ph = (t * 0.25f + i / 3f) % 1;
+            c.Stroke = new Color(MenuArt.AMBER.R, MenuArt.AMBER.G, MenuArt.AMBER.B, 0.12f * (1 - ph)); c.LineWidth = 0.8f;
+            c.BeginPath(); c.Ellipse(sz.X / 2, -6, 30 + ph * 160, 8 + ph * 40, 0, 0, H.PI * 2); c.StrokePath();
+        }
+        // Maren, far below, sinking with her arms up, the lantern going down beside her
+        float bx = sz.X * 0.24f + MathF.Sin(t * 0.3f) * 6, by = sz.Y - 74 + MathF.Sin(t * 0.21f) * 3, rot = MathF.Sin(t * 0.25f) * 0.15f;
+        c.Glow(bx, by, 34, 30, new Color(0.25f, 0.45f, 0.45f, 0.12f));
+        c.Glow(bx + 14, by + 8, 30, new Color(1, 0.6f, 0.25f, 0.1f + 0.05f * MathF.Sin(t * 3)));
+        c.Fill = new Color(1, 0.75f, 0.35f, 0.5f); c.FillRect(bx + 13, by + 7, 2.2f, 3);
+        c.Save(); c.Translate(bx, by); c.Rotate(rot);
+        var body = new Color(0.03f, 0.05f, 0.06f, 0.95f);
+        c.Fill = body; c.FillCircle(0, -9, 4.2f); c.FillRect(-3.2f, -5, 6.4f, 10);
+        c.Stroke = body; c.LineWidth = 1.6f;
+        c.Line(-3, -4, -7, -14 + MathF.Sin(t * 0.8f)); c.Line(3, -4, 7.5f, -13 + MathF.Sin(t * 0.7f + 1));
+        c.Line(-2, 5, -4, 13); c.Line(2, 5, 5, 12.5f);
+        // the light from above catches her helmet and shoulders
+        c.Stroke = new Color(0.45f, 0.65f, 0.65f, 0.6f); c.LineWidth = 0.7f; c.BeginPath(); c.Arc(0, -9, 4.2f, -H.PI * 0.95f, -H.PI * 0.2f); c.StrokePath();
+        c.Line(-3.2f, -4.6f, 3.2f, -4.6f);
+        c.Fill = new Color(0.7f, 0.55f, 0.3f, 0.5f); c.FillCircle(1.6f, -9, 1.5f);
+        c.Restore();
+        // her last breath, going up
+        for (int i = 0; i < 14; i++)
+        {
+            float sp = 14 + TileArt.Hash(i, 7) * 18, ph = (t * sp / 300 + TileArt.Hash(i, 8)) % 1;
+            float y = by - 12 - ph * (by - 20), x = bx + MathF.Sin(t * 2 + i) * 3 + (TileArt.Hash(i, 9) - 0.5f) * 10 * ph;
+            float r = 0.6f + TileArt.Hash(i, 10) * 1.6f * (1 - ph * 0.3f);
+            c.Stroke = new Color(0.75f, 0.9f, 0.92f, 0.5f * (1 - ph)); c.LineWidth = 0.5f; c.BeginPath(); c.Arc(x, y, r, 0, H.PI * 2); c.StrokePath();
+            c.FillRect(x - r * 0.4f, y - r * 0.5f, 0.5f, 0.5f, new Color(1, 1, 1, 0.5f * (1 - ph)));
+        }
+        // dark shapes at the edge of the light, turning toward her
+        for (int i = 0; i < 3; i++)
+        {
+            float sx = i == 1 ? sz.X - 70 + MathF.Sin(t * 0.17f) * 10 : 50 + i * 30 + MathF.Sin(t * 0.13f + i) * 12, sy = sz.Y - 40 - i * 46;
+            c.Glow(sx, sy, 26, 12, new Color(0, 0, 0, 0.5f));
+            c.Fill = new Color(0.9f, 0.85f, 0.7f, 0.25f + 0.15f * MathF.Sin(t * 1.7f + i)); c.FillRect(sx - 3, sy - 1, 1, 1); c.FillRect(sx + 2, sy - 1, 1, 1);
+        }
+    }
 
-    // Words cut into the island, shown like an inscription.
+    // Words cut into the island: a slab of salt-whitened stone, the letters cut deep.
     public void Inscription(string title, string text, Action done = null)
     {
         if (kind == "inscription" && inscDone != null) { var prev = inscDone; inscDone = null; Callable.From(prev).CallDeferred(); }
         Show("inscription");
         inscDone = done;
-        var center = new CenterContainer();
-        center.SetAnchorsPreset(Control.LayoutPreset.FullRect);
-        root.AddChild(center);
-        var pc = new PanelContainer { CustomMinimumSize = new Vector2(213, 0) };
-        Ornate(pc);
-        var bx = Box(new Color(18 / 255f, 22 / 255f, 24 / 255f, 0.96f), H.Col("#3c4448"), 1, 14);
-        bx.ShadowColor = new Color(0, 0, 0, 0.7f); bx.ShadowSize = 10;
-        pc.AddThemeStyleboxOverride("panel", bx);
-        center.AddChild(pc);
-        var col = new VBoxContainer(); col.AddThemeConstantOverride("separation", 8);
-        pc.AddChild(col);
-        Lbl(col, string.Join(" ", (title ?? "").ToUpperInvariant().ToCharArray()), 5, MUTED, center: true);
-        var t = Lbl(col, text, 8, H.Col("#d8dfe0"), center: true);
-        t.AddThemeColorOverride("font_shadow_color", new Color(0.6f, 0.78f, 0.86f, 0.25f));
-        t.AddThemeConstantOverride("shadow_outline_size", 2);
-        var f = Footer(col, ("confirm", "close")); f.Align = 1;
+        var c = Panel(240, 300, MenuArt.Look.Stone, 0.9f);
+        c.AddThemeConstantOverride("separation", 7);
+        Lbl(c, string.Join(" ", (title ?? "").ToUpperInvariant().ToCharArray()), 5, H.Col("#9aa4a4"), center: true);
+        var t = Lbl(c, text, 8, H.Col("#dfe4e2"), center: true);
+        // cut letters: dark above where the chisel went in, light below where the edge catches
+        t.AddThemeColorOverride("font_shadow_color", new Color(0, 0, 0, 0.85f));
+        t.AddThemeConstantOverride("shadow_offset_x", -1); t.AddThemeConstantOverride("shadow_offset_y", -1);
+        t.AddThemeColorOverride("font_outline_color", new Color(0.55f, 0.7f, 0.75f, 0.18f));
+        t.AddThemeConstantOverride("outline_size", 2);
+        var f = Footer(c, ("confirm", "close")); f.Align = 1;
     }
 
     // Black-screen text, one line at a time. Confirm or a click advances; cancel skips.
     public void Cinematic(List<string> lines, Action done, string first = null)
     {
         Show("cinematic");
-        dim.Color = Colors.Black;
+        dim.Dim = 1; dim.Tint = Colors.Black; dim.Kelp = false; dim.Shafts = false;
         cine = new Cine { lines = lines.Where(l => !string.IsNullOrEmpty(l)).ToList(), done = done, first = first };
         var center = new CenterContainer();
         center.SetAnchorsPreset(Control.LayoutPreset.FullRect);

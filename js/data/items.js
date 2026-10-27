@@ -3,25 +3,25 @@
 
 // perSlot: how many fit in one satchel slot. slots: key items take 2 slots each.
 H.ITEMS = {
-  rivets:   { name: 'Rivets', perSlot: 18, color: '#c9b37a', desc: 'Ammunition for the Rivet Driver. Crafted from scrap, never bought.' },
-  bolts:    { name: 'Harpoon bolts', perSlot: 6, color: '#a8b8c0', desc: 'Pin a limb to a wall for 4 s. Recoverable, but lost if it sinks at Ebb.' },
-  flares:   { name: 'Flares', perSlot: 3, color: '#ff9a4a', desc: 'Thrown with the Flare Sling. Light that draws Driftlings.' },
-  spools:   { name: 'Saw-Line spools', perSlot: 3, color: '#d0d0d0', desc: 'A wire strung at knee height. Cuts knots that cross it.' },
-  oil:      { name: 'Oil flask', perSlot: 3, color: '#e0b040', desc: 'One flask: 90 s of focused beam or 3 burns. Rekindles Bell Rooms.' },
-  poultice: { name: 'Poultice', perSlot: 3, color: '#7fbf7f', desc: 'Restores 2 pips over 4 s; you can only walk while it works. A hit cancels the remainder.' },
-  stitchkit:{ name: 'Stitch Kit', perSlot: 3, color: '#e07070', desc: 'Restores all health in 4 s while kneeling.' },
-  scrap:    { name: 'Scrap', perSlot: 10, color: '#8a8a8a', desc: 'The contested material: rivets or bolts.' },
-  cord:     { name: 'Cord', perSlot: 10, color: '#b89a6a', desc: 'Tarred cord from the wrecks.' },
-  kelp:     { name: 'Kelp', perSlot: 10, color: '#4f8a4f', desc: 'Binds a poultice.' },
-  salt:     { name: 'Salt', perSlot: 10, color: '#e8e8f0', desc: 'Dead salt. The live kind is worse.' },
-  tallow:   { name: 'Tallow', perSlot: 10, color: '#e8d8a0', desc: 'Rendered into lamp oil.' },
-  spirit:   { name: 'Spirit', perSlot: 10, color: '#b0d0ff', desc: 'Surgical spirit for a Stitch Kit.' },
-  ivory:    { name: 'Mere-ivory', perSlot: 10, color: '#f4ecd8', desc: 'Rare bone from the Mere-Saint. Buys a weapon tier.' },
+  rivets:   { name: 'Rivets', perSlot: 18, color: '#c9b37a', desc: 'Ammunition for the Rivet Driver. Crafted from scrap, never bought.', examine: 'Cut from the hull plates of the ferry that brought her. Every head is stamped with a number. She has stopped reading them.' },
+  bolts:    { name: 'Harpoon bolts', perSlot: 6, color: '#a8b8c0', desc: 'Pin a limb to a wall for 4 s. Recoverable, but lost if it sinks at Ebb.', examine: 'Barbed iron, a forearm long. The barbs are filed backwards, so that whatever is pinned tears itself trying to leave.' },
+  flares:   { name: 'Flares', perSlot: 3, color: '#ff9a4a', desc: 'Thrown with the Flare Sling. Light that draws Driftlings.', examine: 'Magnesium in waxed card. The Driftlings cannot help it: they turn toward the light like flowers, and open.' },
+  spools:   { name: 'Saw-Line spools', perSlot: 3, color: '#d0d0d0', desc: 'A wire strung at knee height. Cuts knots that cross it.', examine: 'Piano wire on a fishing reel. It sings when it is strung, and again when it cuts.' },
+  oil:      { name: 'Oil flask', perSlot: 3, color: '#e0b040', desc: 'One flask: 90 s of focused beam or 3 burns. Rekindles Bell Rooms.', examine: 'Rendered tallow thinned with spirit. It smells of the chapel, and of what the chapel used to burn.' },
+  poultice: { name: 'Poultice', perSlot: 3, color: '#7fbf7f', desc: 'Restores 2 pips over 4 s; you can only walk while it works. A hit cancels the remainder.', examine: 'Kelp and salt bound in linen. It stings. It is meant to: the sting is the salt finding what does not belong.' },
+  stitchkit:{ name: 'Stitch Kit', perSlot: 3, color: '#e07070', desc: 'Restores all health in 4 s while kneeling.', examine: 'Curved needles, gut thread, a stopper of spirit. Her mother\'s hand on the label: not for the face.' },
+  scrap:    { name: 'Scrap', perSlot: 10, color: '#8a8a8a', desc: 'The contested material: rivets or bolts.', examine: 'Hull iron, nails, the lid of a tin. On the island everything is either a rivet or a bolt sooner or later.' },
+  cord:     { name: 'Cord', perSlot: 10, color: '#b89a6a', desc: 'Tarred cord from the wrecks.', examine: 'Tarred hemp cut from a net. Something is still knotted into one end. She does not look at it closely.' },
+  kelp:     { name: 'Kelp', perSlot: 10, color: '#4f8a4f', desc: 'Binds a poultice.', examine: 'Cold, slick, and faintly warm in the middle, like a hand that has only just let go.' },
+  salt:     { name: 'Salt', perSlot: 10, color: '#e8e8f0', desc: 'Dead salt. The live kind is worse.', examine: 'Dead salt: grey, crumbling, harmless. Live salt glitters and creeps toward warm skin. This does not. Yet.' },
+  tallow:   { name: 'Tallow', perSlot: 10, color: '#e8d8a0', desc: 'Rendered into lamp oil.', examine: 'Pale fat in a twist of paper. She has decided not to wonder what it was rendered from.' },
+  spirit:   { name: 'Spirit', perSlot: 10, color: '#b0d0ff', desc: 'Surgical spirit for a Stitch Kit.', examine: 'Surgical spirit in a brown bottle. Clean enough to burn, clean enough to drink, if it comes to that.' },
+  ivory:    { name: 'Mere-ivory', perSlot: 10, color: '#f4ecd8', desc: 'Rare bone from the Mere-Saint. Buys a weapon tier.', examine: 'Not bone, quite. It is warm. In the dark of the satchel it grows, very slowly, when she is not looking.' },
   // key items
-  crank:    { name: 'Sluice Crank', key: true, slots: 2, color: '#c08040', desc: 'Opens the seawall gate to the Saltworks.' },
-  tags:     { name: "Teodor's tags", key: true, slots: 1, color: '#d0c080', desc: "A diver's brass tags. Odile will know them." },
-  clapper:  { name: 'Bell clapper', key: true, slots: 2, color: '#b0a070', desc: 'The tongue of a Bell Room bell.' },
-  prism:    { name: 'Salt prism', key: true, slots: 2, color: '#d0f0ff', desc: 'Bends a focused beam.' },
+  crank:    { name: 'Sluice Crank', key: true, slots: 2, color: '#c08040', desc: 'Opens the seawall gate to the Saltworks.', examine: 'A sluice crank, its grip worn smooth by a hundred years of Keepers\' hands. It fits the socket at the foot of the seawall tower.' },
+  tags:     { name: "Teodor's tags", key: true, slots: 1, color: '#d0c080', desc: "A diver's brass tags. Odile will know them.", examine: 'Brass diver\'s tags on a chain: TEODOR, and a number. The chain was cut, not broken.' },
+  clapper:  { name: 'Bell clapper', key: true, slots: 2, color: '#b0a070', desc: 'The tongue of a Bell Room bell.', examine: 'A bell\'s tongue, heavy as a club. Somewhere a Bell Room has gone quiet without it, and something has gone in.' },
+  prism:    { name: 'Salt prism', key: true, slots: 2, color: '#d0f0ff', desc: 'Bends a focused beam.', examine: 'Salt grown clear as glass. Light goes in white and comes out bent, and the dead flinch from where it lands.' },
 };
 
 H.RECIPES = [

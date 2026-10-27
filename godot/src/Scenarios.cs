@@ -1043,19 +1043,47 @@ public static class Scenarios
         {
             G.ToTitle(); await t.Run(0.3f); t.Snap("ui_title");
             t.Ok("title menu", UI.Kind == "title", UI.Kind);
+            await t.ClickButton("Settings"); await t.Run(0.2f); t.Snap("ui_settings");
+            t.Ok("settings from the title", UI.Kind == "settings", UI.Kind);
+            await t.ClickButton("Back");
             await t.ClickButton("Controls"); await t.Run(0.2f); t.Snap("ui_controls");
             await t.ClickButton("Back");
             await t.ClickButton("Row out"); await t.Run(0.2f); t.Snap("ui_voyage"); await t.ClickButton("Cast off"); await t.Run(1.5f); t.Snap("ui_opening");
             t.Ok("opening cinematic", UI.Kind == "cinematic", UI.Kind);
             await t.Tap("pause"); await t.Run(0.5f);
             G.player.bag.Add("scrap", 6); G.player.bag.Add("oil", 2); G.player.bag.Add("kelp", 3);
-            UI.Satchel(); await t.Run(0.2f); t.Snap("ui_satchel");
+            G.player.bag.Add("poultice", 2); G.player.bag.Add("salt", 2); G.player.bag.Add("crank", 1); G.player.hp = 1;
+            UI.Satchel(); await t.Run(0.3f); t.Snap("ui_satchel");
+            t.Ok("the satchel shows her condition", UI.Inst.AllText().Contains("Bleeding out"), UI.Kind);
+            await t.ClickButton("Examine"); await t.Run(0.3f); t.Snap("ui_examine");
+            t.Ok("an item can be examined", UI.Kind == "examine" && UI.Inst.AllText().Contains(Data.Item("rivets").S("examine")), UI.Kind);
+            await t.ClickButton("Back"); await t.Run(0.1f);
+            t.Ok("and put back", UI.Kind == "satchel", UI.Kind);
+            G.player.hp = G.player.maxHp;
+            UI.Satchel("craft"); await t.Run(0.3f); t.Snap("ui_craft");
+            t.Ok("crafting shows what a recipe needs against what she has", UI.Inst.AllText().Contains("Needs") && UI.Inst.AllText().Contains("On hand"), UI.Kind);
+            UI.Satchel("gear"); await t.Run(0.2f); t.Snap("ui_gear");
+            UI.Satchel("log"); await t.Run(0.2f); t.Snap("ui_journal");
             UI.Close(); UI.Map(); await t.Run(0.2f); t.Snap("ui_map");
             UI.Close(); UI.Pause(); await t.Run(0.2f); t.Snap("ui_pause");
+            await t.ClickButton("Quit to title"); await t.Run(0.2f); t.Snap("ui_confirm");
+            t.Ok("quitting asks first", UI.Kind == "confirm", UI.Kind);
+            UI.Inst.TestBack(); await t.Run(0.1f);
+            t.Ok("and no goes back to the pause menu", UI.Kind == "pause", UI.Kind);
+            await t.ClickButton("Settings"); await t.Run(0.2f);
+            t.Ok("settings from the pause menu", UI.Kind == "settings", UI.Kind);
             UI.Close();
             t.Place("chapel", 20, 16); G.player.bag.Add("oil", 1);
             await t.Tap("interact"); await t.Run(0.2f); t.Snap("ui_bell");
             await t.ClickButton("Bench"); await t.Run(0.2f); t.Snap("ui_bench");
+            UI.Inst.PadButton(JoyButton.RightShoulder); await t.Run(0.2f); t.Snap("ui_bench_upgrade");
+            t.Ok("the bench's upgrade page", UI.Inst.AllText().Contains("Upgrade"), UI.Kind);
+            UI.Inst.PadButton(JoyButton.RightShoulder); await t.Run(0.2f); t.Snap("ui_bench_fittings");
+            UI.Inst.PadButton(JoyButton.LeftShoulder); UI.Inst.PadButton(JoyButton.LeftShoulder);
+            UI.Close(); UI.ReliquaryMenu(); await t.Run(0.2f); t.Snap("ui_reliquary");
+            int chestBefore = G.reliquary.Count("salt");
+            await t.ClickButton("Put all in the chest"); await t.Run(0.1f);
+            t.Ok("the reliquary moves a stack across", G.reliquary.List().Count > 0, chestBefore);
             UI.Close();
             t.Place("chapel", 9, 16); await t.Tap("interact"); await t.Run(0.3f); t.Snap("ui_dialogue");
             UI.Close();
@@ -1065,6 +1093,9 @@ public static class Scenarios
             UI.Close();
             G.player.Hurt(99); await t.Run(1.3f); t.Snap("ui_death");
             t.Ok("death screen", UI.Kind == "death", UI.Kind);
+            UI.Ending("The Keeper's Dark", new List<string> { "The lamp goes out, and stays out.", "Three of them row away at dawn." }, "Knots broken 212 · Deaths 4 · 3:12:40", new List<string> { "Odile keeps the ferry." });
+            UI.Inst.TestCancel(); await t.Run(0.3f); t.Snap("ui_ending");
+            t.Ok("the ending's epitaph", UI.Kind == "ending", UI.Kind);
         },
 
         ["controller"] = async t =>

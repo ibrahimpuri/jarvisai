@@ -730,6 +730,18 @@ public static class G
 
     // ------------------------------------------------------------------ save / load
     public static bool HasSave() => Godot.FileAccess.FileExists(SAVE_PATH);
+    // What the title says of the save: the Bell Room she last rang, the act, how long she has been out, how hard.
+    public static (string bell, int act, float time, string difficulty)? SaveSummary()
+    {
+        if (!HasSave()) return null;
+        try
+        {
+            var d = new Props(JsonNode.Parse(Godot.FileAccess.GetFileAsString(SAVE_PATH)).AsObject());
+            string id = d.P("respawn")?.S("room");
+            return (id != null && Data.Room.TryGetValue(id, out var r) ? r.Name : "the island", d.I("act", 1), d.P("stats")?.F("time") ?? 0, d.S("difficulty") ?? "keeper");
+        }
+        catch { return null; }
+    }
     public static void DeleteSave() { if (HasSave()) DirAccess.RemoveAbsolute(ProjectSettings.GlobalizePath(SAVE_PATH)); }
     public static void Save()
     {

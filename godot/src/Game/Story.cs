@@ -39,6 +39,7 @@ public static class Story
     static readonly Dictionary<string, string> NAMES = new() { ["ansel"] = "Brother Ansel", ["odile"] = "Odile Marrow", ["hesper"] = "Hesper Vane", ["agathe"] = "Agathe Hult" };
 
     public static string NpcName(string id) => NAMES.GetValueOrDefault(id, id);
+    public static string NpcIdFor(string name) { foreach (var kv in NAMES) if (kv.Value == name) return kv.Key; return null; }
     public static NpcLook NpcLook(string id) => LOOK.GetValueOrDefault(id, LOOK["ansel"]);
     public static bool ChoirFriendly() => !World.flags.B("choirDrained") && !World.flags.B("choirHostile");
     public static bool NpcPresent(string id, string roomId)

@@ -929,7 +929,7 @@ public class Player : Mover
     }
 
     // ---- healing and crafting --------------------------------------------------------
-    void UsePoultice()
+    public void UsePoultice()
     {
         if (healT > 0 || Locked()) return;
         if (bag.Count("poultice") <= 0) { H.ToastMsg("No poultices.", 1.5f); Snd.Deny(); return; }
@@ -940,7 +940,7 @@ public class Player : Mover
         healTick = 4f / healTotal;
         Snd.Heal(); Hints.Did("poultice");
     }
-    void UseStitch()
+    public void UseStitch()
     {
         if (healT > 0 || Locked()) return;
         if (bag.Count("stitchkit") <= 0) { H.ToastMsg("No Stitch Kits.", 1.5f); Snd.Deny(); return; }

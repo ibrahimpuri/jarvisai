@@ -40,6 +40,7 @@ public partial class Main : Node2D
         var args = OS.GetCmdlineUserArgs();
         if (args.Contains("--test") || args.Contains("--shots"))
         {
+            UiRoot.Instant = true;
             tester = new Tester(args);
             AddChild(tester);
         }
