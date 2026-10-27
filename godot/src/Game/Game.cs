@@ -87,6 +87,14 @@ public static class G
     // ------------------------------------------------------------------ setup
     public static void Init()
     {
+        // A pad button with a tap and a hold waits for the release only when holding it would do something else.
+        Inp.HoldUseful = i => player == null || i switch
+        {
+            0 => player.NearestDownedBody(26) != null,     // Y / triangle held burns a body
+            1 => player.bag.Count("scrap") > 0,              // RB / R1 held quick-crafts rivets
+            2 => player.bag.Count("stitchkit") > 0,          // d-pad up held kneels for a stitch kit
+            _ => true,
+        };
         Data.Load();
         World.Build();
         FindWrackPools();
@@ -822,6 +830,9 @@ public static class G
         var p = player; var r = room;
         float look = p.facing * 30;
         float tx = p.Cx() + look - H.VIEW_W / 2, ty = p.Cy() - H.VIEW_H / 2 - 10;
+        // looking up or down on purpose, and down ahead of a long fall to see where she will land
+        if (p.lookT > 0.4f) ty += p.lookDir * 76;
+        else if (!p.onGround && p.state == "normal" && p.vy > 260) ty += MathF.Min(56, (p.vy - 260) * 0.25f);
         if (!snap) { tx += StoryFocus.CamOffset.X; ty += StoryFocus.CamOffset.Y; }
         if (r.Pw <= H.VIEW_W) tx = r.Px + (r.Pw - H.VIEW_W) / 2; else tx = H.Clamp(tx, r.Px, r.Px + r.Pw - H.VIEW_W);
         if (r.Ph <= H.VIEW_H) ty = r.Py + (r.Ph - H.VIEW_H) / 2; else ty = H.Clamp(ty, r.Py, r.Py + r.Ph - H.VIEW_H);

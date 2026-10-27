@@ -36,8 +36,8 @@ npm start             # or run the desktop app straight from the source
 | Key | Action |
 | --- | --- |
 | A / D | Move |
-| W / S | Climb ladders, swim, shorten or lengthen the swing rope |
-| Space | Jump (S + Space drops through planks) |
+| W / S | Climb ladders, swim, shorten or lengthen the swing rope. Standing still: look up or down |
+| Space | Jump (S + Space drops through planks). At a ladder: climb it. Held in the air: catch one |
 | Shift (hold) | Sneak: footsteps carry 2 m instead of 6 m |
 | C | Dash, 0.2 s invulnerable. With the Jet Valve: air and underwater bursts in any direction |
 | Mouse | Aim |
@@ -50,7 +50,7 @@ npm start             # or run the desktop app straight from the source
 | R | Reload (locks you in place) |
 | T | Shutter the lantern |
 | Z / G | Poultice / Stitch Kit |
-| V | Quick-craft 3 rivets from 1 scrap |
+| V | Quick-craft 2 rivets from 1 scrap |
 | B | Ballast Boots on or off |
 | 1-4 / wheel | Select weapon |
 | I | Satchel, crafting, gear, logbook |
@@ -84,6 +84,7 @@ The game saves when you rest or save at a Bell Room. Continue from the title scr
 - **The Mere's Hollow** (`Hollow.cs`), a relic the sea gives Maren on the Long Pier, with four water verses on an energy bar. See [The Mere's Hollow](#the-meres-hollow).
 - **A guide, a journal and a new chart** (`Guide.cs`, `Chart.cs`): the next main objective on the HUD, in the world, in the journal and on a hand-drawn chart with the route marked. See [The guide](#the-guide-the-journal-and-the-chart).
 - **Combat tuned so Maren is the prey**, and **two Act III legendary weapons**, the Burning Glass and the Saint's Tine (`Legend.cs`), with the sea's hold on her and a fourth ending, Host of the Mere. See [Maren is the prey](#maren-is-the-prey), [The last night](#the-last-night-the-burning-glass-and-the-saints-tine) and [godot/docs/COMBAT.md](godot/docs/COMBAT.md).
+- **Climbing that works on a pad** (`Player.cs`, `Inp.cs`): Cross climbs ladders, a softer stick, the d-pad on ladders, a mid-air catch, a ledge grab that respects the level's walls, and smaller movement fixes. See [Climbing and movement](#climbing-and-movement).
 - **Handmade menus grown over by the sea** (`MenuArt.cs`, `MenuWidgets.cs`, `UiTitle.cs`, `UiSatchel.cs`, `UiBell.cs`): every menu drawn as driftwood, slate, planks, parchment or stone with kelp, wrack, barnacles and salt over its edges, and a satchel, crafting page, upgrade bench and item box modelled on the Resident Evil remakes. See [The menus](#the-menus) and [godot/docs/MENUS.md](godot/docs/MENUS.md).
 - **Lighting and depth** (`LightingManager.cs`, `shaders/world.gdshader`). Direct light from every lamp, fire and the lantern with 2D shadows, shading painted relief (each brick turns toward the light, wet stone below the tide line glints); indirect light as a sky/ground hemisphere plus a bounce buffer every lamp splats into, so light spills round corners and warms whatever stands near a fire; a key light per region (the moon outdoors, with shadows). Each region has a mood (ambient, key light, fog, wetness, depth of field and a colour grade) that blends over a few seconds when you cross into the next. Fog with a body hangs between the depths and the play, lit from inside by the lamps, with light shafts falling at the region's angle and dust turning in them; in front of it the ruin's own bones stand in near-black silhouette (the vault's broken ribs and piers, a candle corona on its chains, the Saltworks' pipes and hoists, the Saint's spine); the depths darken toward the vault and are out of focus, as is the foreground, which thins to a window wherever it would hide Maren; and bloom lets every lamp glow into the air. See [the graphics blueprint](godot/docs/GRAPHICS.md).
 - **Walls that remember** (`Masonry.cs`): ashlar courses with chipped edges, damp, drip streaks under every ledge, soot above every lamp that burned, moss, salt bloom and gilt by region, and in the tidal rooms the sea's own record: green stone below the high-water line, a salt rind, barnacles, and a storm line far higher from the night the light went out.
@@ -179,6 +180,19 @@ Every menu is made from the island and the sea has grown over it: kelp hangs fro
 
 [godot/docs/MENUS.md](godot/docs/MENUS.md) has the details and the sources.
 
+## Climbing and movement
+
+Climbing was the worst of the controls on a PlayStation pad. Cross at a ladder now climbs it, and holding Cross keeps climbing. A third of a push up on the stick climbs, a stick that leans a little no longer drops her off, the d-pad climbs while she is on a ladder, and holding jump in the air catches one. A jump that only just reaches a ledge catches the lip and pulls her up onto it. The grab only catches lips her last jump could have reached anyway, so the island's 4-tile walls still need a ladder, a rope, timber or the tide.
+
+The smaller fixes:
+- **Jumps:** a light tilt of the stick no longer shortens a jump.
+- **Tap-or-hold buttons:** they act on the press when holding would do nothing else.
+- **Swimming:** follows the stick.
+- **The view:** standing still and holding up or down looks that way, and a long fall shows where she will land.
+- **Ceiling corners:** a jump that clips a ceiling's corner slips past it.
+
+[godot/docs/MOVEMENT.md](godot/docs/MOVEMENT.md) has every rule and the tests.
+
 ## Maren is the prey
 
 The drowned close on her faster than she can comfortably back away. Once a Shucker has seen her it lurches at nearly her running speed, then stops to gather itself and lurches again. Its wind-up is quicker and its lunge longer, a grab bites every second and takes eight presses to break, and its knots take seven rivets to down it, one more than a magazine. Maren has 0.6 s of grace after a hit, a heavy blow knocks the wind out of her, her dash is a short dodge that needs 0.75 s to come back, and a scrap makes only two rivets. The Brine grows stronger with each act. The Pilgrim crossing keeps her old margins. [godot/docs/COMBAT.md](godot/docs/COMBAT.md) has every number, before and after.
@@ -215,17 +229,17 @@ Both editions play fully on a controller, from the title screen to the endings. 
 
 | Control | Action |
 | --- | --- |
-| Left stick | Move, climb, swim. A light tilt creeps quietly; click it (L3) to keep sneaking |
+| Left stick | Move, climb (a third of a push is enough), swim where it points. A light tilt creeps quietly; click it (L3) to keep sneaking. Standing still, up or down looks that way |
 | Right stick | Aim. Leave it alone and Maren aims where she walks; a gentle aim assist settles on knots and barrels |
-| A / Cross / Switch B | Jump (down + jump drops through planks) |
+| A / Cross / Switch B | Jump (down + jump drops through planks). At a ladder with no direction held: climb it; held in the air: catch one |
 | B / Circle / Switch A | Dash |
 | X / Square / Switch Y | Gaff strike |
-| Y / Triangle / Switch X | Interact, talk, drag a body. Hold it to burn a downed body |
+| Y / Triangle / Switch X | Interact, talk, drag a body. Hold it to burn a downed body (with no body near, it acts on the press) |
 | LB / L1 / L | Gaff Swing (hold) |
 | RB / R1 / R | Reload. Hold it to quick-craft rivets from scrap |
 | LT / L2 / ZL | Focused beam (hold) |
 | RT / R2 / ZR | Fire |
-| D-pad up | Poultice. Hold it for the Stitch Kit |
+| D-pad up | Poultice. Hold it for the Stitch Kit. On a ladder, the d-pad climbs instead |
 | D-pad down | Ballast Boots |
 | D-pad left / right | Change weapon |
 | R3 | Shutter the lantern |

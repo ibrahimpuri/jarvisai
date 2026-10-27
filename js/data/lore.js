@@ -160,7 +160,7 @@ H.LORE = {
     move: '{move} walk',
     jump: '{jump} jump',
     swim: '{move} swim     {jump} leap out at the surface',
-    ladder: '{up} climb',
+    ladder: '{up} or {jump} climb',
     walljump: '{walljump} cling to timber and leap',
     drop: '{drop} drop through',
     shoot: '{aim} aim     {fire} fire',

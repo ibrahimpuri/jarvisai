@@ -36,8 +36,13 @@ public static class Inp
         ["boots"] = JoyButton.DpadDown, ["wprev"] = JoyButton.DpadLeft, ["wnext"] = JoyButton.DpadRight,
         ["pause"] = JoyButton.Start, ["journal"] = JoyButton.Back, ["map"] = JoyButton.Touchpad,
     };
-    // One button, two actions: a tap does the first, holding it does the second.
+    // One button, two actions: a tap does the first, holding it does the second. When holding would do nothing
+    // different (no body to burn, no stitch kit), the tap happens on the press rather than waiting for the release.
     public const float HOLD = 0.4f;
+    public static Func<int, bool> HoldUseful;
+    // While Maren is on a ladder the d-pad climbs it: up and down rather than the poultice and the boots.
+    public static bool OnLadder;
+    static bool dpadClimb;
     public static readonly (JoyButton btn, string tap, string hold)[] PAD_DUAL =
     {
         (JoyButton.Y, "interact", "burn"), (JoyButton.RightShoulder, "reload", "quickcraft"), (JoyButton.DpadUp, "poultice", "stitch"),
@@ -99,12 +104,22 @@ public static class Inp
 
     static void PollPad(int d, float dt)
     {
-        foreach (var kv in PAD) if (Input.IsJoyButtonPressed(d, kv.Value)) down.Add(kv.Key);
+        // d-pad down pressed on a ladder stays "down" until it is let go, so stepping off the foot does not toggle the boots
+        bool dDown = Input.IsJoyButtonPressed(d, JoyButton.DpadDown);
+        if (OnLadder && dDown) dpadClimb = true; else if (!dDown) dpadClimb = false;
+        foreach (var kv in PAD) if (Input.IsJoyButtonPressed(d, kv.Value)) down.Add(dpadClimb && kv.Value == JoyButton.DpadDown ? "down" : kv.Key);
         for (int i = 0; i < PAD_DUAL.Length; i++)
         {
             var (btn, tap, hold) = PAD_DUAL[i];
+            if (OnLadder && btn == JoyButton.DpadUp)
+            {
+                if (Input.IsJoyButtonPressed(d, btn)) down.Add("up");
+                holdT[i] = 0; holdFired[i] = Input.IsJoyButtonPressed(d, btn);
+                continue;
+            }
             if (Input.IsJoyButtonPressed(d, btn))
             {
+                if (holdT[i] == 0 && !holdFired[i] && HoldUseful != null && !HoldUseful(i)) { holdFired[i] = true; down.Add(tap); }
                 holdT[i] += dt;
                 if (holdT[i] >= HOLD && !holdFired[i]) { holdFired[i] = true; down.Add(hold); }
             }
@@ -117,8 +132,9 @@ public static class Inp
         stick = Dead(new Vector2(Input.GetJoyAxis(d, JoyAxis.LeftX), Input.GetJoyAxis(d, JoyAxis.LeftY)));
         if (stick.X < -0.25f) down.Add("left");
         if (stick.X > 0.25f) down.Add("right");
-        if (stick.Y < -0.5f) down.Add("up");
-        if (stick.Y > 0.5f) down.Add("down");
+        // up and down need only a little over a third of a push: a ladder, a dive or a drop should not need a shove
+        if (stick.Y < -0.35f) down.Add("up");
+        if (stick.Y > 0.35f) down.Add("down");
         // A light tilt creeps; L3 toggles sneaking for players who would rather not feather the stick.
         bool l3 = Input.IsJoyButtonPressed(d, JoyButton.LeftStick);
         if (l3 && !l3Prev) sneakLatch = !sneakLatch;

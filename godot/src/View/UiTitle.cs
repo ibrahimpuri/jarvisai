@@ -309,13 +309,14 @@ public partial class UiRoot
         {
             var k = new (string, string)[]
             {
-                ("A / D", "Move"), ("W / S", "Climb ladders, swim, shorten / lengthen swing rope"), ("Space", "Jump (down + Space drops through planks)"),
+                ("A / D", "Move"), ("W / S", "Climb ladders, swim, shorten / lengthen swing rope. Standing still: look up or down"),
+                ("Space", "Jump (down + Space drops through planks). At a ladder: climb it; held in the air: catch one"),
                 ("Shift (hold)", "Sneak: footsteps 2 m instead of 6 m"), ("C", "Dash (0.2 s invulnerable). Jet Valve: air and water bursts in any direction"),
                 ("Mouse", "Aim"), ("Left click / J", "Fire the selected weapon"), ("Right click / K (hold)", "Focused beam: makes knots glint, double oil"),
                 ("F", "Gaff strike (melee, pry plates, kick barrels)"), ("Q (hold)", "Gaff Swing from an iron ring / hook-pull a light enemy"),
                 ("E", "Interact, talk, drag a downed body"), ("X", "Burn a downed body with lantern oil"), ("R", "Reload (locks you in place)"),
                 ("T", "Shutter the lantern (nearly invisible, blind to weak points)"), ("Z", "Poultice (2 pips over 3 s)"), ("G", "Stitch Kit (full heal, kneel 4 s)"),
-                ("V", "Quick-craft 3 rivets from 1 scrap (2 s, crouched)"), ("B", "Ballast Boots on / off"), ("1-4 / wheel", "Select weapon"),
+                ("V", "Quick-craft 2 rivets from 1 scrap (2.5 s, crouched)"), ("B", "Ballast Boots on / off"), ("1-4 / wheel", "Select weapon"),
                 ("I", "Satchel, crafting, journal"), ("Tab / M", "Map"), ("Esc / P", "Pause"), ("F11", "Fullscreen"),
             };
             if (Hollow.owned) k = k.Concat(new[] { ("5", "Take the Mere's Hollow in hand"), ("H", "Sing the verse (brimming, hold the Calling to turn the tide)"), ("Y", "Change verse") }).ToArray();
@@ -329,14 +330,14 @@ public partial class UiRoot
         {
             var rows = new (string, string)[]
             {
-                ("{move}", "Move, climb ladders, swim. A light tilt creeps quietly"), ("{sneak}", "Sneak on / off"),
+                ("{move}", "Move, climb ladders, swim. A light tilt creeps quietly. Standing still: look up or down"), ("{sneak}", "Sneak on / off"),
                 ("{drop}", "Drop through planks"), ("{aim}", "Aim. With the stick left alone, Maren aims where she walks"),
-                ("{jump}", "Jump"), ("{dash}", "Dash (0.2 s invulnerable)"), ("{gaff}", "Gaff strike: melee, pry plates, kick barrels"),
+                ("{jump}", "Jump. At a ladder with no direction held: climb it. Held in the air: catch one"), ("{dash}", "Dash (0.2 s invulnerable)"), ("{gaff}", "Gaff strike: melee, pry plates, kick barrels"),
                 ("{interact}", "Interact, talk, drag a downed body"), ("{burn}", "Burn a downed body with lantern oil"),
                 ("{swing}", "Gaff Swing from an iron ring / hook-pull a light enemy"),
                 ("{fire}", "Fire the selected weapon"), ("{focus}", "Focused beam: makes knots glint, double oil"),
-                ("{reload}", "Reload"), ("{quickcraft}", "Quick-craft 3 rivets from 1 scrap"),
-                ("{poultice}", "Poultice"), ("{stitch}", "Stitch Kit"), ("{boots}", "Ballast Boots on / off"),
+                ("{reload}", "Reload"), ("{quickcraft}", "Quick-craft 2 rivets from 1 scrap"),
+                ("{poultice}", "Poultice (on a ladder the d-pad climbs instead)"), ("{stitch}", "Stitch Kit"), ("{boots}", "Ballast Boots on / off"),
                 ("{weapon}", "Change weapon"), ("{shutter}", "Shutter the lantern"),
                 ("{journal}", "Map, satchel and journal; the bumpers turn the page"), ("{pause}", "Pause"),
             };
@@ -352,6 +353,7 @@ public partial class UiRoot
         H3(c, "How Hollowmere works");
         Small(c, "Every Brine body is held up by salt knots at its joints. Rivets on flesh barely scratch; hit the knots. The Crown knot in the chest is sealed until two limb knots break. A dropped body lying in water when the next Rising tide reaches it will stand again at High tide: haul it above the tide line or burn it.", false);
         Small(c, "The tide dial (top right) runs a 10-minute cycle: Low, Rising, High, Ebbing. Painted tide marks on pillars show where the water will reach. Bell Rooms are safe; resting there advances the tide to the next Low.", false);
+        Small(c, "Climbing: a jump that only just reaches a ledge catches its lip if you push toward it, and Maren pulls herself up (hold down to drop past instead). Walls higher than a jump still need a ladder, a rope, timber to wall-jump on or the tide.", false);
         var br = Row(c, true); br.AddThemeConstantOverride("separation", 8);
         Btn(br, "Back", () => (back ?? Close)(), style: MenuArt.Btn.Chip);
         Btn(br, "Controller settings", () => ControllerSettings(() => Controls(back, controlsTab)), style: MenuArt.Btn.Chip);

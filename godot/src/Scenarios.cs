@@ -1098,6 +1098,152 @@ public static class Scenarios
             t.Ok("the ending's epitaph", UI.Kind == "ending", UI.Kind);
         },
 
+        ["climb"] = async t =>
+        {
+            // Climbing as a PlayStation player tries it: cross to climb, a half push of the stick, a stick that is
+            // never quite straight, and ledges a jump only just reaches.
+            var p = G.player;
+            Pad.Simulate(PadKind.PlayStation);
+            async Task Foot() { t.PadReset(); p.state = "normal"; t.Place("reef", 22, 12); await t.Run(0.3f); }
+            await Foot();
+            float y0 = p.y;
+            t.PadButton(JoyButton.A, true); await t.Run(0.8f); t.PadButton(JoyButton.A, false); await t.Run(0.05f);
+            t.Ok("cross at the foot of a ladder climbs it", p.state == "ladder" && p.y < y0 - 50, $"{p.state} {y0} -> {p.y}");
+            await Foot(); y0 = p.y;
+            t.PadAxis(JoyAxis.LeftY, -0.5f); await t.Run(0.8f);
+            t.Ok("half a push up the stick climbs", p.state == "ladder" && p.y < y0 - 50, $"{p.state} {y0} -> {p.y}");
+            y0 = p.y;
+            t.PadAxis(JoyAxis.LeftX, 0.45f); t.PadAxis(JoyAxis.LeftY, -0.55f); await t.Run(0.5f);
+            t.Ok("a stick leaning sideways keeps her climbing", p.state == "ladder" && p.y < y0 - 25, $"{p.state} {y0} -> {p.y}");
+            t.PadAxis(JoyAxis.LeftY, 0); t.PadAxis(JoyAxis.LeftX, 1); await t.Run(0.25f);
+            t.Ok("a firm push sideways lets go", p.state != "ladder", p.state);
+            await Foot();
+            t.PadAxis(JoyAxis.LeftY, -1); await t.Run(0.5f); t.PadAxis(JoyAxis.LeftY, 0); await t.Run(0.1f);
+            bool was = p.state == "ladder";
+            t.PadAxis(JoyAxis.LeftX, 1); await t.PadTap(JoyButton.A); await t.Run(0.05f);
+            t.Ok("cross and a direction leap off the ladder", was && p.state != "ladder" && p.vx > 50, $"{was} {p.state} {p.vx}");
+            t.PadReset(); await t.Run(1.2f);
+            await Foot(); float x0 = p.x;
+            t.PadAxis(JoyAxis.LeftX, 1); await t.PadTap(JoyButton.A); await t.Run(0.4f);
+            t.Ok("a running jump past a ladder carries on", p.state != "ladder" && p.x > x0 + 20, $"{p.state} {x0} -> {p.x}");
+            t.PadReset(); await t.Run(1.0f);
+            p.state = "normal"; t.Place("reef", 22, 7); p.vy = 120; t.PadButton(JoyButton.A, true); await t.Run(0.15f);
+            t.Ok("cross held catches a ladder in the air", p.state == "ladder", p.state);
+            t.PadButton(JoyButton.A, false); t.PadReset(); await t.Run(0.05f);
+            p.state = "normal"; t.Place("reef", 22, 7); p.vy = 120; y0 = p.y; await t.Run(0.3f);
+            t.Ok("with nothing held she falls past it", p.state != "ladder" && p.y > y0 + 30, $"{p.state} {y0} -> {p.y}");
+            await Foot();
+            t.PadAxis(JoyAxis.LeftY, -1); await t.Run(3.5f); t.PadAxis(JoyAxis.LeftY, 0); await t.Run(0.2f);
+            var top = t.State();
+            t.Ok("at the top she steps off onto it", top.st == "normal" && top.ground && top.ty <= 4, top);
+            Pad.EndSimulate(); t.PadReset();
+            await Foot(); y0 = p.y;
+            t.Down("jump"); await t.Run(0.6f); t.Release("jump"); await t.Run(0.05f);
+            t.Ok("space at the foot of a ladder climbs it too", p.state == "ladder" && p.y < y0 - 40, $"{p.state} {y0} -> {p.y}");
+            p.state = "normal";
+            // ledges: a jump that falls just short catches the lip and pulls up onto it (the cloister's pits drained
+            // for the test: at Low tide the sea stands in them)
+            float spring = Tide.spring; Tide.spring = -8;
+            t.Place("cloister", 10, 19); await t.Run(0.4f);
+            float lip = G.room.Py + 17 * 16;
+            p.x = G.room.Px + 10 * 16 + 1; p.y = lip + 8 - p.h; p.vy = 60; p.vx = 0; p.onGround = false;
+            t.Down("left"); await t.Run(0.6f); t.Release("left"); await t.Run(0.1f);
+            var s = t.State();
+            t.Ok("a jump that falls just short catches the ledge and climbs it", s.ground && s.ty == 16, s);
+            // a wall higher than a jump can clear stays a wall: no catch for a lip well above where she left the floor
+            t.Place("cloister", 10, 19); await t.Run(0.4f);
+            p.takeoffY = lip + 64;
+            p.x = G.room.Px + 10 * 16 + 1; p.y = lip + 8 - p.h; p.vy = 60; p.vx = 0; p.onGround = false;
+            t.Down("left"); await t.Run(0.6f); t.Release("left"); await t.Run(0.1f);
+            s = t.State();
+            t.Ok("a wall taller than a jump is not climbed", s.ty == 19, s);
+            // holding down lets her drop past a ledge
+            t.Place("cloister", 10, 19); await t.Run(0.4f);
+            p.x = G.room.Px + 10 * 16 + 1; p.y = lip + 8 - p.h; p.vy = 60; p.vx = 0; p.onGround = false;
+            t.Down("left", "down"); await t.Run(0.6f); t.Release("left", "down"); await t.Run(0.1f);
+            t.Ok("holding down drops past a ledge", t.State().ty == 19, t.State());
+            // with real input: every running jump at the pit's 3-tile wall gets out, however late or early the jump
+            int made = 0, tries = 0; var misses = new List<string>();
+            foreach (int start in new[] { 11, 12, 13, 14 })
+                foreach (float delay in new[] { 0f, 0.05f, 0.1f, 0.15f, 0.2f })
+                    for (int attempt = 0; attempt < 3; attempt++)
+                    {
+                        // the pit holds one of Agathe's pages: its reading (and Maren's thought on it) pauses the game,
+                        // so an attempt it interrupts is run again
+                        p.state = "normal"; t.Place("cloister", start, 19); await t.Run(0.25f);
+                        while (UI.IsOpen()) { UI.Close(); await t.Run(0.3f); }
+                        t.Down("left"); await t.Run(delay); await t.Hold("jump", 0.35f); await t.Run(0.6f); t.Release("left"); await t.Run(0.1f);
+                        if (UI.IsOpen()) continue;
+                        tries++; if (t.State().ty == 16) made++; else misses.Add($"{start}/{delay}");
+                        break;
+                    }
+            t.Ok("every running jump at a 3-tile ledge makes it", made == tries && tries == 20, $"{made}/{tries} missed {string.Join(" ", misses)}");
+            // and a 4-tile stone wall is still a wall, however she jumps at it (the breakers' shaft, drained)
+            bool escaped = false;
+            foreach (float delay in new[] { 0f, 0.1f, 0.2f })
+            {
+                p.state = "normal"; t.Place("breakers", 50, 20); await t.Run(0.3f);
+                t.Down("left"); await t.Run(delay);
+                for (int i = 0; i < 4; i++) { await t.Hold("jump", 0.4f); await t.Run(0.5f); }
+                t.Release("left"); await t.Run(0.1f);
+                if (t.State().ty < 17) escaped = true;
+            }
+            t.Ok("a 4-tile stone wall cannot be climbed by jumping", !escaped, t.State());
+            Tide.spring = spring;
+        },
+
+        ["qol"] = async t =>
+        {
+            // the smaller frustrations, fixed
+            var p = G.player;
+            Pad.Simulate(PadKind.PlayStation); t.PadReset();
+            // a light tilt of the stick sneaks on the ground but does not shorten a jump
+            t.Place("reef", 27, 12); await t.Run(0.3f);
+            t.PadAxis(JoyAxis.LeftX, 0.45f); await t.Run(0.3f);
+            float x0 = p.x;
+            t.PadButton(JoyButton.A, true); await t.Run(0.35f); t.PadButton(JoyButton.A, false); await t.Run(0.25f);
+            t.Ok("a light tilt carries a jump at full stride", p.x - x0 > 70, $"{p.x - x0:0} px in 0.6 s");
+            t.PadReset(); await t.Run(0.5f);
+            // triangle opens a locker on the press, not the release, when there is nothing to burn
+            t.Place("reef", 13, 12);
+            var chest = First<Chest>(); p.x = chest.Cx() - p.w / 2; await t.Run(0.1f);
+            t.PadButton(JoyButton.Y, true); await t.Run(0.05f);
+            t.Ok("triangle acts on the press", chest.done, chest.done);
+            t.PadButton(JoyButton.Y, false); await t.Run(0.1f);
+            while (UI.IsOpen()) { UI.Close(); await t.Run(0.1f); }
+            // the d-pad climbs while she is on a ladder, and does not spend a poultice
+            p.state = "normal"; t.Place("reef", 22, 12); await t.Run(0.3f);
+            t.PadAxis(JoyAxis.LeftY, -1); await t.Run(0.2f); t.PadAxis(JoyAxis.LeftY, 0); await t.Run(0.05f);
+            int poultices = p.bag.Count("poultice"); p.hp = p.maxHp - 1;
+            float y0 = p.y;
+            t.PadButton(JoyButton.DpadUp, true); await t.Run(0.5f); t.PadButton(JoyButton.DpadUp, false); await t.Run(0.1f);
+            t.Ok("d-pad up climbs on a ladder", p.state == "ladder" && p.y < y0 - 30 && p.bag.Count("poultice") == poultices && p.healT <= 0, $"{p.state} {y0} -> {p.y} poultices {poultices} -> {p.bag.Count("poultice")}");
+            // and d-pad down climbs to the foot without toggling the boots as she steps off
+            bool hadBoots = p.abilities.Contains("boots"); p.abilities.Add("boots"); p.boots = false;
+            t.PadButton(JoyButton.DpadDown, true); await t.Run(1.2f); t.PadButton(JoyButton.DpadDown, false); await t.Run(0.1f);
+            t.Ok("d-pad down climbs off the foot of a ladder and leaves the boots alone", p.state == "normal" && p.onGround && !p.boots, $"{p.state} ground={p.onGround} boots={p.boots}");
+            if (!hadBoots) p.abilities.Remove("boots");
+            p.hp = p.maxHp; p.state = "normal";
+            // swimming follows the stick, not just its eight directions
+            t.Place("cloister", 13, 19); await t.Run(0.4f);
+            t.PadAxis(JoyAxis.LeftX, 0.9f); t.PadAxis(JoyAxis.LeftY, -0.3f); await t.Run(0.22f);
+            t.Ok("a stick a little above level swims a little upward", p.InWater() && p.vx > 60 && p.vy < -10, $"water={p.InWater()} vx={p.vx:0} vy={p.vy:0}");
+            t.PadReset(); await t.Run(0.2f);
+            Pad.EndSimulate(); t.PadReset();
+            // standing still and holding down looks down (in the ribshaft, two screens tall)
+            t.Place("ribshaft", 22, 20); await t.Run(0.8f);
+            float cy = G.cam.Y;
+            t.Down("down"); await t.Run(1.0f);
+            float looked = G.cam.Y - cy;
+            t.Release("down"); await t.Run(0.8f);
+            t.Ok("holding down while still looks down, and lets go", looked > 40 && MathF.Abs(G.cam.Y - cy) < 10, $"{looked:0} then {G.cam.Y - cy:0}");
+            // a jump that clips the corner of a ceiling slides past it into the gap
+            t.Place("cloister", 17, 3); await t.Run(0.3f);
+            p.x = G.room.Px + 18 * 16 - 3; p.y = G.room.Py + 2 * 16 + 1; p.vy = -320; p.onGround = false;
+            await t.Run(0.12f);
+            t.Ok("a jump clipping a ceiling corner slips past it", p.y < G.room.Py + 2 * 16 - 4, $"y {p.y - G.room.Py:0}");
+        },
+
         ["controller"] = async t =>
         {
             // which family a controller belongs to
@@ -1118,8 +1264,8 @@ public static class Scenarios
             t.PadAxis(JoyAxis.LeftX, 0.45f); await t.Run(0.1f);
             t.Ok("a light tilt sneaks", Inp.Held("sneak") && Inp.Held("right"));
             t.PadAxis(JoyAxis.LeftX, 0); await t.Run(0.1f);
-            // A jumps
-            await t.Run(0.3f);
+            // A jumps (away from the ladder: at one, A climbs)
+            t.Place("reef", 28, 12); await t.Run(0.3f);
             float y0 = p.y; t.PadButton(JoyButton.A, true); await t.Run(0.15f); t.PadButton(JoyButton.A, false);
             t.Ok("A jumps", p.y < y0 - 15, $"{y0} -> {p.y}");
             await t.Run(0.8f);

@@ -48,6 +48,13 @@ public class Player : Mover
     float drownT, pressureT, stepT;
     public float aim;
     float staggerT, gaffLooseT, gaffAnim, ladderCool, dropT;
+    // Ledges: where her feet last left firm footing, and how high the way she left it could carry her. A lip she has
+    // nearly cleared is caught only if that could have reached it, so a ledge grab never climbs a wall a jump cannot.
+    public float takeoffY = 1e9f, takeoffCap;
+    float mantleT; Vector2 mantleFrom, mantleTo; int mantleSide;
+    const float CLIMB = 112, MANTLE_TIME = 0.26f;
+    // Standing still and holding down (or up, away from a ladder) looks that way after a moment.
+    public float lookT; public int lookDir;
     public int hanging;
     int lastHang; float hangGrace;
     public bool dead, inBellRoom;
@@ -78,7 +85,7 @@ public class Player : Mover
     public Vector2 LanternPos() => new(Cx() + facing * 3, y + 9);
     public bool HeadUnder() => World.IsWater(Cx(), y + 3);
     public bool InWater() => World.IsWater(Cx(), Cy());
-    public bool Locked() => reloadT > 0 || craftT > 0 || (healT > 0 && healKind == "stitch") || grabbedBy != null || staggerT > 0;
+    public bool Locked() => reloadT > 0 || craftT > 0 || (healT > 0 && healKind == "stitch") || grabbedBy != null || staggerT > 0 || state == "mantle";
 
     // Beam hit test used by Bellmouths: is (x,y) inside the lantern cone?
     public bool BeamHits(float px, float py)
@@ -107,6 +114,7 @@ public class Player : Mover
         // A hit cancels the remainder of a poultice; interrupts a Stitch Kit.
         if (healT > 0) { if (healKind == "stitch") H.ToastMsg("Stitching interrupted. The kit is kept."); healT = 0; }
         craftT = 0; reloadT = 0;
+        if (state == "mantle") state = "normal";
         if (src != null)
         {
             bool fromBehind = H.Sign(src.Cx() - Cx()) == -facing;
@@ -136,6 +144,7 @@ public class Player : Mover
     // ---- update ---------------------------------------------------------------
     public void Update(float dt)
     {
+        Inp.OnLadder = state == "ladder" && !dead;
         if (dead) return;
         invulnT -= dt; dashCool -= dt; gaffCool -= dt; fireCool -= dt; hazardT -= dt; shutNoteT -= dt; wetT -= dt;
         staggerT -= dt; gaffLooseT -= dt;
@@ -157,11 +166,28 @@ public class Player : Mover
         UpdateLantern(dt);
         UpdateTimers(dt);
 
-        if (state == "swing") { UpdateSwing(dt); AfterMove(dt); return; }
-        if (state == "ladder") { UpdateLadder(dt); AfterMove(dt); return; }
-        if (InWater() && !(boots && !World.IsBrine(Cx(), Cy())) && !BootsBrine()) { UpdateSwim(dt); AfterMove(dt); return; }
+        if (state == "mantle") { UpdateMantle(dt); AfterMove(dt); return; }
+        if (state == "swing") { UpdateSwing(dt); Takeoff(40); AfterMove(dt); return; }
+        if (state == "ladder") { UpdateLadder(dt); Takeoff(19); AfterMove(dt); return; }
+        if (InWater() && !(boots && !World.IsBrine(Cx(), Cy())) && !BootsBrine()) { UpdateSwim(dt); Takeoff(37); AfterMove(dt); return; }
         UpdateGround(dt);
+        if (onGround) Takeoff(boots && InWater() ? 45 : 56);
+        else if (hanging != 0) Takeoff(50);
         AfterMove(dt);
+    }
+    // Her feet are on something firm; `cap` is how far above them the way off it can lift her, less a margin.
+    void Takeoff(float cap) { takeoffY = y + h; takeoffCap = cap; }
+
+    // Up or down on the stick counts only when it is not mostly sideways, so a run with the stick held a little high
+    // does not catch every ladder on the way past.
+    static bool UpIntent() => Inp.Held("up") && (!Pad.Using || -Inp.stick.Y >= MathF.Abs(Inp.stick.X) * 0.6f);
+    static bool DownIntent() => Inp.Held("down") && (!Pad.Using || Inp.stick.Y >= MathF.Abs(Inp.stick.X) * 0.6f);
+    // A ladder carries on at or just above her head: there is something to climb.
+    bool LadderUp() { int tx = H.FloorI(Cx() / TS); return World.IsLadder(tx, H.FloorI((y + 4) / TS)) || World.IsLadder(tx, H.FloorI((y - 6) / TS)); }
+    void MountLadder()
+    {
+        state = "ladder"; Hints.Did("climb"); vx = 0; vy = 0; jumpBuf = 0;
+        x = MathF.Floor(Cx() / TS) * TS + 8 - w / 2;
     }
     bool BootsBrine() => boots && World.IsBrine(Cx(), Cy());
 
@@ -350,8 +376,9 @@ public class Player : Mover
     void UpdateGround(float dt)
     {
         bool sneak = Inp.Held("sneak");
-        float speed = sneak ? SNEAK : RUN;
-        if (dragging != null) speed = 32;
+        // Sneaking quiets her steps; in the air there are none, so a light tilt of the stick does not shorten a jump.
+        float speed = sneak && onGround ? SNEAK : RUN;
+        if (dragging != null) speed = 44;
         if (healT > 0 && healKind == "poultice") speed *= 0.4f;
         if (Legend.beaming) speed = MathF.Min(speed, 55);
         if (boots && InWater()) speed = 85;
@@ -374,11 +401,18 @@ public class Player : Mover
         if (onGround) { coyote = COYOTE; airDashed = false; } else coyote -= dt;
         if (Inp.Hit("jump")) jumpBuf = BUFFER; else jumpBuf -= dt;
 
-        // Ladders
+        // Ladders. Up climbs one; so does jump at a ladder with no direction held (cross on a PlayStation pad), and
+        // jump held in the air catches one. Jump with a direction is still a jump, so a run past a ladder carries on.
         ladderCool -= dt;
-        if ((Inp.Held("up") || (Inp.Held("down") && !onGround && ladderCool <= 0)) && OnLadderTile() && dragging == null) { state = "ladder"; Hints.Did("climb"); vx = 0; vy = 0; x = MathF.Floor(Cx() / TS) * TS + 8 - w / 2; return; }
-        if (Inp.Held("down") && onGround && dragging == null && !LadderBelow()) OpenHatchBelow();
-        if (Inp.Held("down") && onGround && LadderBelow() && dragging == null) { state = "ladder"; Hints.Did("climb"); y += 4; x = MathF.Floor(Cx() / TS) * TS + 8 - w / 2; return; }
+        if (OnLadderTile() && dragging == null && !Locked())
+        {
+            bool jumpClimb = dir == 0 && LadderUp() && (Inp.Hit("jump") || (!onGround && Inp.Held("jump") && vy > -60 && ladderCool <= 0));
+            if (UpIntent() || jumpClimb || (DownIntent() && !onGround && ladderCool <= 0)) { MountLadder(); return; }
+        }
+        if (DownIntent() && onGround && dragging == null && !LadderBelow()) OpenHatchBelow();
+        if (onGround && dir == 0 && MathF.Abs(vx) < 10 && dragging == null && (DownIntent() || UpIntent())) { lookT += dt; lookDir = DownIntent() ? 1 : -1; }
+        else lookT = 0;
+        if (DownIntent() && onGround && LadderBelow() && dragging == null) { MountLadder(); y += 4; return; }
 
         // Wall-hang on timber (never wet stone).
         int wallDir = dir;
@@ -403,7 +437,7 @@ public class Player : Mover
             else if (wetT > 0 && dragging == null && World.IsWater(Cx(), y + h + 2))
             {
                 // bobbing at the surface, half in and half out: the jump still carries her out of the water
-                vy = -330; wetT = 0; jumpBuf = 0;
+                vy = -330; wetT = 0; jumpBuf = 0; Takeoff(37);
                 float surf = World.SurfaceAt(Cx(), y + h + 2);
                 Snd.Splash(0.2f); if (float.IsFinite(surf)) FX.Splash(Cx(), surf, 8);
             }
@@ -435,6 +469,10 @@ public class Player : Mover
         dropping = dropT > 0;
         Phys.Move(this, dt);
         if (platform != null) y += platform.dy;
+        // a jump that clips a ceiling's corner slides past it rather than stopping dead
+        if (hitCeil && vyBefore < -150) CornerSlip(vyBefore, dir);
+        // a ledge she has nearly cleared: catch the lip and pull up onto it
+        if (!onGround && dir != 0 && vy > -60 && dashT <= 0 && dragging == null && !Locked() && !DownIntent() && TryLedge(dir)) return;
         // landing
         if (onGround && !wasG && vyBefore > 250)
         {
@@ -545,8 +583,11 @@ public class Player : Mover
     {
         int tx = H.FloorI(Cx() / TS);
         vx = 0;
-        int v = (Inp.Held("down") ? 1 : 0) - (Inp.Held("up") ? 1 : 0);
-        vy = v * 95;
+        int dir = Dir();
+        // up, or jump held with no direction, climbs; down climbs down
+        bool down = DownIntent(), up = !down && (UpIntent() || (Inp.Held("jump") && dir == 0));
+        int v = (down ? 1 : 0) - (up ? 1 : 0);
+        vy = v * CLIMB;
         float ny = y + vy * dt;
         // stop at the top or bottom of the ladder
         int headTile = H.FloorI((ny + 2) / TS), footTile = H.FloorI((ny + h - 2) / TS);
@@ -569,10 +610,72 @@ public class Player : Mover
             return;
         }
         y = ny;
-        if (MathF.Abs(vy) > 1) { stepT -= dt * 3; if (stepT <= 0) { stepT = 1; Snd.Step(true, 0.05f); } }
-        if (Inp.Hit("jump")) { state = "normal"; vy = -250; vx = Dir() * 140; }
-        else if ((Inp.Held("left") || Inp.Held("right")) && !Inp.Held("up") && !Inp.Held("down")) state = "normal";
+        if (MathF.Abs(vy) > 1) { stepT -= dt * 3.4f; if (stepT <= 0) { stepT = 1; Snd.Step(true, 0.05f); } }
+        // jump with a direction leaps off to that side; a firm push sideways lets go
+        if (Inp.Hit("jump") && dir != 0) { state = "normal"; vy = -250; vx = dir * 140; ladderCool = 0.3f; }
+        else if (dir != 0 && !up && !down && Sideways()) { state = "normal"; ladderCool = 0.3f; }
         onGround = false;
+    }
+    void CornerSlip(float vyWas, int dir)
+    {
+        for (int d = 1; d <= 5; d++)
+            foreach (int s0 in dir < 0 ? new[] { -1, 1 } : new[] { 1, -1 })
+            {
+                float nx = x + s0 * d;
+                if (!Phys.BoxSolid(nx, y, w, h) && !Phys.BoxSolid(nx, y - 4, w, h)) { x = nx; vy = vyWas; hitCeil = false; return; }
+            }
+    }
+    // A push that is mostly sideways, not a climb leaning off true.
+    static bool Sideways() => !Pad.Using || Inp.stick == Vector2.Zero || (MathF.Abs(Inp.stick.X) > 0.5f && MathF.Abs(Inp.stick.X) > MathF.Abs(Inp.stick.Y) * 1.4f);
+
+    // ---- ledges ---------------------------------------------------------------------------
+    // Pushing at a wall whose lip is between her head and her feet, she catches it and pulls herself up: the jump
+    // that clipped the corner still gets her there. Only lips her last takeoff could have reached count.
+    bool TryLedge(int side)
+    {
+        float face = side > 0 ? x + w + 1.5f : x - 1.5f;
+        int tx = H.FloorI(face / TS);
+        if (Phys.BoxSolid(x + side * 2, y, w, h) == false) return false;   // no wall there
+        int t0 = H.FloorI((y - 6) / TS), t1 = H.FloorI((y + h - 3) / TS);
+        for (int ty = t0; ty <= t1; ty++)
+        {
+            if (World.Solid(tx, ty) != 1 || World.Solid(tx, ty - 1) == 1) continue;
+            float lip = ty * TS;
+            if (lip < y - 6 || lip > y + h - 3) continue;
+            if (!Climbable(World.CharAt(tx, ty))) return false;
+            if (lip < takeoffY - takeoffCap) return false;
+            float sx = side > 0 ? tx * TS + 1 : tx * TS + TS - w - 1;
+            // her own column clear up to the top, and room to stand on it
+            if (Phys.BoxSolid(x, lip - h - 0.5f, w, y + h - (lip - h))) return false;
+            if (Phys.BoxSolid(MathF.Min(x, sx), lip - h - 0.5f, MathF.Abs(sx - x) + w, h)) return false;
+            state = "mantle"; mantleT = 0; mantleSide = side;
+            mantleFrom = new Vector2(x, y); mantleTo = new Vector2(sx, lip - h - 0.01f);
+            vx = vy = 0; facing = side; hanging = 0; jumpBuf = 0;
+            Snd.Gaff(); Hints.Did("mantle");
+            return true;
+        }
+        return false;
+    }
+    // Stone, timber, bone, metal and salt can be climbed; crystals, gates and the island's edge cannot.
+    static bool Climbable(char ch) => ch is not ('x' or '_' or 'K' or 'Z' or 'h' or 'E' or 'L' or 'V' or 'Y' or 'C');
+    void UpdateMantle(float dt)
+    {
+        mantleT += dt / MANTLE_TIME;
+        float k = MathF.Min(1, mantleT);
+        // up first, then over the lip
+        float ky = Ease(MathF.Min(1, k / 0.65f)), kx = Ease(MathF.Max(0, (k - 0.4f) / 0.6f));
+        x = H.Lerp(mantleFrom.X, mantleTo.X, kx);
+        y = H.Lerp(mantleFrom.Y, mantleTo.Y, ky);
+        vx = vy = 0; onGround = false;
+        // a jump pressed while she pulls up is kept for the moment she stands
+        if (Inp.Hit("jump")) jumpBuf = BUFFER;
+        if (k >= 1)
+        {
+            state = "normal"; onGround = true; vx = mantleSide * 30; coyote = COYOTE;
+            Snd.Footstep(Surface(), 0.1f); FX.Dust(Cx(), y + h, 3, mantleSide);
+            Noise.Emit(Cx(), y + h, 3 * NoiseScale(), "step");
+        }
+        static float Ease(float u) => u * u * (3 - 2 * u);
     }
 
     void UpdateSwim(float dt)
@@ -580,13 +683,18 @@ public class Player : Mover
         bool brine = World.IsBrine(Cx(), Cy());
         int dx = Dir();
         int dy = (Inp.Held("down") ? 1 : 0) - (Inp.Held("up") ? 1 : 0);
+        // a ladder out of the water: up, or jump with no direction, takes it
+        if (OnLadderTile() && dragging == null && !Locked() && (UpIntent() || DownIntent() || (Inp.Hit("jump") && dx == 0 && LadderUp()))) { MountLadder(); return; }
         float sp = Locked() ? 0 : 105;
         if (dragging != null) sp = 40;
+        // on a pad she swims where the stick points, at the speed it is pushed
+        Vector2 want = Pad.Using && Inp.stick != Vector2.Zero ? Inp.stick : new Vector2(dx, dy);
+        if (want.Length() > 1) want = want.Normalized();
         if (dashT > 0) { dashT -= dt; dashInv -= dt; }
         else
         {
-            vx = H.Approach(vx, dx * sp, 500 * dt);
-            vy = H.Approach(vy, dy * sp, 500 * dt);
+            vx = H.Approach(vx, want.X * sp, 500 * dt);
+            vy = H.Approach(vy, want.Y * sp, 500 * dt);
         }
         // buoyancy
         float buoy = 25;
@@ -604,7 +712,6 @@ public class Player : Mover
         else if (atSurface) wetT = 0.25f;
         if (Inp.Hit("dash") && dashCool <= 0 && !Locked() && dragging == null) Dash(true);
         if (Inp.Hit("swing") && Has("swing")) StartSwing();
-        if ((Inp.Held("up") || Inp.Held("down")) && OnLadderTile() && dragging == null) { state = "ladder"; vx = 0; vy = 0; x = MathF.Floor(Cx() / TS) * TS + 8 - w / 2; return; }
         coyote = 0;
         dropping = dropT > 0;
         Phys.Move(this, dt);
@@ -636,6 +743,7 @@ public class Player : Mover
             if (!grafts.Contains("lung")) breath -= 3;
             Snd.Burst(); FX.Bubbles(Cx(), Cy(), 8);
             airDashed = inAir;
+            if (inAir) Takeoff(56);
         }
         vx = dx * sp; vy = dy * sp;
         Hints.Did(inAir || water ? "jet" : "dash");
@@ -727,8 +835,9 @@ public class Player : Mover
         s.av += (-g / s.len * MathF.Sin(s.ang) + pump) * dt;
         s.av *= 1 - 0.15f * dt;
         s.av = H.Clamp(s.av, -6, 6);
-        if (Inp.Held("up")) s.len = MathF.Max(24, s.len - 60 * dt);
-        if (Inp.Held("down")) s.len = MathF.Min(MathF.Min(110, Phys.Ray(s.ax, s.ay, H.PI / 2, 200) - 22), s.len + 60 * dt);
+        // the rope shortens or pays out only for a push that is mostly up or down, not a pump that leans
+        if (UpIntent()) s.len = MathF.Max(24, s.len - 60 * dt);
+        if (DownIntent()) s.len = MathF.Min(MathF.Min(110, Phys.Ray(s.ax, s.ay, H.PI / 2, 200) - 22), s.len + 60 * dt);
         s.ang += s.av * dt;
         float nx = s.ax + MathF.Sin(s.ang) * s.len - w / 2;
         float ny = s.ay + MathF.Cos(s.ang) * s.len - 4;
@@ -1119,6 +1228,7 @@ public class Player : Mover
         if (onGround && speed > 20) runPhase += dt * speed / 9.5f;
         else if (swim) runPhase += dt * 6;
         else if (state == "ladder" && MathF.Abs(vy) > 10) runPhase += dt * 9;
+        else if (state == "mantle") runPhase += dt * 14;
         coatSway = H.Lerp(coatSway, Math.Clamp(vx / 160f, -1.5f, 1.5f) * -f + (onGround ? 0 : Math.Clamp(-vy / 300f, -1, 1)), MathF.Min(1, dt * 8));
         if (onGround && !wasOnGround && lastVy > 200) landT = 0.14f;
         wasOnGround = onGround; lastVy = vy;
@@ -1139,7 +1249,7 @@ public class Player : Mover
         // ---- legs ----
         Vector2 footA, footB;
         if (kneel) { footA = new(x0 + f * 4, gy); footB = new(x0 - f * 3, gy); }
-        else if (state == "ladder") { float s = MathF.Sin(runPhase); footA = new(x0 - 2, gy - 1.5f + s * 2); footB = new(x0 + 2, gy - 1.5f - s * 2); }
+        else if (state == "ladder" || state == "mantle") { float s = MathF.Sin(runPhase); footA = new(x0 - 2, gy - 1.5f + s * 2); footB = new(x0 + 2, gy - 1.5f - s * 2); }
         else if (swim) { float s = MathF.Sin(runPhase); footA = new(x0 - f * 3 + s * 1.5f, gy + 1 + s * 2); footB = new(x0 - f * 4 - s * 1.5f, gy + 1 - s * 2); }
         else if (!onGround) { footA = vy < 0 ? new(x0 + f * 3.5f, gy - 3.5f) : new(x0 + f * 2.5f, gy - 0.5f); footB = vy < 0 ? new(x0 - f * 2, gy - 1.5f) : new(x0 - f * 3, gy - 1.5f); }
         else if (run > 0)
@@ -1286,7 +1396,7 @@ public class Player : Mover
             c.Stroke = H.Col("#121110"); c.LineWidth = 2.1f; c.Line(back.X, back.Y, hand.X, hand.Y);
             c.Fill = H.Col("#221a12"); c.FillCircle(hand.X, hand.Y, 1.1f);
         }
-        float aimA = state == "swing" ? MathF.Atan2(swing.ay - sh.Y, swing.ax - sh.X) : state == "ladder" ? -H.PI / 2 : aim;
+        float aimA = state == "swing" ? MathF.Atan2(swing.ay - sh.Y, swing.ax - sh.X) : state == "ladder" ? -H.PI / 2 : state == "mantle" ? -H.PI / 2 + mantleSide * 0.5f : aim;
         float reach = state == "ladder" ? 5 : 6.4f;
         var elbowBend = new Vector2(MathF.Cos(aimA + 0.5f * f), MathF.Sin(aimA + 0.5f * f)) * 3.4f;
         var hx2 = sh + new Vector2(MathF.Cos(aimA), MathF.Sin(aimA)) * reach;
