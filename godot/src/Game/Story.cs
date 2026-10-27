@@ -166,6 +166,7 @@ public static class Story
         }
         if (id == "agathe")
         {
+            q.Set("agatheMet", true);
             int n = G.pages.Count;
             var lines = new List<string>
             {

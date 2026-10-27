@@ -1360,6 +1360,222 @@ public static class Scenarios
             t.Ok("narrative state saved", saved.P("narr")?.Has("read") == true);
         },
         // She is the prey: the drowned close on her, she has little grace after a hit, and the Hollow is a last breath.
+        // The crank, the whole way round, with real inputs only: the seawall tower is shut, so down through the Tithe
+        // Gallery into the hall, the crank from the altar, up with the flood, back through the gallery, the socket,
+        // and up the tower. Then: someone who reached the Saltworks some other way can always get back down.
+        // The island's seams: every opening at a room's edge meets an opening in the room beside it, every ladder that
+        // runs off a room's edge carries on into the next, and nothing is placed inside a wall.
+        // The guide: the main story's next step follows what she has done, points the way through the rooms, and is
+        // written up in the journal and on the chart.
+        // The Evaporation Pans with real inputs: the levers in the plaque's order, a sprint through the closing hatch,
+        // onto the barge, up with the water, and off at the top into the Kilns.
+        ["pans"] = async t =>
+        {
+            async Task<(string room, float x, float y, int tx, int ty, int hp, string st, bool ground, string phase)> Until(string[] keys, Func<(string room, float x, float y, int tx, int ty, int hp, string st, bool ground, string phase), bool> cond, float secs = 12)
+            {
+                t.Down(keys); var s = t.State();
+                for (int f = 0; f < secs * 60; f += 3) { s = t.State(); if (cond(s)) break; await t.Run(0.05f); }
+                t.Release(keys); await t.Run(0.05f); return t.State();
+            }
+            G.god = true; World.flags.Set("seawallOpen", true);
+            var p = G.player;
+            t.Place("saltgate", 14, 18); await t.Run(0.3f);
+            foreach (var b in G.ents.OfType<Body>()) b.gone = true;
+            var s = await Until(new[] { "right" }, s => s.tx >= 16); await t.Tap("interact"); await t.Run(0.2f);
+            s = await Until(new[] { "left" }, s => s.tx <= 12); await t.Tap("interact"); await t.Run(0.2f);
+            s = await Until(new[] { "right" }, s => s.tx >= 24); await t.Tap("interact"); await t.Run(0.1f);
+            t.Ok("wave, skull, flame: the pan floods", World.flags.B("basinFilling"), string.Join(",", World.flags.Strings("basinSeq")));
+            s = await Until(new[] { "right" }, s => s.tx >= 30, 3);
+            t.Ok("there is time to run through the hatch before it shuts", s.tx >= 30, s);
+            // the pan is already deep: swim up with the water to the barge, or the top
+            s = await Until(new[] { "up" }, s => s.ty <= 8, 10);
+            for (int k = 0; k < 40 && World.State("saltgate").pool["basin"] > 7.3f; k++) await t.Run(0.25f);
+            t.Ok("the hatch is shut behind her", World.Solid(G.room.Ox + 28, G.room.Oy + 17) == 1);
+            s = await Until(new[] { "up" }, s => s.ty <= 8, 4);
+            t.Ok("she rises with the water to the top of the pan", t.State().ty <= 8, t.State());
+            for (int k = 0; k < 4 && t.State().room != "kilns"; k++) { t.Down("up", "right"); await t.Hold("jump", 0.35f); await t.Run(0.8f); t.Release("up", "right"); await t.Run(0.2f); }
+            t.Ok("and off the top of the pan into the Kilns", t.State().room == "kilns", t.State());
+            G.god = false;
+        },
+        ["guide"] = async t =>
+        {
+            G.god = true;
+            var p = G.player; var f = World.flags; var q = G.quests;
+            t.Ok("every step's room is on the island, and reachable from the reef", Guide.Steps.All(s0 => Data.Room.ContainsKey(s0.room) && Guide.Route("reef", s0.room) != null), string.Join(",", Guide.Steps.Where(s0 => Guide.Route("reef", s0.room) == null).Select(s0 => s0.id)));
+            t.Ok("a new game starts with getting ashore", Guide.Current?.id == "ashore", Guide.Current?.id);
+            t.Place("pier", 20, 16); await t.Run(0.2f);
+            t.Ok("on the pier, the next step is the chapel", Guide.Current?.id == "chapel", Guide.Current?.id);
+            t.Ok("and a new objective is announced", Guide.bannerT > 0 && Guide.bannerTitle == Guide.Current.title, Guide.bannerTitle);
+            G.titleT = 0; await t.Run(0.8f); t.Snap("guide_1_banner");
+            var h = Guide.Heading(out bool thing);
+            t.Ok("the pier points at the foot of its ladder up to the Seawall", h != null && !thing && MathF.Abs(h.Value.X - (G.room.Px + 4 * 16 + 8)) < 2 && h.Value.Y > G.room.Py + 14 * 16, h);
+            q.Set("anselMet", true); await t.Run(0.1f);
+            t.Ok("after Ansel: the crank", Guide.Current?.id == "crank", Guide.Current?.id);
+            t.Place("tithe_gallery", 30, 16); await t.Run(0.2f);
+            h = Guide.Heading(out thing, out var exit);
+            t.Ok("in the gallery it points at the top of the ladder down, not the room's edge", h != null && exit.Y > 0 && MathF.Abs(h.Value.X - (G.room.Px + 35 * 16 + 8)) < 2 && h.Value.Y < G.room.Py + 17 * 16 + 8, $"{h} {exit}");
+            G.titleT = 0; H.Toasts.Clear(); await t.Run(0.8f); t.Snap("guide_2_ladder");
+            t.Place("tithe", 20, 16); await t.Run(0.2f);
+            h = Guide.Heading(out thing);
+            var crank = First<Crank>();
+            t.Ok("in the hall it marks the crank itself", thing && h != null && MathF.Abs(h.Value.X - crank.Cx()) < 2, h);
+            p.x = crank.Cx() + 40; G.SnapCamera(); G.titleT = 0; H.Toasts.Clear(); await t.Run(0.8f); t.Snap("guide_3_crank");
+            UI.Map(); await t.Run(0.4f); t.Snap("guide_4_chart_crank"); UI.Close();
+            p.bag.Add("crank", 1); await t.Run(0.1f);
+            t.Ok("with the crank: the Seawall gate", Guide.Current?.id == "gate", Guide.Current?.id);
+            G.titheFlood = 5; await t.Run(0.05f);
+            t.Ok("in the flooding hall it says how to get out", Guide.Current.now?.Invoke()?.Contains("walkway ladder") == true);
+            G.titheFlood = null;
+            f.Set("seawallOpen", true); p.bag.Remove("crank", 1); await t.Run(0.1f);
+            t.Ok("gate open: climb to the Saltworks", Guide.Current?.id == "climb", Guide.Current?.id);
+            t.Place("saltgate", 10, 18); await t.Run(0.2f);
+            t.Ok("in the Saltworks: cross the pans", Guide.Current?.id == "pans", Guide.Current?.id);
+            f.Set("basinJam", true); await t.Run(0.05f);
+            t.Ok("jammed sluices get their own advice", Guide.Current.now?.Invoke()?.Contains("Ebb") == true);
+            f.Set("basinJam", false);
+            t.Place("kilns", 15, 18); await t.Run(0.2f);
+            t.Ok("at the Kilns: the Abbot", Guide.Current?.id == "abbot", Guide.Current?.id);
+            // the journal and the chart
+            UI.Satchel("log"); await t.Run(0.2f);
+            t.Snap("guide_5_journal");
+            t.Ok("the journal leads with the objective and how to do it", UI.Inst.AllText().Contains(Guide.Current.title) && UI.Inst.AllText().Contains("Cathedral of Salt"), UI.Kind);
+            UI.Map(); await t.Run(0.3f);
+            t.Ok("the chart opens", UI.Kind == "satchel");
+            t.Snap("guide_6_chart_abbot");
+            UI.Close();
+            // steps done out of order are skipped
+            f.Set("abbotDead", true); p.abilities.Add("boots"); t.Place("nave", 20, 16); await t.Run(0.2f);
+            t.Ok("steps already done are skipped", Guide.Current?.id == "prior", Guide.Current?.id);
+            // the guide can be put away
+            Settings.Guide = false; await t.Run(0.05f);
+            t.Ok("the guide can be turned off", !Guide.On);
+            Settings.Guide = true;
+            G.god = false;
+        },
+        ["worldaudit"] = async t =>
+        {
+            await t.Run(0.05f);
+            var gaps = new List<string>(); var ladders = new List<string>(); var buried = new List<string>();
+            static bool Open(char ch) => World.Solidity(ch) != 1 || ch is 'L' or 'E' or 'K' or 'Z' or 'V' or 'Y' or 'h';
+            foreach (var r in Data.Rooms)
+            {
+                for (int ty = 0; ty < r.Th; ty++)
+                    for (int tx = 0; tx < r.Tw; tx++)
+                    {
+                        bool edge = tx == 0 || ty == 0 || tx == r.Tw - 1 || ty == r.Th - 1;
+                        if (!edge) continue;
+                        int wx = r.Ox + tx, wy = r.Oy + ty;
+                        char ch = World.CharAt(wx, wy);
+                        if (!Open(ch)) continue;
+                        // the tile across the edge
+                        foreach (var (dx, dy) in new[] { (-1, 0), (1, 0), (0, -1), (0, 1) })
+                        {
+                            int nx = tx + dx, ny = ty + dy;
+                            if (nx >= 0 && ny >= 0 && nx < r.Tw && ny < r.Th) continue;
+                            var nr = World.RoomAtTile(wx + dx, wy + dy);
+                            if (nr == null) { if (!r.Outdoor) gaps.Add($"{r.Id} ({tx},{ty}) opens onto nothing"); else GD.Print($"EDGE {r.Id} ({tx},{ty}) open to the outside"); continue; }
+                            char nc = World.CharAt(wx + dx, wy + dy);
+                            if (!Open(nc)) gaps.Add($"{r.Id} ({tx},{ty}) '{ch}' -> {nr.Id} '{nc}'");
+                            if (World.IsLadder(wx, wy) || ch == 'H') { if (dy != 0 && nc != 'H' && nc != 'K' && nc != 'Z' && World.Solidity(nc) != 0) ladders.Add($"{r.Id} ({tx},{ty}) ladder ends at {nr.Id} '{nc}'"); }
+                        }
+                    }
+                foreach (var spec in G.RoomSpecs(r))
+                {
+                    int tx = spec.I("tx"), ty = spec.I("ty");
+                    if (tx < 0 || ty < 0 || tx >= r.Tw || ty >= r.Th) continue;
+                    char ch = World.CharAt(r.Ox + tx, r.Oy + ty);
+                    if (World.Solidity(ch) == 1 && spec.S("type") is not ("gullet" or "pews" or "wrackpool" or "driftnest")) buried.Add($"{r.Id} {spec.S("type")} at ({tx},{ty}) in '{ch}'");
+                }
+            }
+            foreach (var g in gaps.Distinct()) GD.Print("GAP " + g);
+            foreach (var g in ladders.Distinct()) GD.Print("LADDER " + g);
+            foreach (var g in buried.Distinct()) GD.Print("BURIED " + g);
+            t.Ok("every opening at a room's edge meets an opening beside it", gaps.Count == 0, gaps.Count + " gaps");
+            t.Ok("every ladder off a room's edge carries on", ladders.Count == 0, ladders.Count + "");
+            t.Ok("nothing is placed inside a wall", buried.Count == 0, buried.Count + "");
+        },
+        ["walkthrough"] = async t =>
+        {
+            async Task<(string room, float x, float y, int tx, int ty, int hp, string st, bool ground, string phase)> Until(string[] keys, Func<(string room, float x, float y, int tx, int ty, int hp, string st, bool ground, string phase), bool> cond, float secs = 12)
+            {
+                t.Down(keys);
+                var s = t.State();
+                for (int f = 0; f < secs * 60; f += 3) { s = t.State(); if (cond(s)) break; await t.Run(0.05f); }
+                t.Release(keys);
+                await t.Run(0.05f);
+                return t.State();
+            }
+            G.god = true;
+            var p = G.player;
+            // the tower: without the crank its gate is shut, and the ladder stops under it
+            t.Place("seawall", 23, 16); await t.Run(0.3f);
+            var s = await Until(new[] { "up" }, s => s.room != "seawall", 5);
+            t.Ok("the tower ladder stops under the shut gate", s.room == "seawall" && s.ty <= 3, s);
+            s = await Until(new[] { "down" }, s => s.ground && s.st == "normal", 6);
+            t.Ok("and she can climb back down to the foot of the tower", s.room == "seawall" && s.ty == 16 && s.ground, s);
+            // the socket tells her where the crank is
+            var sock = First<Socket>(); p.x = sock.Cx() - p.w / 2; await t.Run(0.1f);
+            await t.Tap("interact"); await t.Run(0.2f);
+            t.Ok("the empty socket says where the crank is", UI.IsOpen() && UI.Inst.AllText().Contains("Tithe Hall"), UI.Kind);
+            UI.Close(); await t.Run(0.1f);
+            // the other way: west along the seawall into the Tithe Gallery
+            t.Place("seawall", 3, 16); await t.Run(0.3f);
+            s = await Until(new[] { "left" }, s => s.room == "tithe_gallery");
+            t.Ok("west from the seawall into the Tithe Gallery", s.room == "tithe_gallery", s);
+            s = await Until(new[] { "left" }, s => s.tx <= 35);
+            s = await Until(new[] { "down" }, s => s.room == "tithe" && s.ground, 12);
+            t.Ok("down the gallery ladder to the Tithe Hall floor", s.room == "tithe" && s.ground && s.ty == 16, s);
+            // and from the hall floor a jump reaches the bottom of the walkway ladder
+            t.Down("up"); await t.Hold("jump", 0.3f); await t.Run(0.3f); t.Release("up");
+            t.Ok("from the floor, a jump catches the walkway ladder", p.state == "ladder", p.state);
+            s = await Until(new[] { "down" }, s => s.ground, 4);
+            s = await Until(new[] { "left", "sneak" }, s => s.tx <= 4, 20);
+            t.Ok("across the hall to the altar", s.tx <= 5, s);
+            await t.Tap("interact"); await t.Run(0.3f);
+            t.Ok("the crank is taken, and the hall floods", p.bag.Count("crank") == 1 && G.titheFlood != null, $"crank={p.bag.Count("crank")}");
+            // back up: under the walkway, rise with the water, climb out, and up the ladder
+            s = await Until(new[] { "right" }, s => s.tx >= 34 || s.st == "swim", 20);
+            s = await Until(new[] { "right" }, s => s.tx >= 34, 12);
+            float waited = 0;
+            while (waited < 30 && World.State("tithe").flood > 10) { await t.Run(0.5f); waited += 0.5f; }
+            // a jump from the surface always carries her out, wherever she is in her bob (in open water, under no walkway)
+            s = await Until(new[] { "left" }, s => s.tx <= 27, 8);
+            float lowest = 1e9f;
+            for (int k = 0; k < 4; k++)
+            {
+                s = await Until(new[] { "up" }, s => p.y < World.SurfaceAt(p.Cx(), p.Cy() + 30), 6);
+                await t.Run(0.13f + k * 0.07f);
+                float y0 = p.y; t.Down("jump");
+                float top = y0; for (int f = 0; f < 18; f++) { await t.Run(1 / 60f); top = MathF.Min(top, p.y); }
+                t.Release("jump");
+                lowest = MathF.Min(lowest, y0 - top);
+                await t.Run(0.8f);
+            }
+            t.Ok("a jump from the water's surface always leaves the water", lowest > 24, $"weakest jump rose {lowest:0} px");
+            s = await Until(new[] { "right" }, s => s.tx >= 35, 8);
+            p.x = G.room.Px + 35 * 16 + 3; p.vx = 0; await t.Run(0.2f);
+            s = await Until(new[] { "up" }, s => s.st == "ladder", 4);
+            t.Ok("from the flood she can reach the walkway ladder", s.st == "ladder", s);
+            s = await Until(new[] { "up" }, s => s.room == "tithe_gallery" && s.st != "ladder", 14);
+            t.Ok("up with the flood and the ladder, back to the gallery", s.room == "tithe_gallery", s);
+            s = await Until(new[] { "right" }, s => s.room == "seawall");
+            t.Ok("east to the seawall with the crank", s.room == "seawall" && p.bag.Count("crank") == 1, s);
+            s = await Until(new[] { "right" }, s => s.tx >= 22);
+            sock = First<Socket>(); p.x = sock.Cx() - p.w / 2; await t.Run(0.1f);
+            await t.Tap("interact"); await t.Run(0.3f);
+            t.Ok("the crank opens the gate", World.flags.B("seawallOpen") && p.bag.Count("crank") == 0);
+            p.x = G.room.Px + 23 * 16 + 3; await t.Run(0.1f);
+            s = await Until(new[] { "up" }, s => s.room == "saltgate" && s.st != "ladder", 14);
+            t.Ok("up the tower into the Saltworks", s.room == "saltgate", s);
+            s = await Until(new[] { "down" }, s => s.room == "seawall" && s.ground, 14);
+            t.Ok("and back down", s.room == "seawall" && s.ground, s);
+            // someone already above the shut gate (an old save) can always get down
+            World.flags.Set("seawallOpen", false); World.MarkDirty();
+            t.Place("saltgate", 23, 18); await t.Run(0.3f);
+            s = await Until(new[] { "down" }, s => s.room == "seawall" && s.ground, 16);
+            t.Ok("from above, the shut gate's bar lifts and she climbs down", s.room == "seawall" && World.flags.B("seawallOpen"), s);
+            G.god = false;
+        },
         ["prey"] = async t =>
         {
             var p = G.player;

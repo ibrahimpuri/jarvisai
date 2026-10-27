@@ -135,6 +135,15 @@ public static class TileArt
                         if (ch == 'V') { c.FillStyle = "#c0a060"; c.FillRect(x + 6, y + 6, 4, 4); }
                     }
                     else if (ch == 'K' || ch == 'Z') Decor(c, 'H', x, y, tx, ty);
+                    else if (ch == 'h' && World.flags.B("basinFilling") && !World.flags.B("basinCrossed"))
+                    {
+                        // grinding down: the whole door's height falls over HATCH_CLOSE seconds, top tile first
+                        float k = Math.Clamp(G.basinFillT / G.HATCH_CLOSE, 0, 1) * 3 - (ty - (World.RoomAtTile(tx, ty)?.Oy ?? 0) - 16);
+                        float fill = Math.Clamp(k, 0, 1);
+                        c.FillStyle = col; c.FillRect(x, y, TS, TS * fill);
+                        c.Fill = new Color(1, 1, 1, 0.12f); c.FillRect(x + 7, y, 2, TS * fill);
+                        c.Fill = new Color(0, 0, 0, 0.25f); c.FillRect(x, y, 2, TS); c.FillRect(x + TS - 2, y, 2, TS);
+                    }
                     else { c.Fill = new Color(0, 0, 0, 0.25f); c.FillRect(x, y, 2, TS); c.FillRect(x + TS - 2, y, 2, TS); }
                     break;
                 }

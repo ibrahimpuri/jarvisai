@@ -33,6 +33,7 @@ public class Player : Mover
     float coyote, jumpBuf;
     public float invulnT, dashT, dashCool, dashInv, dashVy;
     float hazardT;   // a dash carries her clean over crystals and through fire, though not past the drowned
+    float wetT;      // just out of the water, bobbing at the surface: a jump still leaves the water
     bool airDashed, dashAir;
     float gaffCool, fireCool;
     public float reloadT, healT, craftT;
@@ -136,7 +137,7 @@ public class Player : Mover
     public void Update(float dt)
     {
         if (dead) return;
-        invulnT -= dt; dashCool -= dt; gaffCool -= dt; fireCool -= dt; hazardT -= dt;
+        invulnT -= dt; dashCool -= dt; gaffCool -= dt; fireCool -= dt; hazardT -= dt; shutNoteT -= dt; wetT -= dt;
         staggerT -= dt; gaffLooseT -= dt;
         if (lastRing != null) lastRing.t -= dt;
         var r = G.room;
@@ -376,6 +377,7 @@ public class Player : Mover
         // Ladders
         ladderCool -= dt;
         if ((Inp.Held("up") || (Inp.Held("down") && !onGround && ladderCool <= 0)) && OnLadderTile() && dragging == null) { state = "ladder"; Hints.Did("climb"); vx = 0; vy = 0; x = MathF.Floor(Cx() / TS) * TS + 8 - w / 2; return; }
+        if (Inp.Held("down") && onGround && dragging == null && !LadderBelow()) OpenHatchBelow();
         if (Inp.Held("down") && onGround && LadderBelow() && dragging == null) { state = "ladder"; Hints.Did("climb"); y += 4; x = MathF.Floor(Cx() / TS) * TS + 8 - w / 2; return; }
 
         // Wall-hang on timber (never wet stone).
@@ -397,6 +399,13 @@ public class Player : Mover
             {
                 vy = boots && InWater() ? -300 : -JUMP; coyote = 0; jumpBuf = 0;
                 Snd.Jump(); Noise.Emit(Cx(), y + h, 2, "jump"); Hints.Did("jump");
+            }
+            else if (wetT > 0 && dragging == null && World.IsWater(Cx(), y + h + 2))
+            {
+                // bobbing at the surface, half in and half out: the jump still carries her out of the water
+                vy = -330; wetT = 0; jumpBuf = 0;
+                float surf = World.SurfaceAt(Cx(), y + h + 2);
+                Snd.Splash(0.2f); if (float.IsFinite(surf)) FX.Splash(Cx(), surf, 8);
             }
             else if (hanging != 0 || hangGrace > 0)
             {
@@ -511,6 +520,27 @@ public class Player : Mover
         vx += r.Seaward * 160 * dt;
     }
 
+    float shutNoteT;
+    static void ShutOverhead(char ch)
+    {
+        if (ch == 'K') { Snd.Thud(); H.ToastMsg("The seawall gate is shut fast above you. Its crank socket is at the foot of the tower.", 3.5f); Hints.Did("climb"); }
+        else if (ch == 'Z') { Snd.Thud(); H.ToastMsg("The hatch into the Skull is shut fast above you.", 3); }
+    }
+    // Standing on a shut gate from its far side, she can lift its bar and let it fall open beneath her: a way back,
+    // never a way through. (It also frees anyone who reached the far side some other way.)
+    bool OpenHatchBelow()
+    {
+        int tx = H.FloorI(Cx() / TS), ty = H.FloorI((y + h + 4) / TS);
+        char ch = World.CharAt(tx, ty);
+        string flag = ch == 'K' ? "seawallOpen" : ch == 'Z' ? "skullOpen" : null;
+        if (flag == null || World.flags.B(flag) || !World.IsLadder(tx, ty + 1)) return false;
+        World.flags.Set(flag, true);
+        World.MarkDirty();
+        Snd.Rumble(); G.Shake(3);
+        H.ToastMsg(ch == 'K' ? "From this side the gate's bar lifts easily. It swings open beneath you." : "From this side the hatch's bolt draws back. It falls open beneath you.", 4);
+        return true;
+    }
+
     void UpdateLadder(float dt)
     {
         int tx = H.FloorI(Cx() / TS);
@@ -521,6 +551,14 @@ public class Player : Mover
         // stop at the top or bottom of the ladder
         int headTile = H.FloorI((ny + 2) / TS), footTile = H.FloorI((ny + h - 2) / TS);
         if (!World.IsLadder(tx, headTile) && !World.IsLadder(tx, footTile)) { state = "normal"; return; }
+        // a shut gate or solid stone overhead stops the climb (a ladder never carries her through it)
+        int over = H.FloorI(ny / TS);
+        if (v < 0 && World.Solid(tx, over) == 1)
+        {
+            y = (over + 1) * TS; vy = 0;
+            if (shutNoteT <= 0) { shutNoteT = 4; ShutOverhead(World.CharAt(tx, over)); }
+            return;
+        }
         if (v > 0 && World.Solid(tx, H.FloorI((ny + h) / TS)) == 1) { state = "normal"; y = H.FloorI((ny + h) / TS) * TS - h; vy = 0; onGround = true; ladderCool = 0.3f; return; }
         if (v < 0 && !World.IsLadder(tx, headTile) && !World.IsLadder(tx, footTile) && !World.IsLadder(tx, H.FloorI((ny + h - 10) / TS)))
         {
@@ -562,7 +600,8 @@ public class Player : Mover
         // surface: jump out
         float surf = World.SurfaceAt(Cx(), Cy());
         bool atSurface = y + 4 < surf + 4;
-        if (Inp.Hit("jump") && atSurface && !Locked()) { vy = -330; Snd.Splash(0.2f); FX.Splash(Cx(), surf, 8); }
+        if (Inp.Hit("jump") && atSurface && !Locked()) { vy = -330; wetT = 0; Snd.Splash(0.2f); FX.Splash(Cx(), surf, 8); }
+        else if (atSurface) wetT = 0.25f;
         if (Inp.Hit("dash") && dashCool <= 0 && !Locked() && dragging == null) Dash(true);
         if (Inp.Hit("swing") && Has("swing")) StartSwing();
         if ((Inp.Held("up") || Inp.Held("down")) && OnLadderTile() && dragging == null) { state = "ladder"; vx = 0; vy = 0; x = MathF.Floor(Cx() / TS) * TS + 8 - w / 2; return; }

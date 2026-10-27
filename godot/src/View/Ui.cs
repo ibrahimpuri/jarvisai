@@ -566,6 +566,7 @@ public partial class UiRoot : CanvasLayer
         Btn(r2, Settings.Bloom ? "Glow: on" : "Glow: off", () => { Settings.Bloom = !Settings.Bloom; Settings.Apply(); Settings.Save(); Pause(); }, selected: Settings.Bloom);
         Btn(r2, Settings.Shake ? "Shake: on" : "Shake: off", () => { Settings.Shake = !Settings.Shake; Settings.Save(); Pause(); }, selected: Settings.Shake);
         Btn(r2, Settings.Hints ? "Hints: on" : "Hints: off", () => { Settings.Hints = !Settings.Hints; Settings.Save(); Pause(); }, selected: Settings.Hints);
+        Btn(r2, Settings.Guide ? "Guide: on" : "Guide: off", () => { Settings.Guide = !Settings.Guide; Settings.Save(); Pause(); }, selected: Settings.Guide);
         H3(c, "Gore");
         var r3 = Row(c);
         foreach (var (v, label) in new[] { ("full", "Full"), ("reduced", "Reduced"), ("off", "Off (salt only)") })
@@ -748,20 +749,20 @@ public partial class UiRoot : CanvasLayer
     static List<string> BenchTabs(bool chapel) { var t = new List<string> { "craft", "upgrade", "fittings" }; if (chapel) t.Add("surgery"); return t; }
 
     // ---- satchel / logbook ----------------------------------------------------------------------
-    static readonly string[] SAT_TABS = { "map", "satchel", "craft", "gear", "log" };
+    static readonly string[] SAT_TABS = { "map", "log", "satchel", "craft", "gear" };
     public void Satchel(string tab = null)
     {
         var p = G.player;
         if (tab != null) satTab = tab;
         Show("satchel");
-        var c = Panel(270);
+        var c = Panel(satTab == "map" ? 610 : 270);
         var tr = Row(c);
-        foreach (var (t, n) in new[] { ("map", "Map"), ("satchel", "Satchel"), ("craft", "Craft"), ("gear", "Gear"), ("log", "Logbook") })
+        foreach (var (t, n) in new[] { ("map", "Map"), ("log", "Journal"), ("satchel", "Satchel"), ("craft", "Craft"), ("gear", "Gear") })
             Btn(tr, n, () => Satchel(t), selected: t == satTab);
         if (satTab == "map")
         {
             Hints.Did("map");
-            var mapCtl = new MapView { CustomMinimumSize = new Vector2(253, 157) };
+            var mapCtl = new MapView { CustomMinimumSize = new Vector2(590, 262) };
             c.AddChild(mapCtl);
         }
         if (satTab == "satchel")
@@ -834,27 +835,40 @@ public partial class UiRoot : CanvasLayer
         }
         if (satTab == "log")
         {
-            var q = G.quests; var f = World.flags;
-            var obj = new List<string>();
-            if (!f.B("seawallOpen")) obj.Add("Fetch the Sluice Crank from the Tithe Hall altar and fit it to the seawall gate.");
-            else if (G.act == 1) obj.Add("Cross the Saltworks and face the Abbot of Salt.");
-            else if (!p.Has("jet")) obj.Add("Find a way through the Lower Cloister. The Prior's door answers to the hymnal.");
-            else if (!p.Has("tidekey")) obj.Add("Climb to the Sunken Choir.");
-            else if (!p.Has("seal")) obj.Add("Use the Tide Key to reach the Ribvault above the Choir.");
-            else if (!f.B("skullOpen")) obj.Add("Weight the lift in the Prior's Walk and dive the Gullet. The Undertow waits there.");
-            else obj.Add("Climb from the Ribvault Bell Room to the Lantern Skull.");
-            if (q.S("teodor") == "asked") obj.Add("Odile: find Teodor in the Lower Cloister. Bring his tags, or break every limb knot but the Crown and bind him.");
-            if (G.tables.Count > 0 && q.S("tables") != "given" && q.S("tables") != "sold") obj.Add($"Prior's tide tables: {G.tables.Count}/4. Ansel or the Choir's bowl.");
-            H3(c, "Objectives");
-            foreach (var o in obj) ItemRow(c, o);
+            // the journal: where the story goes next, and how to do it, then everything else worth doing
+            var step = Guide.Current;
+            if (step != null)
+            {
+                Small(c, Guide.ActName(step.act), false);
+                H2(c, step.title);
+                Lbl(c, Guide.WhereLine(step), 6, MUTED, italic: true);
+                var now = step.now?.Invoke();
+                if (now != null) Lbl(c, now, 7, WARM);
+                Lbl(c, Glyphs.Plain(step.how, Glyphs.Current), 7);
+                Btn(Row(c), "Show on the map", () => Satchel("map"));
+                var before = Guide.Steps.Where(s0 => s0.act == step.act && Guide.Index(s0) < Guide.Index(step) && s0.done()).ToList();
+                if (before.Count > 0)
+                {
+                    H3(c, "The way so far");
+                    foreach (var s0 in before) Lbl(c, "✓  " + s0.title, 6, MUTED);
+                }
+            }
+            else H2(c, "The night is over.");
+            var also = Guide.Also();
+            if (also.Count > 0)
+            {
+                H3(c, "Also");
+                foreach (var (t0, d0) in also) ItemRow(c, t0, d0);
+            }
             H3(c, $"Agathe's log ({G.pages.Count}/9)");
+            if (G.pages.Count < 9) Small(c, "Your mother's pages are scattered across the island. All nine show the ferry's tides: the Keeper's Dark ending needs them, and two others alive to row.");
             var pr = Row(c);
             if (G.pages.Count == 0) Small(pr, "No pages yet.");
-            foreach (var n in G.pages.OrderBy(x => x)) Btn(pr, "Page " + n, () => Dialogue("Agathe's log", new List<string> { Story.PAGES[n] }, () => Satchel()));
+            foreach (var n in G.pages.OrderBy(x => x)) Btn(pr, "Page " + n, () => Dialogue("Agathe's log", new List<string> { Story.PAGES[n] }, () => Satchel("log")));
             H3(c, $"Prior's tide tables ({G.tables.Count}/4)");
             var tr2 = Row(c);
             if (G.tables.Count == 0) Small(tr2, "No tables yet.");
-            foreach (var n in G.tables.OrderBy(x => x)) Btn(tr2, "Table " + n, () => Dialogue("Prior's tide table", new List<string> { Story.TABLES[n] }, () => Satchel()));
+            foreach (var n in G.tables.OrderBy(x => x)) Btn(tr2, "Table " + n, () => Dialogue("Prior's tide table", new List<string> { Story.TABLES[n] }, () => Satchel("log")));
             Small(c, $"Stitches: {G.collected.Count(k => k.StartsWith("stitch"))}/4 · Brass Seals: {G.collected.Count(k => k.StartsWith("seal"))}/6 · Knots broken: {G.stats.knots.Values.Sum()}");
         }
         Btn(Row(c), "Close", Close);
@@ -867,9 +881,9 @@ public partial class UiRoot : CanvasLayer
         public override void _Draw()
         {
             var c = cv.Begin(this);
-            c.Scale(Size.X / 760f, Size.Y / 470f);
-            Hud.DrawMap(c, 760, 470);
+            Chart.Draw(c, Size.X, Size.Y);
         }
+        public override void _Process(double delta) => QueueRedraw();
     }
 
     // ---- Choir menus ---------------------------------------------------------------------------

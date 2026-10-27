@@ -10,7 +10,7 @@ public static class Settings
     const string PATH = "user://settings.json";
     public static bool Fullscreen = true, Bloom = true, Shake = true;
     public static float Vibration = 1;            // 0, 0.5 or 1
-    public static bool AimAssist = true, Gyro, NintendoConfirm = true, Hints = true;
+    public static bool AimAssist = true, Gyro, NintendoConfirm = true, Hints = true, Guide = true;
     public static string Prompts = "auto";        // auto, xbox, playstation, switch
     public static string Gore = "full";           // full, reduced, off
     public static WorldEnvironment Env;
@@ -29,6 +29,7 @@ public static class Settings
             AimAssist = !p.Has("aimAssist") || p.B("aimAssist");
             Gyro = p.B("gyro");
             Hints = !p.Has("hints") || p.B("hints");
+            Guide = !p.Has("guide") || p.B("guide");
             NintendoConfirm = !p.Has("nintendoConfirm") || p.B("nintendoConfirm");
             if (p.Has("prompts")) Prompts = p.S("prompts");
             if (p.Has("gore")) Gore = p.S("gore");
@@ -41,7 +42,7 @@ public static class Settings
         var o = new JsonObject
         {
             ["fullscreen"] = Fullscreen, ["bloom"] = Bloom, ["shake"] = Shake, ["volume"] = Snd.Volume,
-            ["vibration"] = Vibration, ["aimAssist"] = AimAssist, ["gyro"] = Gyro, ["nintendoConfirm"] = NintendoConfirm, ["prompts"] = Prompts, ["hints"] = Hints, ["gore"] = Gore, ["music"] = Score.MusicVolume,
+            ["vibration"] = Vibration, ["aimAssist"] = AimAssist, ["gyro"] = Gyro, ["nintendoConfirm"] = NintendoConfirm, ["prompts"] = Prompts, ["hints"] = Hints, ["guide"] = Guide, ["gore"] = Gore, ["music"] = Score.MusicVolume,
         };
         using var f = FileAccess.Open(PATH, FileAccess.ModeFlags.Write);
         f?.StoreString(o.ToJsonString());

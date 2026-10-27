@@ -143,7 +143,8 @@ public static class World
             case 'Z': return flags.B("skullOpen") ? 0 : 1;
             case 'Y': return flags.B("choirDrained") ? 0 : 1;
             case 'y': return flags.B("choirDrained") ? 2 : 0;
-            case 'h': return (flags.B("basinFilling") && !flags.B("basinCrossed")) ? 1 : 0;
+            // the pan's hatch grinds shut behind whoever ran for the barge (G.HATCH_CLOSE seconds after the last lever)
+            case 'h': return (flags.B("basinFilling") && !flags.B("basinCrossed") && G.basinFillT >= G.HATCH_CLOSE) ? 1 : 0;
             default: return 0;
         }
     }

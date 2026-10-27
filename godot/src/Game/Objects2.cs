@@ -157,7 +157,7 @@ public class Lever : Obj
         if (seq.Count == 3)
         {
             f.Set("basinFilling", true);
-            H.ToastMsg("The sluices open in order. The pan floods and the barge lifts. The hatch is closing!");
+            H.ToastMsg("The sluices open in order. The pan floods and the barge lifts. The hatch is closing: run for the barge!", 4);
             Snd.Rumble();
         }
         else H.ToastMsg("Water spills into the pan.");

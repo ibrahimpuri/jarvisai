@@ -325,6 +325,7 @@ public static class Hud
         Pips(c, p); Lantern(c, p); Hollow.DrawHud(c, 49); Breath(c, p);
         if (G.dialT > 0.01f) { c.GlobalAlpha = G.dialT; Dial(c); c.GlobalAlpha = 1; }
         Weapon(c, p); PromptBox(c); Toasts(c); RoomTitle(c); BossBar(c); Grabbed(c, p);
+        Guide.DrawHud(c);
         Hints.Draw(c);
         if (Inp.sneakLatch && Pad.Using) { c.Font = "7px caps"; c.FillStyle = "#a89c80"; c.FillText("creeping", 12, 62); }
         if (G.god) { c.FillStyle = "#f66"; c.Font = "7px sans"; c.FillText("DEBUG", 6, H.VIEW_H - 4); }
@@ -332,65 +333,5 @@ public static class Hud
     }
 
     // ---- logbook map --------------------------------------------------------------------
-    public static void DrawMap(Canvas c, float W, float Hh)
-    {
-        c.FillStyle = "#1a1712"; c.FillRect(0, 0, W, Hh);
-        c.FillStyle = "#2a251c"; c.FillRect(8, 8, W - 16, Hh - 16);
-        // the island's extent, from the rooms themselves
-        int cols = Data.Rooms.Max(r => r.Col + r.W), rows = Data.Rooms.Max(r => r.Row + r.H);
-        float sw = MathF.Floor((W - 40) / cols), sh = MathF.Floor((Hh - 60) / rows);
-        float ox = 20, oy = 36;
-        c.Font = "11px Georgia, serif"; c.FillStyle = "#d8c8a0";
-        c.FillText("Maren's logbook — the island", 20, 24);
-        foreach (var r in Data.Rooms)
-        {
-            var st = World.StateOrNull(r.Id);
-            if (st == null || !st.visited) continue;
-            float x = ox + r.Col * sw, y = oy + r.Row * sh, w = r.W * sw - 3, h = r.H * sh - 3;
-            var col = H.Col(Data.Regions.P(r.Region).S("color")); col.A = 0.55f;
-            c.Fill = col; c.FillRect(x, y, w, h);
-            c.StrokeStyle = r == G.room ? "#ffe0a0" : "#5a5040"; c.LineWidth = r == G.room ? 2 : 1; c.StrokeRect(x, y, w, h);
-            // water lines only for tide phases Maren has actually seen here
-            float LineFor(float sea) => y + ((sea - r.Oy) / r.Th) * h;
-            if (r.Row == 4 && r.FixedWater == null)
-            {
-                if (st.seen.Contains("low")) { c.StrokeStyle = "#7ab0c0"; c.LineWidth = 1; c.Line(x, LineFor(Tide.SEA_LOW), x + w, LineFor(Tide.SEA_LOW)); }
-                if (st.seen.Contains("high")) { c.StrokeStyle = "#3a70b0"; c.LineWidth = 1; c.Line(x, LineFor(Tide.SEA_HIGH), x + w, LineFor(Tide.SEA_HIGH)); }
-                if (st.seen.Contains("ebbing")) { c.FillStyle = "#9ac0a0"; c.Font = "8px monospace"; c.FillText("E", x + w - 9, y + 10); }
-                bool sounded = st.seen.Contains("low") && st.seen.Contains("high") && st.seen.Contains("ebbing");
-                if (sounded) { c.FillStyle = "#d8c8a0"; c.Font = "8px monospace"; c.FillText("✓", x + 3, y + 10); }
-            }
-            if (r.BellRoom) { c.FillStyle = G.bellsLit.Contains(G.BellIdFor(r.Id) ?? "") ? "#ffd27a" : "#6a5a3a"; c.BeginPath(); c.Arc(x + w / 2, y + h / 2, 4, 0, H.PI * 2); c.FillPath(); }
-            if (G.undertow != null && G.undertow.ripples.Contains(r.Id))
-            {
-                c.Stroke = H.Rgba(160, 200, 230, 0.6f); c.LineWidth = 1;
-                for (int i = 1; i <= 2; i++) { c.BeginPath(); c.Arc(x + w * 0.3f, y + h * 0.75f, i * 4, 0, H.PI * 2); c.StrokePath(); }
-            }
-            if (r.Ents.Values.Any(e => e.S("type") == "wrackpool")) { c.FillStyle = "#5a8aa0"; c.Font = "8px monospace"; c.FillText("W", x + 3, y + h - 4); }
-        }
-        // Salt Ear: every Brine body within two rooms
-        if (G.player.grafts.Contains("ear"))
-        {
-            foreach (var r in Data.Rooms)
-            {
-                if (Math.Abs(r.Col - G.room.Col) + Math.Abs(r.Row - G.room.Row) > 2) continue;
-                var st = World.StateOrNull(r.Id);
-                int n = st == null ? 0 : st.ents.Values.Count(e => e != null && e.A("knots") != null && e.A("knots").Count > 0 && !e.B("gone") && e.S("mode") != "downed");
-                float x = ox + r.Col * sw, y = oy + r.Row * sh;
-                for (int i = 0; i < Math.Min(n, 8); i++) { c.FillStyle = "#ff8080"; c.FillRect(x + 6 + i * 5, y + sh / 2, 3, 3); }
-            }
-        }
-        if (G.satchelDrop != null)
-        {
-            var r = Data.Room[G.satchelDrop.room];
-            float x = ox + r.Col * sw + ((G.satchelDrop.x - r.Px) / r.Pw) * r.W * sw, y = oy + r.Row * sh + ((G.satchelDrop.y - r.Py) / r.Ph) * r.H * sh;
-            c.FillStyle = "#e0a040"; c.FillRect(x - 3, y - 3, 6, 6);
-        }
-        // Maren
-        var p = G.player; var rr = G.room;
-        float px = ox + rr.Col * sw + ((p.Cx() - rr.Px) / rr.Pw) * rr.W * sw, py = oy + rr.Row * sh + ((p.Cy() - rr.Py) / rr.Ph) * rr.H * sh;
-        c.FillStyle = "#fff0c0"; c.BeginPath(); c.Arc(px, py, 3, 0, H.PI * 2); c.FillPath();
-        c.Font = "9px monospace"; c.FillStyle = "#9a9080";
-        c.FillText("Water lines appear for tide phases you have witnessed. ✓ = fully sounded. W = Wrack Pool. Ripples = the Undertow passed.", 20, Hh - 14);
-    }
+    public static void DrawMap(Canvas c, float W, float Hh) => Chart.Draw(c, W, Hh);
 }

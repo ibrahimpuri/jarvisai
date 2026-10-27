@@ -63,6 +63,9 @@ public static class G
     public static Dictionary<string, Spot> wrackPools = new();
     public static NarrState narr;
     public static float? titheFlood;
+    // the Evaporation Pans: seconds since the last lever opened the sluices; the hatch is shut once it reaches HATCH_CLOSE
+    public static float basinFillT;
+    public const float HATCH_CLOSE = 3.2f;
     public static float breachT, glimpseT, frameDt = 1 / 60f;
     public static float stepDt = 1 / 60f;   // this frame's step, set by Main whatever the mode (the view's blends run on it)
     public static bool gusting;
@@ -137,7 +140,7 @@ public static class G
         Narr.Reset();
         Hints.Reset();
         FX.parts.Clear();
-        Gore.Reset(); Voices.Reset(); Hollow.Reset(); Legend.Reset(); Dread.Reset();
+        Gore.Reset(); Voices.Reset(); Hollow.Reset(); Legend.Reset(); Dread.Reset(); Guide.Reset();
         dialT = 0;
         // Maren comes ashore on the outer rocks; the tide holds at Low until she reaches the reef.
         EnterRoom(Data.Room["breakers"], true);
@@ -152,7 +155,7 @@ public static class G
     // ------------------------------------------------------------------ rooms
     static string SpecKey(Props spec) => spec.S("id") ?? $"{spec.S("type")}@{spec.I("tx")},{spec.I("ty")}";
 
-    static List<Props> RoomSpecs(RoomDef r)
+    public static List<Props> RoomSpecs(RoomDef r)
     {
         var o = new List<Props>();
         for (int ty = 0; ty < r.Map.Length; ty++)
@@ -785,7 +788,7 @@ public static class G
         titheFlood = null; breachT = 0;
         Narr.Reset();
         Hints.Reset();
-        Gore.Reset(); Voices.Reset(); Hollow.Load(d.P("hollow")); Legend.Load(d.P("legend"));
+        Gore.Reset(); Voices.Reset(); Hollow.Load(d.P("hollow")); Legend.Load(d.P("legend")); Guide.Reset();
         player.hp = player.maxHp;
         EnterRoom(Data.Room[respawn.room], true);
         player.x = respawn.x; player.y = respawn.y;
@@ -855,6 +858,12 @@ public static class G
         var sst = World.State("saltgate");
         sst.pool ??= new Dictionary<string, float>();
         if (f.Has("basinTarget")) sst.pool["basin"] = H.Approach(sst.pool.TryGetValue("basin", out var bl) ? bl : 19, f.F("basinTarget"), dt * (f.B("basinFilling") ? 1.1f : 2));
+        if (f.B("basinFilling") && !f.B("basinCrossed"))
+        {
+            float was = basinFillT; basinFillT += dt;
+            if (was < HATCH_CLOSE && basinFillT >= HATCH_CLOSE) { World.MarkDirty(); if (room?.Id == "saltgate") { Snd.Thud(); Shake(2); } }
+        }
+        else basinFillT = 0;
         // Tithe Hall flood set-piece.
         if (titheFlood != null)
         {
@@ -924,6 +933,7 @@ public static class G
         Dread.Update(dt);
         Hollow.Update(dt);
         Legend.Update(dt);
+        Guide.Update(dt);
         AmbientOneShots(dt);
         Narr.UpdateWhispers(dt);
         undertow.Update(dt);
