@@ -347,6 +347,16 @@ public static class Scenarios
             t.Ok("it wails when a limb comes off", Snd.Heard.Contains("shucker:wail") && Snd.Heard.Contains("sever"), string.Join(" ", Snd.Heard));
             sh.DamageKnot(sh.K("kneeR"), 99, "rivet"); sh.DamageKnot(sh.K("crown"), 99, "rivet");
             t.Ok("and rattles when it goes down", Snd.Heard.Contains("shucker:rattle"));
+            // every kind of drowned has every line
+            foreach (var kind in new[] { "shucker", "bellmouth", "saltwright", "gullet", "grafted" })
+            {
+                var ks = Props.Empty(); ks.Set("x", hall.Px + 20 * 16); ks.Set("y", hall.Py + 17 * 16); ks.Set("key", "voice_" + kind); ks.Set("anchorY", hall.Py + 4 * 16); ks.Set("pose", "standing");
+                var vb = BodyTypes.Make(kind, ks, hall);
+                if (vb.mode == "dormant") vb.mode = "hunt";
+                Voices.Idle(vb); vb.busyT = 0; Voices.Alert(vb); vb.busyT = 0; Voices.Windup(vb); vb.busyT = 0;
+                Voices.Hurt(vb, false); vb.busyT = 0; Voices.Hurt(vb, true); Voices.Die(vb); Voices.Rise(vb);
+            }
+            t.Ok("every kind of drowned speaks", new[] { "bellmouth:hum", "saltwright:heave", "gullet:click", "grafted:shriek", "bellmouth:toll", "grafted:fall" }.All(k => Snd.Heard.Contains(k)), string.Join(" ", Snd.Heard.Where(k => k.Contains(':')).Distinct()));
             G.god = false;
         },
 

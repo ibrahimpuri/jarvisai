@@ -78,6 +78,10 @@ The game saves when you rest or save at a Bell Room. Continue from the title scr
 - Hit-stop and white hit flashes on knots, dust from landings and dashes, a dip to black between rooms and a red edge at one pip of health.
 - Fonts: IM Fell English for titles and text, Alegreya Sans for small print (both SIL Open Font License, in `godot/fonts`).
 - Native controller support through SDL3: Xbox, PlayStation (DualShock 4, DualSense) and Switch (Pro Controller, Joy-Con pairs), with the extras below.
+- **Dismemberment** (`Gore.cs`). A Brine body is held up by its knots, so when a limb knot breaks the limb comes away: the forearm, the shin, the whole arm or the jaw tears off as a tumbling piece, the stump keeps weeping, and old blood thick with salt sprays away from the shot. It stains floors and walls until the tide comes in and washes the stone clean, and under water it hangs in slow dark clouds. Pieces lie where they fall and Maren kicks them as she walks. A body the tide re-knots grows its lost limbs back in salt crystal, so a scarred walker tells you it has died before. A Saltwright's pick goes with the hand that held it. The pause menu sets gore to Full, Reduced or Off (salt only, as before).
+- **The voices of the drowned** (`Voices.cs`, `Audio.cs`). A formant synthesiser gives each kind of Brine body its own voice. Shuckers murmur wetly while they lie dormant, moan as they walk, cry out the moment they see Maren, snarl before they lunge, wail when a limb comes off and rattle when they go down. Bellmouths hum the Hours to themselves, Saltwrights breathe through salt and grunt as they swing, Gullets click above you, the Grafted Choir sings the hymn in D and shrieks a semitone apart, and the Abbot roars. Only the knotted dead breathe, so a silent body is a true corpse. Their wet, dragging or salt-crunching footsteps are placed in the room, so you can track them by ear. Each room has its own reverb (the nave and the sunken choir ring for seconds), the world muffles when Maren's helmet goes under, a sting of strings marks the moment something first sees her, Bell Rooms hold a soft breathing chord, and indoors the Saint's ribs groan under the abbey and a bell is rung somewhere far off.
+- **Hurt, inside the helmet.** At two pips Maren's faceplate cracks, the edges of the view craze like the glass she looks through, and she breathes hard inside the helmet.
+- **The Mere's Hollow** (`Hollow.cs`), a relic the sea gives Maren on the Long Pier, with four water verses. See [The Mere's Hollow](#the-meres-hollow).
 
 **Play on Windows:** unzip `Hollowmere-Godot-Windows.zip` and run `Hollowmere.exe`. Keep the `data_Hollowmere_windows_x86_64` folder next to it; it holds the .NET runtime. Saves live in `%APPDATA%\Godot\app_userdata\Hollowmere`.
 
@@ -95,16 +99,50 @@ The game has its own test harness. These run inside the real game:
 ```sh
 godot --headless --path godot -- --test              # every scripted scenario: the play.js ports, controllers, the opening, hints
 godot --path godot -- --shots out/ [room...]         # screenshots of every room
-godot --path godot -- --test perf                    # frame cost of the painters in the busiest rooms
+godot --path godot -- --test perf                    # frame cost of the painters in the busiest rooms, and of gore at its caps
+godot --path godot -- --test showcase --out shots/   # staged screenshots of the Riptide, the Answer, a cracked faceplate and the journal
+godot --headless --path godot -- --test voices --dump-sounds sounds/   # write every sound made to a WAV file
 ```
 
 | Folder | Contents |
 | --- | --- |
 | `godot/src/Core` | Constants and helpers, game data loading, input and controllers (`Pad.cs`: detection, rumble, light bar, gyro), synthesised audio, settings |
 | `godot/src/World` | The tide clock, tile queries and water, AABB physics |
-| `godot/src/Game` | Player, bodies and knots, bosses, objects, combat, story, narrative, hints, the opening's zones, the game loop and saving |
+| `godot/src/Game` | Player, bodies and knots, bosses, objects, combat, story, narrative, hints, the opening's zones, the game loop and saving; gore (`Gore.cs`), the voices of the drowned (`Voices.cs`) and the Mere's Hollow (`Hollow.cs`) |
 | `godot/src/View` | The world view (lights, shadows, water, post), region palettes (`Palette.cs`), depth layers (`Strata.cs`), silhouette terrain (`Terrain.cs`), tile art, room dressing (`Decor.cs`), the shore night and title vista (`Backdrop.cs`, `TitleVista.cs`), HUD and item icons, button glyphs, menus, a Canvas-style drawing layer that batches its shapes |
 | `godot/shaders` | The palette shader, water and post-processing |
+
+## The Mere's Hollow
+
+*AUDIT ET RESPONDET. It hears, and it answers.*
+
+The Mere's Hollow is a reliquary box of Mere-ivory holding the Saint's ear-bone. Whale ear-bones are the densest bone there is and often the last part of a whale to wash ashore. The first brothers found this one on the strand, curled like a shell and humming, and named the island for it. Then they dug, found the rest of the Saint underneath, and stopped naming things. For three hundred years the Choir sang into it every Hour, and the tide came when it was called. When the Abbot wanted it for his salt pans, Hesper rowed it out past the reef and gave it back to the sea.
+
+Forty nights later the sea gives it to Maren. The first time the tide turns while she stands on the Long Pier, the sea heaves up over the boards and slides back down, leaving the box behind, glowing faintly and humming. The same wave stands the first drowned man up. Ansel, Odile and Hesper each say what they know of it the first time they see her carrying it, a carving in the Sunken Choir marks the niche where it lay, and one of the Bell Room dreams is its own.
+
+Its powers are verses of the Choir's hymn, the one already carved on the Choir Steps. The Hollow learns each verse by hearing the thing the verse is about:
+
+| Verse | Line | Learned | What the Saint does |
+| --- | --- | --- | --- |
+| The Calling | *Sing to the sea* | with the Hollow, from the sea | The sea in the room rises or falls to the point Maren sings toward (up to 6 tiles), holds, then settles back. Only the tide answers: still pools, the brine shaft, the Choir's font and the Gullet's deep water do not hear it, so it never breaks the Ballast Boots, Pressure Seal or Choir's Water gates. With the Hollow brimming, a held note makes the Saint breathe early and the tide rushes through to its next turn. |
+| The Riptide | *...and the sea will take you home* | when the Undertow passes the Tithe window | A rush of the sea throws back whatever stands before her, slams it into walls, puts out fire, drowns flares and tears loose any grip on her. Under water it carries her the way she points. |
+| The Salting | *Sing to the salt and the salt will rise* | in the Saltworks, where the live salt hums back | Salt crusts one of the drowned where it stands, and the next blow shatters a limb. Sung at stone, a pillar of salt grows out of it for 15 s, as a step or a wall. Fire still cracks it. Saltwrights and the Abbot are salt already. |
+| The Answer | *Sing to the bone and the bone will answer* | in the Cloister, where the brothers all turn their heads | One of the drowned, standing or fallen, turns on its own kind and sings while it fights. When the verse runs out its knots let go for good. |
+
+Breaking a knot lets out the brine that held it, and the Hollow drinks it in and rings louder. This is resonance, the cost of every verse, and it also fills slowly while the Hollow is under the sea and fully while Maren rests at a bell. Singing has a price, as the Choir warned: *Take of the Saint and the Saint takes of you.* Everything near hears the Hollow and wakes. Water it calls over the downed dead stands them up at the next High like any tide. Inside a Bell Room nothing answers at all.
+
+**Controls.** Keyboard: 5 takes the Hollow in hand, H sings at any time (left click or J also sings while it is in hand), Y changes verse (or R while it is in hand). Controller: the Hollow sits after the weapons on the d-pad, RT sings and RB changes verse. Holding the note, with the Hollow brimming, turns the tide. The journal's Gear page lists the verses learned. The box hangs on Maren's belt, and its seam glows sea-green while it holds enough for a verse.
+
+## What this build takes from Hollow Knight, Rain World, Dead Space and Resident Evil
+
+The aim is a player immersed in Maren's journey, so each borrowing is chosen for that.
+
+| From | What players love about it | Here |
+| --- | --- | --- |
+| Dead Space | Strategic dismemberment, and feedback in the world rather than on a HUD ([diegetic UI](https://www.hudsandguis.com/2012/08/22/dead-space-2-diegetic-interface-design)) | Knot breaks tear limbs off and change how bodies move. Low health also shows in the world, on Maren's cracking faceplate and the crazed edges of the view, and the Hollow's charge glows on her belt. |
+| Rain World | Creatures that act and sound alive, and a [threat score that follows danger](https://killscreen.com/the-threat-music-and-animal-sounds-of-rain-world) | Every kind of drowned has its own voice and footsteps, placed in the room. A sting marks the moment you are seen, and the drone already rises with tension. The drowned the Answer turns fight their own kind. |
+| Hollow Knight | A resource earned by fighting (SOUL), abilities gained in ceremonial moments, lore told through the world and left for players to piece together | Resonance from breaking knots. Each verse is learned at a place in the story, with an inscription. The Hollow's history is spread across a relic, three islanders, a carving and a dream. |
+| Resident Evil | The stalker heard before he is seen, the relief of a safe room, scarcity | The Undertow's bell and the drowned's footsteps carry. Bell Rooms hold their own calm chord and the Hollow is silent there. Resonance is scarce and singing is loud. |
 
 ## Controllers
 
