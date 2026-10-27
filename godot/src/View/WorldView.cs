@@ -31,6 +31,8 @@ public partial class WorldView : Node2D
 
     CanvasModulate modulate;
     bool silhouettes = true;
+    DrawLayer maren;
+    const int MAREN_BIT = 2;   // the light-mask bit Maren's layer is on
     LightingManager lighting;
     DirectionalLight2D keyLight;
     ShaderMaterial fogBackMat, fogFrontMat;
@@ -119,6 +121,11 @@ public partial class WorldView : Node2D
         var entMat = new ShaderMaterial { Shader = entShader };
         entities = Add(new DrawLayer { Paint = PaintEntities, Material = entMat });
         lighting.RegisterEntity(entMat);
+        // Maren on her own light bit: the room's lamps and the key light reach her, her own lantern and aura do not
+        // (they light the world around her, the way a Hollow Knight character is never lit by its own glow)
+        var marenMat = new ShaderMaterial { Shader = entShader };
+        maren = Add(new DrawLayer { Paint = PaintMaren, Material = marenMat, LightMask = MAREN_BIT });
+        lighting.RegisterEntity(marenMat);
         water = Add(new DrawLayer { Paint = PaintWater });
         waterMat = new ShaderMaterial { Shader = GD.Load<Shader>("res://shaders/water.gdshader") };
         water.Material = waterMat;
@@ -145,7 +152,7 @@ public partial class WorldView : Node2D
         aura = new PointLight2D { Texture = lightTex, Color = new Color(1f, 0.88f, 0.7f), Energy = 0.8f, ShadowEnabled = true, ShadowFilter = Light2D.ShadowFilterEnum.Pcf5, ShadowFilterSmooth = 2f, Height = 30 };
         lightRoot.AddChild(aura);
         // the region's key light: the moon outdoors (with shadows), a soft fill from the region's light indoors
-        keyLight = new DirectionalLight2D { ShadowEnabled = false, ShadowFilter = Light2D.ShadowFilterEnum.Pcf5, ShadowFilterSmooth = 3f, Energy = 0.3f };
+        keyLight = new DirectionalLight2D { ShadowEnabled = false, ShadowFilter = Light2D.ShadowFilterEnum.Pcf5, ShadowFilterSmooth = 3f, Energy = 0.3f, RangeItemCullMask = 1 | MAREN_BIT };
         lightRoot.AddChild(keyLight);
         lighting.KeyLight = keyLight;
 
@@ -306,8 +313,8 @@ public partial class WorldView : Node2D
         // the foreground opens a window around Maren rather than hide her
         foreMat.SetShaderParameter("cut_pos", new Vector2((p.Cx() - G.cam.X) / VW, (p.Cy() - G.cam.Y) / VH));
         foreMat.SetShaderParameter("cut_r", p.dead ? 0f : 0.16f);
-        foreach (var l in new[] { sky, far, midL, nearL, back, deco, entities, water, waterLines, solid, haze, dyn, fxShaded, fxGlow, fxText, fore, foreMotes, rain, overlay, hud }) l.QueueRedraw();
-        if (sky.Name != "sky") { sky.Name = "sky"; far.Name = "far"; midL.Name = "mid"; nearL.Name = "near"; back.Name = "back"; deco.Name = "deco"; entities.Name = "entities"; water.Name = "water"; waterLines.Name = "waterLines"; solid.Name = "solid"; dyn.Name = "dyn"; fxShaded.Name = "fxShaded"; fxGlow.Name = "fxGlow"; fxText.Name = "fxText"; fore.Name = "fore"; foreMotes.Name = "foreMotes"; rain.Name = "rain"; overlay.Name = "overlay"; hud.Name = "hud"; }
+        foreach (var l in new[] { sky, far, midL, nearL, back, deco, entities, maren, water, waterLines, solid, haze, dyn, fxShaded, fxGlow, fxText, fore, foreMotes, rain, overlay, hud }) l.QueueRedraw();
+        if (sky.Name != "sky") { sky.Name = "sky"; far.Name = "far"; midL.Name = "mid"; nearL.Name = "near"; back.Name = "back"; deco.Name = "deco"; entities.Name = "entities"; maren.Name = "maren"; water.Name = "water"; waterLines.Name = "waterLines"; solid.Name = "solid"; dyn.Name = "dyn"; fxShaded.Name = "fxShaded"; fxGlow.Name = "fxGlow"; fxText.Name = "fxText"; fore.Name = "fore"; foreMotes.Name = "foreMotes"; rain.Name = "rain"; overlay.Name = "overlay"; hud.Name = "hud"; }
     }
 
     // Colours every encoded layer from the region's palette, drifting with the tide.
@@ -357,7 +364,7 @@ public partial class WorldView : Node2D
         srcs.AddRange(Decor.Lights(decor, G.Now, ViewRect()).OrderBy(l => (new Vector2(l.x, l.y) - mid).LengthSquared()).Take(10));
         while (pool.Count < srcs.Count)
         {
-            var pl = new PointLight2D { Texture = lightTex, ShadowFilter = Light2D.ShadowFilterEnum.Pcf5, ShadowFilterSmooth = 2f, Height = 34 };
+            var pl = new PointLight2D { Texture = lightTex, ShadowFilter = Light2D.ShadowFilterEnum.Pcf5, ShadowFilterSmooth = 2f, Height = 34, RangeItemCullMask = 1 | MAREN_BIT };
             lightRoot.AddChild(pl); pool.Add(pl);
         }
         // the same lights, and the windows, feed the radiance buffer the world's bounce light comes from
@@ -581,9 +588,6 @@ public partial class WorldView : Node2D
         c.Flash = 0;
         Gore.DrawPieces(c);
         Hollow.DrawWorld(c);
-        var pm = c.Mark();
-        G.player.Draw(c);
-        if (silhouettes && !G.player.dead) Silhouette(c, pm, G.player.Cx(), G.player.Cy());
         foreach (var pr in G.projectiles) pr.Draw(c);
         foreach (var s in G.enemyShots) { c.StrokeStyle = "#a0b0b8"; c.LineWidth = 1.5f; c.Line(s.x, s.y, s.x - s.vx * 0.02f, s.y - s.vy * 0.02f); }
         foreach (var m in motes)
@@ -597,6 +601,14 @@ public partial class WorldView : Node2D
                 default: c.Fill = H.Rgba(220, 210, 180, 0.35f); c.FillRect(m.x, m.y, 1, 1); break;
             }
         }
+    }
+
+    void PaintMaren(Canvas c)
+    {
+        if (G.room == null || G.player == null) return;
+        var pm = c.Mark();
+        G.player.Draw(c);
+        if (silhouettes && !G.player.dead) Silhouette(c, pm, G.player.Cx(), G.player.Cy());
     }
 
     // Characters stand off the world the way they do in Hollow Knight: a crisp dark edge on the side away from the
@@ -642,7 +654,11 @@ public partial class WorldView : Node2D
             if (span.Count >= 2)
             {
                 var pts = new List<Vector2>(span) { new(span[^1].X, bottom), new(span[0].X, bottom) };
-                c.Fill = Colors.White; c.Poly(pts.ToArray());
+                // the span's surface, in screen UV, carried to the shader in the vertex colour for its reflection
+                float sy = float.PositiveInfinity; foreach (var q in span) sy = MathF.Min(sy, q.Y);
+                float enc = Math.Clamp(((sy - cam.Y) / VH + 1) / 3, 0, 1);
+                float hi = MathF.Floor(enc * 255) / 255, lo = enc * 255 - MathF.Floor(enc * 255);
+                c.Fill = new Color(hi, lo, 0, 1); c.Poly(pts.ToArray());
             }
             span.Clear();
         }
@@ -667,6 +683,8 @@ public partial class WorldView : Node2D
             waterMat.SetShaderParameter("caustic_col", new Vector3(pal.glow.R, pal.glow.G, pal.glow.B) * 0.75f);
         }
         waterMat.SetShaderParameter("top_y", top);
+        waterMat.SetShaderParameter("ambient_mod", new Vector3(lighting.Ambient.R, lighting.Ambient.G, lighting.Ambient.B));
+        waterMat.SetShaderParameter("reflect_amt", r.Brine ? 0.3f : r.Deep ? 0.45f : 0.72f);
     }
 
     void PaintWaterLines(Canvas c)

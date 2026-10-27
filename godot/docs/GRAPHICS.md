@@ -51,8 +51,12 @@ each rendering its own sorting layers, with a render texture in between for blur
     0   back wall (bake)           1.0       ashlar masonry and its weathering (Masonry.cs),     world.gdshader: relief,
                                              windows, architecture, monuments (Monuments.cs)     Light2D, hemisphere, bounce
     0   deco                       1.0       swaying props drawn live: kelp, chains, candles     world.gdshader
-    0   entities                   1.0       Maren, the drowned, objects, gore                   entity.gdshader + Light2D
-    0   water, water lines         1.0       the sea and pools (water.gdshader)                  own shader
+    0   entities                   1.0       the drowned, objects, gore                          entity.gdshader + Light2D
+    0   maren                      1.0       Maren alone, on her own light-mask bit: the room's  entity.gdshader + Light2D
+                                             lamps and the key light reach her, her own lantern  (not her own)
+                                             and aura do not
+    0   water, water lines         1.0       the sea and pools, mirroring what stands above      own shader + the screen
+                                             them (water.gdshader)                               behind it
     0   solid rock (bake)          1.0       the rock Maren walks on (Terrain.cs)                world.gdshader
     0   front haze                 1.1       a thin mist in front of the world                   radiance buffer
     0   dyn, fx (shaded/glow/text) 1.0       salt crystals, sparks, embers, whispers             world/entity/additive
@@ -84,7 +88,8 @@ The planes are kept apart by what reaches them, not only by draw order:
    Characters are drawn in their own colours with one bright note (Maren's helmet, a body's knots), and each
    gets a crisp ink edge on the side away from the light and a rim in the nearest lamp's colour on the side that
    faces it (copies of its own triangles, shifted a fraction of a pixel, behind it in the same batch), so they
-   stand off any background the way Hollow Knight's figures do.
+   stand off any background the way Hollow Knight's figures do. Maren is never lit by her own lantern or aura
+   (they light the world around her), so her brass helmet and faceplate keep their shape instead of burning out.
 3. **Focus.** Far and mid are blurred (a rotated 12-tap Poisson disc in `palette.gdshader`); the gameplay plane is
    always sharp; the foreground is blurred hardest. StoryFocus can pull the background further out of focus.
 4. **Atmosphere between them.** The back fog plane hangs between the depths and the play, so the vista always sits
@@ -93,6 +98,9 @@ The planes are kept apart by what reaches them, not only by draw order:
    hide the player. Its shader opens a soft window (radius 16% of the screen height, 30% of the silhouette left
    at the centre) around Maren's screen position every frame, so a pillar in front of her thins to a ghost of
    itself and closes again as she passes.
+6. **Water reflects.** Near the surface every pool mirrors the screen as drawn so far, flipped about its own
+   surface line (passed to the shader in each span's vertex colour), broken by ripples, softer and fainter with
+   depth: the flooded Choir holds its lamps, the Cloister's channels hold the arches.
 
 ---
 

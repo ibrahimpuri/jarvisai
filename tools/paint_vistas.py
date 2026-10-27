@@ -339,9 +339,9 @@ def cloister(rng):
 
 def choir(rng):
     # the nave of the great choir: columns receding to the rose window, the floor drowned and mirroring it
-    V = Vista(rng, 0.24, 0.56, 0.4, 0.66)
+    V = Vista(rng, 0.22, 0.44, 0.34, 0.66)
     cx, cy = W * 0.5, H * 0.3
-    V.source(cx, cy, 460, 0.38, 0.55)
+    V.source(cx, cy, 420, 0.26, 0.45)
     far = Layer()
     rose(far, cx, cy, 150)
     for dx in (-330, -230, 230, 330): lancet(far, cx + dx, H * 0.3, 18, H * 0.22, 120)
@@ -350,7 +350,7 @@ def choir(rng):
         h = 120 + (9 - abs(k)) * 14
         far.rect(cx + k * 16 - 6, H * 0.66 - h, cx + k * 16 + 6, H * 0.66)
     V.add(far, 0.4, 2.4, glow_v=0.32)
-    V.rays(cx, cy, [-0.5, -0.25, 0.0, 0.25, 0.5], H * 0.9, 50, 0.24, 20)
+    V.rays(cx, cy, [-0.5, -0.25, 0.0, 0.25, 0.5], H * 0.9, 50, 0.16, 20)
     # columns marching away on both sides toward the window
     vp = (cx, H * 0.4)
     for depth in range(4):
