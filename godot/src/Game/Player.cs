@@ -20,6 +20,7 @@ public class Player : Mover
     public int facing = 1;
     public int maxHp = 5, hp = 5;
     public float breath = 30, oil = 90;
+    bool lowAir;   // she stayed under long enough to come up gasping
     public HashSet<string> abilities = new() { "swing" };
     public Dictionary<string, WeaponState> weapons = new() { ["driver"] = new WeaponState { tier = 0, mag = 6 } };
     public List<string> weaponOrder = new() { "driver" };
@@ -419,7 +420,7 @@ public class Player : Mover
         if (onGround && !wasG && vyBefore > 250)
         {
             Noise.Emit(Cx(), y + h, NoiseScale() * 3, "land");
-            Snd.Step(OnMetal(), 0.18f);
+            Snd.Land(Surface(), vyBefore > 450 ? 0.32f : 0.22f);
             FX.Dust(Cx(), y + h, vyBefore > 450 ? 9 : 5);
             if (boots && !HasFitting("soles")) Stomp();
         }
@@ -432,7 +433,7 @@ public class Player : Mover
                 stepT = 1;
                 float m = (sneak ? 2 : 6) * NoiseScale();
                 Noise.Emit(Cx(), y + h, m, "step");
-                Snd.Step(OnMetal(), sneak ? 0.04f : 0.1f);
+                Snd.Footstep(Surface(), sneak ? 0.04f : 0.11f);
                 if (!sneak && MathF.Abs(vx) > 140) FX.Dust(Cx() - facing * 2, y + h, 1, -facing);
             }
         }
@@ -443,6 +444,17 @@ public class Player : Mover
         if (OnMetal()) s *= 1.5f;
         if (HasFitting("soles")) s *= 0.5f;
         return s;
+    }
+    // what is under her boots: the footsteps are of it
+    public string Surface()
+    {
+        if (InWater() && !HeadUnder() || World.IsWater(Cx(), y + h - 2)) return "water";
+        char ch = World.CharAt(H.FloorI(Cx() / TS), H.FloorI((y + h + 2) / TS));
+        if (ch is 'M' or 'G') return "metal";
+        if (ch is 'P' or '=' or 'T' or 'b') return "wood";
+        if (ch is 'S' or 'x' or 'C') return "salt";
+        if (ch == 'R') return "bone";
+        return G.room?.Region switch { "gullet" => "flesh", "ribvault" or "skull" => "bone", "saltworks" => H.Rand() < 0.3f ? "salt" : "stone", _ => "stone" };
     }
     bool OnMetal()
     {
@@ -952,11 +964,13 @@ public class Player : Mover
             if (breath <= 0)
             {
                 breath = 0; drownT -= dt;
-                if (drownT <= 0) { drownT = 2; invulnT = 0; Hurt(1); H.ToastMsg("Drowning!", 1); }
+                if (drownT <= 0) { drownT = 2; invulnT = 0; Snd.Choke(); Hurt(1); H.ToastMsg("Drowning!", 1); }
             }
+            lowAir = breath < max * 0.3f;
         }
         else
         {
+            if (lowAir) { lowAir = false; Snd.Surface(); }
             breath = MathF.Min(float.IsFinite(max) ? max : 30, breath + dt * (vent ? 12 : 8));
             drownT = 0;
         }

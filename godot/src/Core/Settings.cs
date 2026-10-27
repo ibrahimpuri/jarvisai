@@ -32,6 +32,7 @@ public static class Settings
             NintendoConfirm = !p.Has("nintendoConfirm") || p.B("nintendoConfirm");
             if (p.Has("prompts")) Prompts = p.S("prompts");
             if (p.Has("gore")) Gore = p.S("gore");
+            if (p.Has("music")) Score.MusicVolume = Math.Clamp(p.F("music"), 0, 1);
         }
         catch { }
     }
@@ -40,7 +41,7 @@ public static class Settings
         var o = new JsonObject
         {
             ["fullscreen"] = Fullscreen, ["bloom"] = Bloom, ["shake"] = Shake, ["volume"] = Snd.Volume,
-            ["vibration"] = Vibration, ["aimAssist"] = AimAssist, ["gyro"] = Gyro, ["nintendoConfirm"] = NintendoConfirm, ["prompts"] = Prompts, ["hints"] = Hints, ["gore"] = Gore,
+            ["vibration"] = Vibration, ["aimAssist"] = AimAssist, ["gyro"] = Gyro, ["nintendoConfirm"] = NintendoConfirm, ["prompts"] = Prompts, ["hints"] = Hints, ["gore"] = Gore, ["music"] = Score.MusicVolume,
         };
         using var f = FileAccess.Open(PATH, FileAccess.ModeFlags.Write);
         f?.StoreString(o.ToJsonString());

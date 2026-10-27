@@ -556,6 +556,10 @@ public partial class UiRoot : CanvasLayer
         var r = Row(c);
         foreach (var v in new[] { 0f, 0.35f, 0.7f, 1f })
             Btn(r, v == 0 ? "Off" : Mathf.RoundToInt(v * 100) + "%", () => { Snd.SetVolume(v); Settings.Save(); Pause(); }, selected: MathF.Abs(Snd.Volume - v) < 0.01f);
+        H3(c, "Music");
+        var rm = Row(c);
+        foreach (var v in new[] { 0f, 0.4f, 0.8f, 1f })
+            Btn(rm, v == 0 ? "Off" : Mathf.RoundToInt(v * 100) + "%", () => { Score.SetMusicVolume(v); Settings.Save(); Pause(); }, selected: MathF.Abs(Score.MusicVolume - v) < 0.01f);
         H3(c, "Display");
         var r2 = Row(c);
         Btn(r2, "Fullscreen (F11)", Settings.ToggleFullscreen);

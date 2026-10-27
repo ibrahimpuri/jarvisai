@@ -50,6 +50,7 @@ public static class G
     public static SatchelInfo satchelDrop;
     public static string difficulty = "keeper";
     public static float swell, valveT, sinceLoad;
+    public static float tension;   // how wrong things are this frame (the swell, the Undertow, a boss): the score reads it
     public static UndertowSystem undertow;
     public static Body bossBar;
     public static string encrustedType;
@@ -136,7 +137,7 @@ public static class G
         Narr.Reset();
         Hints.Reset();
         FX.parts.Clear();
-        Gore.Reset(); Voices.Reset(); Hollow.Reset();
+        Gore.Reset(); Voices.Reset(); Hollow.Reset(); Dread.Reset();
         dialT = 0;
         // Maren comes ashore on the outer rocks; the tide holds at Low until she reaches the reef.
         EnterRoom(Data.Room["breakers"], true);
@@ -345,7 +346,7 @@ public static class G
         H.ToastMsg("The tide turns: " + Tide.PhaseName() + ".", 2.5f);
         if (room != null) MarkSeen();
         undertow?.OnPhase(ph);
-        if (ph == "rising") Hints.TideTurned();
+        if (ph == "rising") { Hints.TideTurned(); Score.Sting("turn", 0.85f); }
         var f = World.flags;
         if (ph == "rising")
         {
@@ -657,6 +658,10 @@ public static class G
         if (p.dead) return;
         p.dead = true; p.grabbedBy = null; if (p.dragging != null) p.StopDrag();
         stats.deaths++;
+        Score.Sting("death");
+        bool drowned = p.HeadUnder() && p.breath <= 0.01f;
+        if (drowned) Snd.Choke();
+        Snd.MarenDies(drowned);
         // The satchel stays where she fell; weapons and fittings stay with her.
         var bag = new Bag(99);
         foreach (var kv in p.bag.List()) bag.items[kv.Key] = kv.Value;
@@ -908,6 +913,7 @@ public static class G
         FX.Update(dt);
         Gore.Update(dt);
         Voices.Update(dt);
+        Dread.Update(dt);
         Hollow.Update(dt);
         AmbientOneShots(dt);
         Narr.UpdateWhispers(dt);
@@ -982,17 +988,21 @@ public static class G
         UpdateCamera(dt);
         shakeX = (H.Rand() - 0.5f) * shakeAmt; shakeY = (H.Rand() - 0.5f) * shakeAmt;
         // Ambience follows the tide and the tension.
-        float tension = H.Clamp(swell / 9 + (undertow.live != null ? 0.6f : 0) + (bossBar != null ? 0.4f : 0), 0, 1);
+        tension = H.Clamp(swell / 9 + (undertow.live != null ? 0.6f : 0) + (bossBar != null ? 0.4f : 0), 0, 1);
         Snd.Ambience(room.Row == 4 || room.Outdoor ? Tide.Level01() : 0.2f, tension, p.HeadUnder(), p.inBellRoom);
     }
 
     // The island is never quite silent: the Saint's ribs settle under the abbey, and somewhere far off a bell is rung.
-    static float groanT = 40, farBellT = 70, breathT;
+    static float groanT = 40, farBellT = 70, breathT, heartT;
     static void AmbientOneShots(float dt)
     {
         // badly hurt, she hears herself breathing in the helmet
         breathT -= dt;
         if (player.hp <= 2 && !player.dead && !player.HeadUnder() && breathT <= 0) { breathT = player.hp <= 1 ? 1.6f : 2.5f; Snd.Breath(player.hp <= 1); }
+        // and at the last pip, her heart, louder than the room
+        heartT -= dt;
+        if (player.hp <= 1 && !player.dead && heartT <= 0) { heartT = 0.78f; Snd.Heartbeat(true); }
+        else if (player.hp == 2 && !player.dead && heartT <= 0) { heartT = 1.05f; Snd.Heartbeat(false); }
         if (room.Outdoor || player.inBellRoom) return;
         groanT -= dt; farBellT -= dt;
         if (groanT <= 0) { groanT = H.Rand(50, 110); Snd.SaintGroan(H.Rand(-0.7f, 0.7f)); }

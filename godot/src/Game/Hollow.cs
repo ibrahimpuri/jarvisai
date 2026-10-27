@@ -87,7 +87,7 @@ public static class Hollow
         owned = true; held = true;
         var f = World.flags; f.Set("hollowTaken", true); f.O.Remove("hollowX"); f.O.Remove("hollowY");
         resonance = MathF.Max(resonance, 60);
-        Snd.Pickup(); Snd.Verse("calling");
+        Snd.Pickup(); Snd.Verse("calling"); Score.Sting("discover", 0.8f);
         var L = Data.Lore.P("hollow");
         UI.Inscription(L.S("name"), L.S("reveal"), () =>
         {
@@ -106,7 +106,7 @@ public static class Hollow
         resonance = MathF.Max(resonance, Def(id).cost + 5);
         var v = Def(id);
         var L = Data.Lore.P("hollow").P("verses").P(id);
-        if (moment) { Snd.Verse(id); G.Shake(2); Narr.Think("learn_" + id); }
+        if (moment) { Snd.Verse(id); G.Shake(2); Narr.Think("learn_" + id); Score.Sting("discover", 0.7f); }
         Hints.Did("verse_" + id);
         G.After(moment ? 1.6f : 0.05f, () => UI.Inscription(v.name, "“" + v.line + "”\n\n" + Glyphs.Plain(L.S("desc"), Glyphs.Current)));
     }

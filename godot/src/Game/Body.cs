@@ -261,7 +261,7 @@ public class Body : Ent
             var limb = knots.Where(k => !k.broken && k.type != "crown" && KnotPos(k) != null).OrderBy(k => (KnotPos(k).Value - new Vector2(hx, hy)).LengthSquared()).FirstOrDefault();
             if (limb != null) { DamageKnot(limb, 99, src); return; }
         }
-        Snd.Thud(Pan());
+        Snd.Flesh(Pan());
         Gore.Wound(hx, hy);
         if (src == "rivet" && !corpse && knots.Any(k => !k.broken)) Narr.Think("torso");
         Wake(true);
@@ -277,7 +277,7 @@ public class Body : Ent
         if (best != null)
         {
             best.hp -= dmg * 0.1f;
-            if (best.hp <= 0) { best.broken = true; Snd.Crack(Pan()); OnKnotBroken(best, src); Gore.OnKnotBroken(this, best, src); Hollow.OnKnotBroken(this, src); }
+            if (best.hp <= 0) { best.broken = true; Snd.KnotBreak(Pan()); OnKnotBroken(best, src); Gore.OnKnotBroken(this, best, src); Hollow.OnKnotBroken(this, src); }
             else if (H.Rand() < 0.4f) Voices.Hurt(this, false);
         }
         Flinch();

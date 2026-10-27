@@ -17,6 +17,7 @@ public partial class Main : Node2D
         Pad.Notice = OnPadNotice;
         AddChild(new Snd());
         Snd.SetVolume(Snd.Volume);
+        AddChild(new Score());
         G.Init();
         view = new WorldView();
         AddChild(view);

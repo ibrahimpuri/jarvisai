@@ -339,7 +339,7 @@ public static class Scenarios
             await t.Run(1.2f);
             t.Ok("it cries out when it sees her", Snd.Heard.Contains("shucker:alert"));
             await t.Run(0.4f);
-            t.Ok("and the strings sting", Voices.Stings == stings + 1 && Snd.Heard.Contains("sting"), Voices.Stings - stings);
+            t.Ok("and the strings sting", Voices.Stings == stings + 1 && (Snd.Heard.Contains("sting") || Score.Stung.Contains("seen")), Voices.Stings - stings);
             await t.Run(2f);
             t.Ok("its wet footsteps carry", Snd.Heard.Any(k => k.StartsWith("step:")));
             Snd.Heard.Clear();
@@ -968,6 +968,69 @@ public static class Scenarios
                     $"{StoryFocus.Active?.id} {StoryFocus.W:0.00} calm {StoryFocus.Calm:0.00} inv {G.player.invulnT:0.00} boss {G.bossBar?.type} hp {G.player.hp} near {G.ents.OfType<Body>().Where(b => !b.gone && b.Alive()).Select(b => H.Dist(b.Cx(), b.Cy(), G.player.Cx(), G.player.Cy())).DefaultIfEmpty(-1).Min():0} lit {G.player.LanternLit()} at {(G.player.Cx() - r.Px) / 16:0},{(G.player.Cy() - r.Py) / 16:0} mon {(m.x - r.Px) / 16:0},{(m.floor - r.Py) / 16:0}");
                 t.Snap("monument_" + d.id);
             }
+        },
+
+        ["audio"] = async t =>
+        {
+            // the score follows where she is and how things stand
+            World.flags.Set("hollowGift", true);
+            t.Ok("the score is installed", Score.Active);
+            t.Place("kilns", 15, 18);
+            foreach (var b in G.ents.OfType<Body>()) b.gone = true;
+            G.player.invulnT = 0;
+            await t.Run(4.5f);
+            t.Ok("the Saltworks bed plays in the Kilns", Score.Bed == "saltworks" && Score.Target("score/bed_saltworks") > 0.9f && Score.Level("score/bed_saltworks") > 0.9f, $"{Score.Bed} {Score.Level("score/bed_saltworks"):0.00}");
+            t.Ok("with the room's own ambience under it", Score.Level("amb/saltworks") > 0.8f);
+            t.Ok("and no chase while nothing hunts her", Score.Target("score/chase") == 0);
+            // something sees her and comes
+            var kr = Data.Room["kilns"];
+            var sp = Props.Empty(); sp.Set("x", G.player.Cx() + 70); sp.Set("y", G.player.y + G.player.h); sp.Set("key", "audio_hunter"); sp.Set("pose", "standing");
+            var foe = new Shucker(sp, kr); foe.mode = "hunt"; foe.spotted = true; G.ents.Add(foe);
+            await t.Run(1.5f);
+            t.Ok("a hunter close by brings the chase in", Score.Target("score/chase") == 1 && Score.Level("score/chase") > 0.5f, Score.Level("score/chase"));
+            t.Ok("and the dread under it", Score.Target("score/dread") > 0.5f, Score.Target("score/dread"));
+            t.Ok("the region's bed steps back for it", Score.Target("score/bed_saltworks") < 0.7f);
+            foe.gone = true;
+            await t.Run(10.5f);
+            t.Ok("when it is gone the chase lets go", Score.Target("score/chase") == 0 && Score.Level("score/chase") < 0.2f, Score.Level("score/chase"));
+            // a Bell Room
+            t.Place("saltbell", 20, 18); await t.Run(3.5f);
+            t.Ok("a Bell Room plays the sanctuary", G.player.inBellRoom && Score.Target("score/sanctuary") == 1 && Score.Level("score/sanctuary") > 0.8f, $"{G.player.inBellRoom} {Score.Level("score/sanctuary"):0.00}");
+            t.Ok("and the dread cannot follow her in", Score.Target("score/dread") == 0);
+            // another region
+            t.Place("cloister", 8, 16); await t.Run(4.5f);
+            t.Ok("the Cloister has its own bed", Score.Bed == "cloister" && Score.Level("score/bed_cloister") > 0.9f && Score.Level("score/bed_saltworks") < 0.05f, $"{Score.Bed}");
+            // the dread director: quiet, alone, it makes sounds; never in a fight
+            Snd.Heard.Clear(); int before = Dread.Played;
+            foreach (var kind in new[] { "knock", "scratch", "whisper", "steps", "drag", "scream", "breath", "chain", "child", "laugh" }) Dread.Play(kind);
+            t.Ok("the dark has its sounds", new[] { "dread:knock", "dread:scratch", "dread:whisper", "dread:steps", "dread:drag", "dread:scream", "dread:breath", "dread:chain", "dread:child", "dread:laugh" }.All(k => Snd.Heard.Any(h => h.StartsWith(k))), string.Join(" ", Snd.Heard.Where(h => h.StartsWith("dread")).Distinct()));
+            Score.Stung.Clear(); Dread.Play("slam");
+            t.Ok("the big one comes with a scare and her gasp", Score.Stung.Contains("scare"));
+            await t.Run(0.3f);
+            t.Ok("she gasps", Snd.Heard.Contains("gasp"));
+            int played = Dread.Played;
+            var sp2 = Props.Empty(); sp2.Set("x", G.player.Cx() + 60); sp2.Set("y", G.player.y + G.player.h); sp2.Set("key", "audio_hunter2"); sp2.Set("pose", "standing");
+            var foe2 = new Shucker(sp2, Data.Room["cloister"]); foe2.mode = "hunt"; G.ents.Add(foe2);
+            for (int i = 0; i < 30; i++) { Dread.Update(5); await t.Run(0.02f); }
+            t.Ok("never while something is coming for her", Dread.Played == played, Dread.Played - played);
+            foe2.gone = true; G.player.invulnT = 0; await t.Run(0.2f);
+            for (int i = 0; i < 40 && Dread.Played == played; i++) { Dread.Update(10); await t.Run(0.02f); }
+            t.Ok("but alone in the quiet, it comes", Dread.Played > played, Dread.Last);
+            // her body: footsteps of what is under her, the heart at the last pip, choking under water
+            Snd.Heard.Clear();
+            await t.Hold("right", 0.6f);
+            t.Ok("her boots sound of the floor", Snd.Heard.Any(h => h.StartsWith("foot:")), string.Join(" ", Snd.Heard.Where(h => h.StartsWith("foot")).Distinct()));
+            string uiWas = UI.Kind; UI.Close(); await t.Run(0.1f);
+            G.player.hp = 1; Snd.Heard.Clear(); await t.Run(2f);
+            t.Ok("at the last pip she hears her heart", Snd.Heard.Contains("heartTrue"), $"{G.mode} ui {uiWas}/{UI.IsOpen()} dead {G.player.dead} hp {G.player.hp}: " + string.Join(" ", Snd.Heard.Distinct().Take(12)));
+            G.player.hp = G.player.maxHp;
+            // the moments
+            Score.Stung.Clear();
+            Tide.AdvanceTo("rising"); await t.Run(0.5f);
+            t.Ok("the tide turning toward High is marked", Score.Stung.Contains("turn"), string.Join(",", Score.Stung));
+            // the title screen has its own music
+            G.ToTitle(); await t.Run(4.5f);
+            t.Ok("the title plays its theme", Score.Target("score/title") == 1 && Score.Level("score/title") > 0.9f && Score.Bed == null, Score.Level("score/title"));
         },
 
         ["menus"] = async t =>

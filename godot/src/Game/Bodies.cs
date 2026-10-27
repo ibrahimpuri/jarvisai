@@ -654,7 +654,7 @@ public class Corpse : Body
     public override void Wake(bool force = false) { }
     public override Palette Pal() => sailor ? new Palette { robe = "#2a3a4a", skin = "#8c9890", dark = "#1a242c" } : new Palette { robe = "#3b3631", skin = "#7a837a", cowl = "#2c2824" };
     public override bool DamageKnot(Knot k, float dmg, string src) => false;
-    public override void DamageFlesh(float d, float hx, float hy, string src) { Snd.Thud(Pan()); Gore.Wound(hx, hy, 3); }
+    public override void DamageFlesh(float d, float hx, float hy, string src) { Snd.Flesh(Pan()); Gore.Wound(hx, hy, 3); }
     public override void Update(float dt)
     {
         _skel = null;

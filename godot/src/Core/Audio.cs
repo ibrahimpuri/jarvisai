@@ -131,11 +131,32 @@ public class Synth
     // A voice: a pulse at a pitch that glides from f0a to f0b, shaped by three formant bands that morph
     // from one vowel to another, with breath, a wet gurgle (water in the throat) and vocal fry (the voice
     // catching and rattling). Every drowned thing in the abbey speaks through this.
+    // growl: period doubling (every other glottal pulse weaker), the subharmonic an octave down that makes a
+    // throat sound like something else is using it. throats: more than one voice in the same body, each a little off
+    // in pitch and shape. harsh: the cry torn ragged, clipped in the throat. inhale: a gasp drawn in first.
     public void Voice(float dur, float vol, float f0a, float f0b, (float, float, float) va, (float, float, float) vb,
-        float breath = 0.2f, float gurgle = 0, float fry = 0, float vib = 0, float at = 0, float attack = 0.06f, float shift = 1)
+        float breath = 0.2f, float gurgle = 0, float fry = 0, float vib = 0, float at = 0, float attack = 0.06f, float shift = 1,
+        float growl = 0, int throats = 1, float harsh = 0, float inhale = 0)
+    {
+        if (inhale > 0) { NoiseSweep(inhale, vol * 0.35f, "bandpass", 900, 2400, 2.5f, inhale * 0.8f, at); at += inhale * 0.9f; }
+        if (throats > 1)
+        {
+            for (int k = 0; k < throats; k++)
+            {
+                float d = 1 + (k - (throats - 1) / 2f) * 0.035f + (float)(rng.NextDouble() - 0.5) * 0.02f;
+                VoiceOne(dur * (0.92f + (float)rng.NextDouble() * 0.12f), vol / MathF.Sqrt(throats), f0a * d, f0b * d * (1 + (float)(rng.NextDouble() - 0.5) * 0.04f), va, vb, breath, gurgle, fry, vib, at + (float)rng.NextDouble() * 0.06f, attack, shift * (0.94f + 0.12f * k / MathF.Max(1, throats - 1)), growl, harsh);
+            }
+            return;
+        }
+        VoiceOne(dur, vol, f0a, f0b, va, vb, breath, gurgle, fry, vib, at, attack, shift, growl, harsh);
+    }
+    void VoiceOne(float dur, float vol, float f0a, float f0b, (float, float, float) va, (float, float, float) vb,
+        float breath, float gurgle, float fry, float vib, float at, float attack, float shift, float growl, float harsh)
     {
         int start = (int)(at * RATE), n = (int)(dur * RATE);
         var b1 = new Biquad("bandpass", va.Item1 * shift, 5); var b2 = new Biquad("bandpass", va.Item2 * shift, 8); var b3 = new Biquad("bandpass", va.Item3 * shift, 10);
+        var b4 = new Biquad("bandpass", 3400 * shift, 12);
+        int cyc = 0; double lastP = 0;
         // the rattle and the gurgle are amplitude games that leave a rumble under the voice: cut it, and dull the top
         var hp = new Biquad("highpass", 110, 0); var hp2 = new Biquad("highpass", 110, 0); var lp = new Biquad("lowpass", 3200, 0);
         double ph = 0, fryPh = 0;
@@ -161,12 +182,59 @@ public class Synth
             float f0 = f0a * MathF.Pow(f0b / f0a, u) * (1 + vib * MathF.Sin(2 * MathF.PI * 5.2f * t) + jit + gurgle * 0.05f * bub);
             ph += f0 / RATE;
             float p = (float)(ph - Math.Floor(ph));
+            if (p < lastP) cyc++;
+            lastP = p;
             float exc = (1 - breath) * (1 - 2 * p) + breath * ((float)rng.NextDouble() * 2 - 1) * 0.9f;
+            if (growl > 0) exc *= (cyc & 1) == 0 ? 1 + growl * 0.6f : 1 - growl * 0.75f;
             if (fry > 0) { fryPh += fryHz / RATE; float fp = (float)(fryPh - Math.Floor(fryPh)); exc *= 1 - fry + fry * (fp < 0.3f ? 1.7f : 0.15f); }
             if (gurgle > 0) exc *= 1 - gurgle * 0.55f + gurgle * 0.9f * bub;
-            float y = lp.Run(hp2.Run(hp.Run(b1.Run(exc) + b2.Run(exc) * 0.7f + b3.Run(exc) * 0.3f)));
+            float y = lp.Run(hp2.Run(hp.Run(b1.Run(exc) + b2.Run(exc) * 0.7f + b3.Run(exc) * 0.3f + b4.Run(exc) * 0.15f)));
+            if (harsh > 0) y = MathF.Tanh(y * (1 + harsh * 9)) / (1 + harsh * 1.5f);
             float env = MathF.Min(1, t / attack) * MathF.Min(1, (dur - t) / rel);
             Add(start + i, y * env * vol);
+        }
+    }
+
+    // Whispered speech: breath through a mouth shaping sounds. Each phone is a vowel's formants, a nasal, a hiss, a stop
+    // or a liquid; the formants glide from one to the next. Close enough to words, in the dark, to be heard as one.
+    static readonly Dictionary<string, (float f1, float f2, float f3, float amp, string kind)> PHONES = new()
+    {
+        ["a"] = (730, 1090, 2440, 1, "v"), ["e"] = (530, 1840, 2480, 1, "v"), ["i"] = (300, 2250, 3000, 0.8f, "v"),
+        ["o"] = (570, 840, 2410, 1, "v"), ["u"] = (320, 870, 2240, 0.8f, "v"), ["uh"] = (520, 1190, 2390, 0.9f, "v"),
+        ["m"] = (260, 1000, 2200, 0.35f, "n"), ["n"] = (280, 1700, 2600, 0.35f, "n"), ["ng"] = (280, 2300, 2800, 0.3f, "n"),
+        ["r"] = (420, 1300, 1650, 0.6f, "v"), ["l"] = (380, 1100, 2700, 0.6f, "v"), ["w"] = (300, 700, 2200, 0.5f, "v"),
+        ["s"] = (5200, 7000, 8500, 0.55f, "s"), ["sh"] = (2600, 3600, 5000, 0.6f, "s"), ["h"] = (900, 1500, 2600, 0.5f, "h"),
+        ["k"] = (1800, 2400, 3200, 0.9f, "p"), ["t"] = (3500, 4500, 6000, 0.9f, "p"), ["d"] = (2800, 3800, 5200, 0.7f, "p"),
+        ["p"] = (900, 1400, 2400, 0.8f, "p"),
+    };
+    public void Whisper(float vol, float at, params (string ph, float dur)[] phones)
+    {
+        float total = 0; foreach (var (_, d) in phones) total += d;
+        int start = (int)(at * RATE), n = (int)((total + 0.1f) * RATE);
+        var f1 = new Biquad("bandpass", 500, 6); var f2 = new Biquad("bandpass", 1500, 8); var f3 = new Biquad("bandpass", 2500, 9);
+        var hiss = new Biquad("highpass", 4000, 0);
+        float tAcc = 0; int idx = 0;
+        for (int i = 0; i < n; i++)
+        {
+            float t = (float)i / RATE;
+            while (idx < phones.Length - 1 && t > tAcc + phones[idx].dur) { tAcc += phones[idx].dur; idx++; }
+            var cur = PHONES[phones[idx].ph]; var nxt = PHONES[phones[Math.Min(phones.Length - 1, idx + 1)].ph];
+            float u = Math.Clamp((t - tAcc) / MathF.Max(0.01f, phones[idx].dur), 0, 1), k = MathF.Max(0, (u - 0.6f) / 0.4f);
+            if ((i & 63) == 0)
+            {
+                f1.Set("bandpass", H.Lerp(cur.f1, nxt.f1, k), 6); f2.Set("bandpass", H.Lerp(cur.f2, nxt.f2, k), 8); f3.Set("bandpass", H.Lerp(cur.f3, nxt.f3, k), 9);
+            }
+            float w = (float)rng.NextDouble() * 2 - 1;
+            float y = cur.kind switch
+            {
+                "s" => hiss.Run(w) * 0.6f,
+                "p" => (f2.Run(w) + f3.Run(w)) * (u < 0.35f ? 1.6f : 0.05f),
+                _ => f1.Run(w) + f2.Run(w) * 0.6f + f3.Run(w) * 0.3f,
+            };
+            // each phone swells and falls; the word as a whole trails off
+            float e = MathF.Sin(MathF.Min(1, u * 1.15f) * MathF.PI) * 0.6f + 0.4f;
+            float word = MathF.Min(1, t / 0.03f) * MathF.Max(0, 1 - MathF.Max(0, t - total * 0.75f) / (total * 0.3f + 0.05f));
+            Add(start + i, y * cur.amp * e * word * vol * 1.6f);
         }
     }
 
@@ -297,6 +365,7 @@ public partial class Snd : Node
         float aS = 1 - MathF.Exp(-2 * MathF.PI * surfFreq / rate), aD = 1 - MathF.Exp(-2 * MathF.PI * droneFreq / rate);
         var buf = new Vector2[frames];
         var rng = H.Rng;
+        bool scored = Score.Active;
         for (int i = 0; i < frames; i++)
         {
             phLfo += 0.12 / rate; ph1 += 55 / rate; ph2 += 55.6 / rate; ph3 += 82.4 / rate;
@@ -314,7 +383,8 @@ public partial class Snd : Node
                 float breathe = 0.6f + 0.4f * MathF.Sin((float)(phLfo * Math.PI * 2 * 2.5));
                 safe = (MathF.Sin((float)(phS1 * Math.PI * 2)) + 0.7f * MathF.Sin((float)(phS2 * Math.PI * 2)) + 0.45f * MathF.Sin((float)(phS3 * Math.PI * 2)) + 0.2f * MathF.Sin((float)(phS4 * Math.PI * 2))) * 0.05f * safeGain * breathe;
             }
-            float v = (surf + drone * (1 - safeGain * 0.8f) + safe) * 0.5f;
+            // the drone and the Bell Room's chord were the music before there was a score: the score has them now
+            float v = (surf + (scored ? 0 : drone * (1 - safeGain * 0.8f) + safe)) * 0.5f;
             buf[i] = new Vector2(v, v);
         }
         if (frames > 0) amb.PushBuffer(buf);
@@ -358,11 +428,11 @@ public partial class Snd : Node
         v.Play();
     }
     // A sound from a place in the world. Godot pans and quietens it by distance from the view.
-    public static void At(string key, float seconds, Action<Synth> build, float x, float y, float vol = 1, int variants = 3, float normalize = 0.9f)
+    public static void At(string key, float seconds, Action<Synth> build, float x, float y, float vol = 1, int variants = 3, float normalize = 0.9f, string variant = null)
     {
         Log(key);
         if (inst == null || Muted) return;
-        var arr = Bake(key + "|at", seconds, build, 0, variants, normalize);
+        var arr = Bake(key + (variant ?? "") + "|at", seconds, build, 0, variants, normalize);
         var v = inst.spots[inst.nextSpot++ % inst.spots.Count];
         v.Stream = arr[H.Rng.Next(arr.Length)];
         v.GlobalPosition = new Vector2(x, y);
@@ -401,30 +471,52 @@ public partial class Snd : Node
         Play("step" + metal, 0.15f, s => { s.Noise(0.05f, 1, "bandpass", metal ? 2600 : 700, metal ? 6 : 1.5f); if (metal) s.Tone("triangle", 900 + H.Rand() * 200, 0.08f, 0.4f); }, vol, pan, 3);
     public static void Splash(float vol = 0.25f, float pan = 0) => Play("splash", 0.45f, s => s.Noise(0.35f, 1, "lowpass", 1400, 0.5f, 0.01f), vol, pan);
     public static void Jump(float pan = 0) => Play("jump", 0.15f, s => s.Noise(0.08f, 0.08f, "bandpass", 500, 1), 1, pan);
-    public static void Rivet(float pan = 0) => Play("rivet", 0.15f, s => { s.Noise(0.06f, 0.4f, "highpass", 2000, 1); s.Tone("square", 220, 0.07f, 0.15f, 80); }, 1, pan);
-    public static void Harpoon(float pan = 0) => Play("harpoon", 0.3f, s => { s.Noise(0.15f, 0.3f, "bandpass", 900, 2); s.Tone("sawtooth", 160, 0.2f, 0.15f, 60); }, 1, pan);
+    // the rivet driver: a punch of compressed air, steel slammed home, the mechanism clacking back, the room answering
+    public static void Rivet(float pan = 0) => Play("rivet", 0.45f, s =>
+    {
+        s.Noise(0.05f, 0.55f, "highpass", 2400, 1, 0.001f);
+        s.Noise(0.09f, 0.5f, "lowpass", 900, 0.8f, 0.001f);
+        s.Tone("sine", 120, 0.12f, 0.5f, 55);
+        s.Tone("triangle", 1900, 0.05f, 0.15f, 1200, 0.005f);
+        s.Noise(0.03f, 0.25f, "bandpass", 3200, 6, 0.001f, 0.09f);
+        s.NoiseSweep(0.18f, 0.12f, "bandpass", 5000, 2500, 2, 0.01f, 0.03f);
+    }, 1, pan);
+    // the harpoon: the prod's thunk, the line paying out and whirring
+    public static void Harpoon(float pan = 0) => Play("harpoon", 0.6f, s =>
+    {
+        s.Noise(0.06f, 0.6f, "lowpass", 600, 0.8f, 0.001f); s.Tone("sine", 95, 0.14f, 0.5f, 50);
+        s.Tone("sawtooth", 160, 0.2f, 0.12f, 60);
+        s.NoiseSweep(0.45f, 0.2f, "bandpass", 1400, 3800, 4, 0.02f, 0.05f);
+    }, 1, pan);
     public static void Sling(float pan = 0) => Play("sling", 0.3f, s => s.Noise(0.2f, 0.15f, "bandpass", 1500, 3, 0.04f), 1, pan);
     public static void Reload() => Play("reload", 0.25f, s => { s.Tone("square", 600, 0.04f, 0.08f); s.Tone("square", 900, 0.04f, 0.08f, 0, 0.12f); }, 1, 0, 1);
     public static void Empty() => Play("empty", 0.1f, s => s.Tone("square", 1200, 0.03f, 0.06f), 1, 0, 1);
-    public static void Tink(float pan = 0) => Play("tink", 0.15f, s => s.Tone("triangle", 2400, 0.08f, 0.12f, 1800), 1, pan, 1);
+    // a rivet off stone: the spang of the ricochet, and the chip of rock
+    public static void Tink(float pan = 0) => Play("tink", 0.4f, s => { s.Tone("triangle", H.Rand(2200, 2900), 0.25f, 0.14f, H.Rand(1300, 1700)); s.Noise(0.04f, 0.3f, "highpass", 3000, 1, 0.001f); s.Noise(0.06f, 0.2f, "lowpass", 1200, 0.7f, 0.001f, 0.01f); }, 1, pan, 3);
     public static void Thud(float pan = 0) => Play("thud", 0.2f, s => s.Noise(0.12f, 0.25f, "lowpass", 300), 1, pan);
     public static void Crack(float pan = 0) => Play("crack", 0.35f, s => { s.Noise(0.18f, 0.5f, "highpass", 1500, 0.8f); s.Tone("triangle", 1700, 0.25f, 0.2f, 500); }, 1, pan);
     public static void Gaff(float pan = 0) => Play("gaff", 0.2f, s => s.Noise(0.12f, 0.15f, "bandpass", 2000, 2, 0.02f), 1, pan);
     public static void Hook(float pan = 0) => Play("hook", 0.15f, s => s.Tone("triangle", 1400, 0.1f, 0.12f, 900), 1, pan, 1);
     // Maren, hit: the clang of the blow on brass and her grunt inside the helmet
-    public static void Hurt() => Play("hurt", 0.4f, s => { s.Tone("sawtooth", 180, 0.25f, 0.2f, 70); s.Noise(0.15f, 0.2f, "lowpass", 800); s.Voice(0.3f, 0.35f, H.Rand(230, 260), H.Rand(180, 200), (520, 1190, 2390), (570, 840, 2410), 0.5f, 0, 0.2f, 0, 0.02f, 0.02f, 0.85f); }, 1, 0, 3);
+    public static void Hurt() => Play("hurt", 0.6f, s =>
+    {
+        // the blow on brass, ringing in her ears inside the helmet, and her cry
+        s.Tone("sawtooth", 180, 0.25f, 0.2f, 70); s.Noise(0.15f, 0.25f, "lowpass", 800);
+        s.Bell(620, 0.18f, 0.5f);
+        s.Voice(0.35f, 0.45f, H.Rand(250, 290), H.Rand(180, 200), (520, 1190, 2390), (570, 840, 2410), 0.45f, 0, 0.25f, 0, 0.02f, 0.02f, 0.85f, 0, 1, 0.35f, 0.08f);
+    }, 1, 0, 4);
     public static void Heal() => Play("heal", 0.65f, s => { s.Tone("sine", 520, 0.3f, 0.12f); s.Tone("sine", 780, 0.4f, 0.1f, 0, 0.15f); }, 1, 0, 1);
     public static void Pickup() => Play("pickup", 0.25f, s => { s.Tone("triangle", 880, 0.08f, 0.1f); s.Tone("triangle", 1320, 0.1f, 0.08f, 0, 0.07f); }, 1, 0, 1);
     public static void Craft() => Play("craft", 0.2f, s => { s.Noise(0.1f, 0.12f, "bandpass", 3000, 4); s.Tone("triangle", 660, 0.12f, 0.08f); }, 1, 0, 1);
     public static void Groan(float pan = 0, float vol = 0.18f) => Play("groan", 1.0f, s => s.Tone("sawtooth", H.Rand(70, 95), 0.9f, 1, H.Rand(50, 60)), vol, pan, 3);
     public static void Inhale(float pan = 0) => Play("inhale", 2.8f, s => s.Noise(1.5f, 0.25f, "bandpass", 600, 1.5f, 1.2f), 1, pan, 1);
     // The Bellmouth's scream: a cracked bell of a voice, many throats in it, loud enough to wake the room.
-    public static void Scream(float pan = 0) => Play("scream", 1.5f, s =>
+    public static void Scream(float pan = 0) => Play("scream", 2.0f, s =>
     {
-        s.Tone("sawtooth", 420, 1.2f, 0.25f, 900); s.Tone("square", 610, 1.2f, 0.12f, 1300); s.Noise(1.2f, 0.3f, "bandpass", 2500, 1);
-        s.Voice(1.35f, 0.5f, 380, 640, (730, 1090, 2440), (530, 1840, 2480), 0.3f, 0.2f, 0.4f, 0.03f);
-        s.Voice(1.35f, 0.4f, 405, 690, (730, 1090, 2440), (730, 1090, 2440), 0.3f, 0, 0.5f, 0.04f, 0.04f);
-        s.Bell(311, 0.25f, 1.3f);
+        s.Tone("sawtooth", 420, 1.2f, 0.2f, 900); s.Tone("square", 610, 1.2f, 0.1f, 1300); s.Noise(1.2f, 0.3f, "bandpass", 2500, 1);
+        s.Voice(1.5f, 0.55f, 380, 640, (730, 1090, 2440), (530, 1840, 2480), 0.3f, 0.2f, 0.4f, 0.03f, 0, 0.05f, 1, 0.3f, 4, 0.6f, 0.4f);
+        s.Voice(1.4f, 0.4f, 405, 690, (730, 1090, 2440), (730, 1090, 2440), 0.3f, 0, 0.5f, 0.04f, 0.44f, 0.06f, 1, 0.2f, 3, 0.5f);
+        s.Bell(311, 0.25f, 1.3f, 0.4f);
     }, 1, pan, 1);
     public static void Grab() => Play("grab", 0.35f, s => { s.Noise(0.2f, 0.3f, "lowpass", 600); s.Tone("sawtooth", 110, 0.3f, 0.2f, 70); }, 1, 0, 1);
     public static void Fire(float pan = 0) => Play("fire", 0.8f, s => s.Noise(0.6f, 0.2f, "bandpass", 900, 0.5f, 0.1f), 1, pan);
@@ -435,10 +527,65 @@ public partial class Snd : Node
     public static void TideBell() => Bell(330, 0.25f, 0, 3);
     public static void RoomBell() => Play("roombell", 5.4f, s => { s.Bell(392, 0.35f, 5); s.Bell(392 * 1.5f, 0.15f, 4, 0.3f); }, 1, 0, 1);
     public static void Toll() => Bell(110, 0.6f, 0, 6);
-    public static void Ui() => Play("ui", 0.1f, s => s.Tone("triangle", 700, 0.05f, 0.06f), 1, 0, 1);
-    public static void Deny() => Play("deny", 0.2f, s => s.Tone("square", 160, 0.12f, 0.1f), 1, 0, 1);
+    // the menus: a soft tick of bone on wood, and a dull knock for no
+    public static void Ui() => Play("ui", 0.25f, s => { s.Noise(0.02f, 0.3f, "bandpass", 1800, 3, 0.001f); s.Tone("sine", 420, 0.12f, 0.07f, 380); }, 1, 0, 2);
+    public static void Deny() => Play("deny", 0.35f, s => { s.Noise(0.08f, 0.35f, "lowpass", 300, 0.8f, 0.002f); s.Tone("sine", 92, 0.2f, 0.25f, 70); }, 1, 0, 1);
     public static void Rumble() => Play("rumble", 1.9f, s => s.Noise(1.5f, 0.4f, "lowpass", 120, 0.5f, 0.2f), 1, 0, 2);
     public static void Flare(float pan = 0) => Play("flare", 0.6f, s => s.Noise(0.5f, 0.2f, "highpass", 3000, 0.5f, 0.02f), 1, pan);
+
+    // ---- Maren ----------------------------------------------------------------------------------------------
+    // Her weighted diving boots on whatever is under them: the heel's thump, then the surface's own sound.
+    public static void Footstep(string surface, float vol = 0.12f, float pan = 0) => Play("foot:" + surface, 0.35f, s =>
+    {
+        s.Noise(0.05f, 0.7f, "lowpass", 260, 0.8f, 0.002f); s.Tone("sine", 70, 0.06f, 0.35f, 45);
+        switch (surface)
+        {
+            case "metal": s.Tone("triangle", H.Rand(850, 1000), 0.12f, 0.25f); s.Tone("triangle", H.Rand(1300, 1500), 0.08f, 0.12f); s.Noise(0.04f, 0.4f, "bandpass", 2600, 6, 0.001f); break;
+            case "wood": s.Noise(0.08f, 0.6f, "bandpass", 320, 3, 0.002f); if (H.Rand() < 0.4f) s.Clicks(8, 0.25f, 0.12f, 600, 1, 0.05f); break;
+            case "water": s.NoiseSweep(0.2f, 0.6f, "lowpass", 1800, 500, 0.8f, 0.005f); s.Noise(0.06f, 0.25f, "bandpass", 1200, 2, 0.002f, 0.05f); break;
+            case "salt": s.Clicks(10, 0.07f, 0.35f, 4500, 1); s.Noise(0.04f, 0.3f, "highpass", 3500, 1, 0.001f); break;
+            case "bone": s.Clicks(5, 0.05f, 0.45f, 2200, 1); s.Tone("triangle", H.Rand(650, 800), 0.05f, 0.12f); break;
+            case "flesh": s.NoiseSweep(0.14f, 0.6f, "bandpass", 1200, 380, 2, 0.003f); s.Noise(0.05f, 0.4f, "lowpass", 300, 0.8f, 0.002f, 0.02f); break;
+            default: s.Noise(0.03f, 0.35f, "bandpass", 1800, 2, 0.001f, 0.035f); if (H.Rand() < 0.3f) s.Tone("triangle", 1500, 0.03f, 0.05f, 0, 0.02f); break;
+        }
+    }, vol, pan, 4);
+    // She lands: the boots, and the corselet and helmet rattling on her
+    public static void Land(string surface, float vol = 0.25f) { Footstep(surface, vol); Play("land", 0.3f, s => { s.Noise(0.08f, 0.5f, "lowpass", 180, 0.8f, 0.003f); s.Clicks(4, 0.08f, 0.25f, 2600, 1, 0.01f); }, vol, 0, 2); }
+    // a sharp breath through the teeth when something comes out of the dark at her
+    public static void Gasp() => Play("gasp", 0.8f, s => { s.NoiseSweep(0.35f, 0.7f, "bandpass", 900, 2400, 2.5f, 0.02f); s.Voice(0.18f, 0.25f, 330, 300, (530, 1840, 2480), (730, 1090, 2440), 0.85f, 0, 0.2f, 0, 0.05f, 0.02f); }, 0.6f, 0, 3);
+    // her heart, in her ears, when she is nearly gone
+    public static void Heartbeat(bool fast) => Play("heart" + fast, 1.0f, s => { s.Tone("sine", 52, 0.14f, 0.9f, 38); s.Noise(0.05f, 0.25f, "lowpass", 140, 0.7f, 0.002f); s.Tone("sine", 60, 0.11f, 0.6f, 42, fast ? 0.24f : 0.3f); }, 0.55f, 0, 1);
+    // out of air: a desperate pull at nothing, the throat closing, bubbles
+    public static void Choke() => Play("choke", 1.4f, s =>
+    {
+        for (int i = 0; i < 3; i++) s.Voice(0.18f, 0.5f, 280 - i * 20, 230, (530, 1840, 2480), (520, 1190, 2390), 0.7f, 0.9f, 0.6f, 0, i * 0.28f, 0.01f, 0.95f, 0.3f, 1, 0.4f);
+        for (int i = 0; i < 6; i++) s.Tone("sine", H.Rand(500, 900), 0.05f, 0.08f, H.Rand(1200, 1700), 0.2f + i * 0.15f);
+    }, 0.6f, 0, 3);
+    // coming up after too long under: air dragged in, coughing the sea out
+    public static void Surface() => Play("surface", 1.6f, s =>
+    {
+        s.NoiseSweep(0.4f, 0.7f, "bandpass", 700, 1900, 2.2f, 0.03f);
+        for (int i = 0; i < 2; i++) { s.Noise(0.12f, 0.6f, "bandpass", 1100, 1.5f, 0.005f, 0.55f + i * 0.35f); s.Voice(0.12f, 0.35f, 240, 200, (730, 1090, 2440), (520, 1190, 2390), 0.6f, 0.6f, 0.4f, 0, 0.55f + i * 0.35f, 0.01f, 0.95f, 0.2f, 1, 0.4f); }
+    }, 0.55f, 0, 2);
+    // Maren dies: her cry cut short inside the brass, and then the helmet filling
+    public static void MarenDies(bool drowned) => Play("marendies" + drowned, 2.6f, s =>
+    {
+        if (drowned) { s.NoiseSweep(1.6f, 0.5f, "lowpass", 1400, 220, 0.8f, 0.05f, 0.3f); for (int i = 0; i < 12; i++) s.Tone("sine", H.Rand(300, 800), 0.06f, 0.1f, H.Rand(900, 1500), 0.3f + i * 0.12f); }
+        else { s.Voice(0.55f, 0.7f, 300, 170, (730, 1090, 2440), (570, 840, 2410), 0.4f, 0, 0.3f, 0.02f, 0, 0.01f, 0.9f, 0.2f, 1, 0.5f, 0.12f); s.Bell(420, 0.4f, 1.6f, 0.05f); s.Noise(0.3f, 0.5f, "lowpass", 400, 0.8f, 0.002f, 0.05f); }
+    }, 0.9f, 0, 1);
+
+    // ---- the drowned, struck ----------------------------------------------------------------------------------
+    // a hit on dead flesh: a wet slap over something that is not quite bone any more
+    public static void Flesh(float pan = 0) => Play("flesh", 0.35f, s => { s.Noise(0.07f, 0.6f, "lowpass", 520, 0.8f, 0.002f); s.NoiseSweep(0.09f, 0.35f, "bandpass", 1600, 600, 3, 0.002f); s.Tone("sine", 140, 0.06f, 0.25f, 90); }, 0.55f, pan, 4);
+    // a knot breaking: the joint gives with a crack of bone and a tearing of what held it
+    public static void KnotBreak(float pan = 0) => Play("knotbreak", 0.7f, s =>
+    {
+        s.Noise(0.03f, 0.7f, "highpass", 1800, 1, 0.001f);
+        s.Tone("triangle", H.Rand(1500, 1900), 0.12f, 0.2f, 500);
+        s.Clicks(6, 0.08f, 0.5f, 2600, 1.4f, 0.01f);
+        s.NoiseSweep(0.3f, 0.45f, "bandpass", 2200, 320, 2.5f, 0.01f, 0.05f);
+        s.Tone("sine", 85, 0.25f, 0.4f, 45, 0.02f);
+    }, 0.9f, pan, 4);
 
     // ---- flesh ------------------------------------------------------------------------------------------
     // A limb tearing away: the wet rip, the crack of the joint, the weight of it, then spatter.
@@ -446,6 +593,8 @@ public partial class Snd : Node
     {
         s.NoiseSweep(0.24f, 0.6f, "bandpass", 1900, 240, 2.5f);
         s.Noise(0.05f, 0.5f, "highpass", 2200, 1, 0.001f, 0.015f);
+        s.Clicks(9, 0.1f, 0.55f, 2400, 1.6f, 0.02f);                       // the bone going, splinter by splinter
+        s.NoiseSweep(0.5f, 0.3f, "bandpass", 900, 260, 1.8f, 0.03f, 0.1f);   // the last of the skin tearing
         s.Tone("sine", 95, 0.2f, 0.45f, 50);
         for (int i = 0; i < 5; i++) s.Noise(0.03f, 0.16f, "bandpass", 700 + i * 260, 3, 0.002f, 0.14f + i * 0.07f + H.Rand(0, 0.04f));
     }, 0.95f, pan, 3);

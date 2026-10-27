@@ -127,7 +127,7 @@ public static class StoryFocus
 
         // stay a moment beside a monument and she thinks about it, once
         if (a.thought != null && W > 0.55f && H.Dist(px, py, a.x, a.y) < a.inner * 1.6f) linger += dt; else linger = MathF.Max(0, linger - dt);
-        if (linger > 1.6f) { Narr.Think(a.thought); linger = -999; }
+        if (linger > 1.6f) { if (!G.narr.thoughts.Contains(a.thought)) Score.Sting("discover", 0.7f, 20); Narr.Think(a.thought); linger = -999; }
     }
 
     // a soft light comes up on whatever she is looking at
