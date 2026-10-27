@@ -41,12 +41,15 @@ public static class Narr
     // ---- thoughts: one quiet italic line, each shown once ----------------------------------
     class Timed { public string text; public float t, max, x, y; }
     static Timed thought, epigraph;
+    static readonly Queue<string> queued = new();
     public static void Think(string id)
     {
         var s = St;
         string text = L.P("thoughts")?.S(id);
         if (s.thoughts.Contains(id) || text == null) return;
         s.thoughts.Add(id);
+        // two thoughts at the same moment: the second waits for the first to fade
+        if (thought != null && thought.max - thought.t < 0.5f) { queued.Enqueue(text); return; }
         thought = new Timed { text = text, t = 5, max = 5 };
     }
 
@@ -163,6 +166,9 @@ public static class Narr
     }
     public static string NpcLore(string id)
     {
+        // the first time they see what Maren is carrying, they say what they know of it
+        var hl = L.P("hollow")?.P("npc")?.S(id);
+        if (Hollow.owned && hl != null && !St.lore.ContainsKey("hollow:" + id)) { St.lore["hollow:" + id] = 1; return hl; }
         var lines = L.P("npcLore")?.Strings(id);
         if (lines == null || lines.Count == 0) return null;
         var s = St;
@@ -227,7 +233,7 @@ public static class Narr
         c.Fill = new Godot.Color(0, 0, 0, 0.55f * a); c.FillText(thought.text, H.VIEW_W / 2 + 0.7f, H.VIEW_H - 63.3f);
         c.Fill = H.Rgba(236, 226, 200, 0.92f * a); c.FillText(thought.text, H.VIEW_W / 2, H.VIEW_H - 64);
         c.TextAlign = 0;
-        if (thought.t <= 0) thought = null;
+        if (thought.t <= 0) thought = queued.Count > 0 ? new Timed { text = queued.Dequeue(), t = 5, max = 5 } : null;
     }
     public static void DrawEpigraph(Canvas c, float dt, float y)
     {
@@ -244,5 +250,5 @@ public static class Narr
     }
     public static bool EpigraphActive() => epigraph != null;
     public static string CurrentThought => thought?.text;
-    public static void Reset() { thought = null; epigraph = null; whispers.Clear(); heardThisVisit.Clear(); }
+    public static void Reset() { thought = null; queued.Clear(); epigraph = null; whispers.Clear(); heardThisVisit.Clear(); }
 }

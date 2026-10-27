@@ -24,6 +24,7 @@ public static class Inp
         ["pause"] = new[] { Key.Escape, Key.P },
         ["w1"] = new[] { Key.Key1 }, ["w2"] = new[] { Key.Key2 }, ["w3"] = new[] { Key.Key3 }, ["w4"] = new[] { Key.Key4 },
         ["fire"] = new[] { Key.J }, ["focus"] = new[] { Key.K }, ["debug"] = new[] { Key.F9 },
+        ["w5"] = new[] { Key.Key5 }, ["sing"] = new[] { Key.H }, ["verse"] = new[] { Key.Y },
     };
 
     // Gamepad layout. Face buttons are positional: A is the bottom button on every controller

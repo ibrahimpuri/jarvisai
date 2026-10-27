@@ -129,6 +129,7 @@ public static class G
         Narr.Reset();
         Hints.Reset();
         FX.parts.Clear();
+        Gore.Reset(); Voices.Reset(); Hollow.Reset();
         dialT = 0;
         // Maren comes ashore on the outer rocks; the tide holds at Low until she reaches the reef.
         EnterRoom(Data.Room["breakers"], true);
@@ -212,6 +213,8 @@ public static class G
         ents = new List<Ent>();
         projectiles = new(); enemyShots = new(); sawlines = new(); tracers = new();
         Fire.Clear();
+        Gore.Clear();
+        Snd.Acoustics(r);
         bossBar = null;
         var st = World.State(r.Id);
         bool firstVisit = !st.visited;
@@ -239,6 +242,7 @@ public static class G
         foreach (var l in st.loose ?? new List<Loose>()) ents.Add(MakeLoosePickup(l, r));
         if (satchelDrop != null && satchelDrop.room == r.Id) ents.Add(MakeSatchel(r));
         RoomEvents(r, firstVisit);
+        Hollow.OnRoomEnter(r);
         sinceLoad = 0;
         if (firstVisit || prevRegion != r.Region) titleT = 2.5f;
         if (Narr.EnterRegion(r.Region)) titleT = 6;
@@ -690,6 +694,8 @@ public static class G
         int heal = p.grafts.Contains("lung") ? (int)MathF.Ceiling((p.maxHp - p.hp) / 2f) : p.maxHp - p.hp;
         if (p.grafts.Contains("lung") && heal < p.maxHp - p.hp) H.ToastMsg("The bell's resonance grinds at the salt in your chest. Healing is halved.", 3);
         p.hp = Math.Min(p.maxHp, p.hp + heal);
+        // the bell's long note fills the Hollow while she sleeps
+        if (Hollow.owned) Hollow.resonance = Hollow.MAX;
         SetRespawn(bell);
         SaveRoomState();
         Tide.AdvanceTo("low");
@@ -725,7 +731,7 @@ public static class G
             ["respawn"] = new JsonObject { ["room"] = respawn.room, ["x"] = respawn.x, ["y"] = respawn.y },
             ["satchelDrop"] = satchelDrop == null ? null : new JsonObject { ["room"] = satchelDrop.room, ["x"] = satchelDrop.x, ["y"] = satchelDrop.y, ["tidal"] = satchelDrop.tidal, ["bag"] = satchelDrop.bag.ToJson() },
             ["difficulty"] = difficulty, ["encrustedType"] = encrustedType, ["freeGraft"] = freeGraft, ["tips"] = SA(tips),
-            ["undertowDead"] = undertow.dead, ["narr"] = narr.ToJson(),
+            ["undertowDead"] = undertow.dead, ["narr"] = narr.ToJson(), ["hollow"] = Hollow.ToJson(),
         };
         using var fa = Godot.FileAccess.Open(SAVE_PATH, Godot.FileAccess.ModeFlags.Write);
         if (fa == null) { H.ToastMsg("Could not save (storage unavailable)."); return; }
@@ -760,6 +766,7 @@ public static class G
         titheFlood = null; breachT = 0;
         Narr.Reset();
         Hints.Reset();
+        Gore.Reset(); Voices.Reset(); Hollow.Load(d.P("hollow"));
         player.hp = player.maxHp;
         EnterRoom(Data.Room[respawn.room], true);
         player.x = respawn.x; player.y = respawn.y;
@@ -890,6 +897,10 @@ public static class G
         enemyShots.RemoveAll(s => s.life <= 0);
         Fire.Update(dt);
         FX.Update(dt);
+        Gore.Update(dt);
+        Voices.Update(dt);
+        Hollow.Update(dt);
+        AmbientOneShots(dt);
         Narr.UpdateWhispers(dt);
         undertow.Update(dt);
 
@@ -960,6 +971,19 @@ public static class G
         shakeX = (H.Rand() - 0.5f) * shakeAmt; shakeY = (H.Rand() - 0.5f) * shakeAmt;
         // Ambience follows the tide and the tension.
         float tension = H.Clamp(swell / 9 + (undertow.live != null ? 0.6f : 0) + (bossBar != null ? 0.4f : 0), 0, 1);
-        Snd.Ambience(room.Row == 4 || room.Outdoor ? Tide.Level01() : 0.2f, tension, p.HeadUnder());
+        Snd.Ambience(room.Row == 4 || room.Outdoor ? Tide.Level01() : 0.2f, tension, p.HeadUnder(), p.inBellRoom);
+    }
+
+    // The island is never quite silent: the Saint's ribs settle under the abbey, and somewhere far off a bell is rung.
+    static float groanT = 40, farBellT = 70, breathT;
+    static void AmbientOneShots(float dt)
+    {
+        // badly hurt, she hears herself breathing in the helmet
+        breathT -= dt;
+        if (player.hp <= 2 && !player.dead && !player.HeadUnder() && breathT <= 0) { breathT = player.hp <= 1 ? 1.6f : 2.5f; Snd.Breath(player.hp <= 1); }
+        if (room.Outdoor || player.inBellRoom) return;
+        groanT -= dt; farBellT -= dt;
+        if (groanT <= 0) { groanT = H.Rand(50, 110); Snd.SaintGroan(H.Rand(-0.7f, 0.7f)); }
+        if (farBellT <= 0) { farBellT = H.Rand(80, 160); Snd.FarBell(H.Rand(-0.9f, 0.9f)); }
     }
 }

@@ -398,7 +398,7 @@ public partial class WorldView : Node2D
             if (m.kind == "drip")
             {
                 m.vy += 500 * dt;
-                if (World.SolidPx(m.x, m.y + 2) || World.IsWater(m.x, m.y + 2)) { FX.Spawn(m.x, m.y, 3, new FXOpt { color = "rgba(160,200,215,0.7)", ang = -H.PI / 2, spread = 1, smin = 15, smax = 45, grav = 300, lmin = 0.2f, lmax = 0.4f, size = 1 }); m.life = 0; }
+                if (World.SolidPx(m.x, m.y + 2) || World.IsWater(m.x, m.y + 2)) { if (H.Rand() < 0.35f) Snd.Drip(m.x, m.y); FX.Spawn(m.x, m.y, 3, new FXOpt { color = "rgba(160,200,215,0.7)", ang = -H.PI / 2, spread = 1, smin = 15, smax = 45, grav = 300, lmin = 0.2f, lmax = 0.4f, size = 1 }); m.life = 0; }
             }
             else if (m.kind == "bubble") { m.vy = -18; m.vx = MathF.Sin(t * 3 + m.p) * 6; if (!World.IsWater(m.x, m.y)) m.life = 0; }
             else m.vx += MathF.Sin(t * 0.7f + m.p) * 2 * dt;
@@ -509,6 +509,8 @@ public partial class WorldView : Node2D
         foreach (var s in G.sawlines) s.Draw(c);
         foreach (var e in G.ents) if (e.isBody && !e.gone) { c.Flash = e is Body b && b.hitFlash > 0 ? MathF.Min(1, b.hitFlash / 0.08f) * 0.85f : 0; e.Draw(c); }
         c.Flash = 0;
+        Gore.DrawPieces(c);
+        Hollow.DrawWorld(c);
         G.player.Draw(c);
         foreach (var pr in G.projectiles) pr.Draw(c);
         foreach (var s in G.enemyShots) { c.StrokeStyle = "#a0b0b8"; c.LineWidth = 1.5f; c.Line(s.x, s.y, s.x - s.vx * 0.02f, s.y - s.vy * 0.02f); }
@@ -603,6 +605,8 @@ public partial class WorldView : Node2D
 
     void PaintFxShaded(Canvas c)
     {
+        // blood soaks into the stone's surface, so it is drawn over the rock
+        Gore.DrawStains(c);
         foreach (var q in FX.parts)
         {
             if (q.glow) continue;
@@ -723,6 +727,28 @@ public partial class WorldView : Node2D
         c.StrokePath();
     }
 
+    static void DrawFaceplateCracks(Canvas c, float k)
+    {
+        var rng = new Random(7);
+        foreach (var (sx, sy, ang) in new[] { (0f, 30f, 0.2f), (VW, 300f, H.PI - 0.3f), (60f, VH, -1.2f), (VW - 40f, 0f, 1.9f), (0f, 250f, -0.4f), (VW, 70f, H.PI + 0.35f) }.Take(k >= 1 ? 6 : 3))
+        {
+            float x = sx, y = sy, a = ang;
+            int segs = k >= 1 ? 9 : 6;
+            for (int i = 0; i < segs; i++)
+            {
+                float len = 10 + (float)rng.NextDouble() * 16, na = a + ((float)rng.NextDouble() - 0.5f) * 0.9f;
+                float nx = x + MathF.Cos(na) * len, ny = y + MathF.Sin(na) * len;
+                c.Stroke = new Color(0.85f, 0.92f, 0.95f, 0.42f * k * (1 - i / (float)segs * 0.6f)); c.LineWidth = 0.8f; c.Line(x, y, nx, ny);
+                if (rng.NextDouble() < 0.4)
+                {
+                    float ba = na + ((float)rng.NextDouble() < 0.5f ? 0.8f : -0.8f), bl = len * 0.6f;
+                    c.Stroke = new Color(0.85f, 0.92f, 0.95f, 0.28f * k); c.LineWidth = 0.5f; c.Line(nx, ny, nx + MathF.Cos(ba) * bl, ny + MathF.Sin(ba) * bl);
+                }
+                x = nx; y = ny; a = na;
+            }
+        }
+    }
+
     float roomFade;
     void PaintOverlay(Canvas c)
     {
@@ -737,6 +763,8 @@ public partial class WorldView : Node2D
             c.FillRectGradH(0, 0, 70, VH, new Color(0.45f, 0, 0, 0.35f * pulse), new Color(0.45f, 0, 0, 0));
             c.FillRectGradH(VW - 70, 0, 70, VH, new Color(0.45f, 0, 0, 0), new Color(0.45f, 0, 0, 0.35f * pulse));
         }
+        // At two pips or less the faceplate she sees through is crazed: cracks creep in from the edges.
+        if (G.mode == "play" && pl != null && !pl.dead && pl.hp <= 2) DrawFaceplateCracks(c, pl.hp <= 1 ? 1 : 0.55f);
         // The Undertow passing the Tithe window.
         if (G.glimpseT > 0)
         {

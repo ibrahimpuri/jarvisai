@@ -31,6 +31,7 @@ public static class Glyphs
         ["weapon"] = new[] { "M:wheel" }, ["drop"] = new[] { "K:S", "+", "K:Space" }, ["walljump"] = new[] { "K:A", "/", "K:D", "+", "K:Space" },
         ["confirm"] = new[] { "K:E" }, ["cancel"] = new[] { "K:Esc" }, ["tabs"] = new string[0], ["skip"] = new[] { "K:Esc" },
         ["mash"] = new[] { "K:F", "/", "K:E", "/", "K:Space" },
+        ["hollow"] = new[] { "K:5" }, ["sing"] = new[] { "K:H" }, ["verse"] = new[] { "K:Y" }, ["singhold"] = new[] { "K:H:hold" },
     };
     static string[] PadControls(string action) => action switch
     {
@@ -44,6 +45,7 @@ public static class Glyphs
         "drop" => new[] { "LS:down", "+", "A" }, "walljump" => new[] { "LS", "+", "A" },
         "confirm" => new[] { Pad.ConfirmButton == JoyButton.A ? "A" : "B" }, "cancel" => new[] { Pad.CancelButton == JoyButton.A ? "A" : "B" },
         "skip" => new[] { "START" }, "tabs" => new[] { "LB", "/", "RB" }, "mash" => new[] { "X", "/", "Y", "/", "A" },
+        "hollow" => new[] { "DLR" }, "sing" => new[] { "RT" }, "verse" => new[] { "RB" }, "singhold" => new[] { "RT:hold" },
         _ => new string[0],
     };
     public static string[] Controls(string action, Style st) =>

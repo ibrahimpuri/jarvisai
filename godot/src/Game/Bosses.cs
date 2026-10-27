@@ -129,7 +129,7 @@ public class Undertow : Body
             {
                 mode = "windup"; atkT = 0.8f; cool = boss ? 2.2f : 3;
                 foreach (var k in knots) if (!k.broken) k.flare = 0.8f;
-                Snd.Groan(Pan(), 0.4f);
+                Voices.Windup(this);
             }
         }
         if (MathF.Abs(vx) > 10) facing = (int)H.Sign(vx);
@@ -407,14 +407,14 @@ public class Abbot : Body
             {
                 mode = "sweep"; atkT = 0.8f; cool = 2.0f;
                 foreach (var k in knots) if (!k.broken) k.flare = 0.8f;
-                Snd.Groan(Pan(), 0.4f);
+                Voices.Windup(this);
             }
             else
             {
                 mode = "windup"; atkT = 1.2f; cool = 2.6f;
                 slamX = H.Clamp(p.Cx(), room.Px + 40, room.Px + room.Pw - 40);
                 foreach (var k in knots) if (!k.broken) k.flare = 1.2f;
-                Snd.Groan(Pan(), 0.5f);
+                Voices.Windup(this);
             }
         }
     }

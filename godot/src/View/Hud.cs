@@ -67,10 +67,11 @@ public static class Hud
         if (!float.IsFinite(max)) return;
         if (!p.HeadUnder() && p.breath >= max - 0.1f) return;
         int n = (int)MathF.Ceiling(p.breath / 3), total = (int)MathF.Ceiling(max / 3);
-        Icons.Draw(c, "helmet", 15, 50, 11);
+        float by = Hollow.owned ? 62 : 50;
+        Icons.Draw(c, "helmet", 15, by, 11);
         for (int i = 0; i < total; i++)
         {
-            float x = 26 + i * 7.5f, y = 50 + MathF.Sin(G.Now * 3 + i) * 0.6f;
+            float x = 26 + i * 7.5f, y = by + MathF.Sin(G.Now * 3 + i) * 0.6f;
             bool on = i < n;
             c.Stroke = on ? H.Rgba(190, 228, 255, 0.95f) : H.Rgba(90, 110, 130, 0.45f); c.LineWidth = 0.9f;
             c.BeginPath(); c.Arc(x, y, 2.6f, 0, H.PI * 2); c.StrokePath();
@@ -150,8 +151,9 @@ public static class Hud
     static void Weapon(Canvas c, Player p)
     {
         var w = p.weapons[p.cur]; var def = Data.Weapons.P(p.cur);
-        float pw = 150, ph = 44, x = H.VIEW_W - pw - 8, y = H.VIEW_H - ph - 8;
+        float pw = 150, ph = Hollow.held ? 52 : 44, x = H.VIEW_W - pw - 8, y = H.VIEW_H - ph - 8;
         Plate(c, x, y, pw, ph);
+        if (Hollow.held) { Hollow.DrawPanel(c, x, y, pw, ph); Consumables(c, p, x, y + ph - 8); return; }
         // icon in a recessed well
         c.Fill = new Color(0, 0, 0, 0.45f); c.FillRect(x + 6, y + 6, 22, 22);
         c.Stroke = new Color(GOLD.R, GOLD.G, GOLD.B, 0.35f); c.LineWidth = 0.6f; c.StrokeRect(x + 6, y + 6, 22, 22);
@@ -179,8 +181,10 @@ public static class Hud
                 c.Save(); c.Translate(x + pw - 9 - (p.weaponOrder.Count - 1 - i) * 7, y + 10); c.Rotate(H.PI / 4);
                 c.Fill = sel ? GOLD : new Color(0.35f, 0.3f, 0.22f, 0.9f); c.FillRect(-1.8f, -1.8f, 3.6f, 3.6f); c.Restore();
             }
-        // consumables
-        float cy = y + 36;
+        Consumables(c, p, x, y + 36);
+    }
+    static void Consumables(Canvas c, Player p, float x, float cy)
+    {
         int k = 0;
         foreach (var item in new[] { "poultice", "stitchkit", "scrap" })
         {
@@ -211,7 +215,7 @@ public static class Hud
     {
         c.Font = "8px serif"; c.TextAlign = 0;
         const float maxW = 230;
-        float y = 66;
+        float y = Hollow.owned ? 80 : 66;
         foreach (var t in H.Toasts)
         {
             float a = MathF.Min(1, MathF.Min(t.T, (t.Max - t.T) * 4 + 0.2f));
@@ -305,7 +309,7 @@ public static class Hud
         c.LineWidth = 1; c.GlobalAlpha = 1; c.TextAlign = 0;
         // a soft shade behind the vitals so they read over bright rooms
         c.Glow(48, 26, 70, 34, new Color(0, 0, 0, 0.35f));
-        Pips(c, p); Lantern(c, p); Breath(c, p);
+        Pips(c, p); Lantern(c, p); Hollow.DrawHud(c, 49); Breath(c, p);
         if (G.dialT > 0.01f) { c.GlobalAlpha = G.dialT; Dial(c); c.GlobalAlpha = 1; }
         Weapon(c, p); PromptBox(c); Toasts(c); RoomTitle(c); BossBar(c); Grabbed(c, p);
         Hints.Draw(c);

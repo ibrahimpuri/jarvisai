@@ -23,7 +23,7 @@ public static class UI
     public static void BenchMenu(bool chapel) => Inst?.Bench(chapel, null);
     public static void SluiceMenu() => Inst?.SluiceMenu();
     public static void FontMenu() => Inst?.FontMenu();
-    public static void Inscription(string title, string text) => Inst?.Inscription(title, text);
+    public static void Inscription(string title, string text, Action done = null) => Inst?.Inscription(title, text, done);
     public static void Cinematic(List<string> lines, Action done, string first = null) => Inst?.Cinematic(lines, done, first);
     public static void Death(string title, string line, string detail, Action onWake) => Inst?.Death(title, line, detail, onWake);
     public static void Ending(string title, List<string> paras, string stats, List<string> fates) => Inst?.Ending(title, paras, stats, fates);
@@ -228,8 +228,11 @@ public partial class UiRoot : CanvasLayer
         return l;
     }
 
+    Action inscDone;
     public void Close()
     {
+        var after = kind == "inscription" ? inscDone : null; inscDone = null;
+        if (after != null) Callable.From(after).CallDeferred();
         foreach (var c in root.GetChildren()) { root.RemoveChild(c); c.QueueFree(); }
         root.Visible = false; Open = false; kind = ""; dlgLines = null;
         if (cine != null) { var d = cine.done; cine = null; if (d != null) Callable.From(d).CallDeferred(); }
@@ -470,6 +473,7 @@ public partial class UiRoot : CanvasLayer
                 ("V", "Quick-craft 3 rivets from 1 scrap (2 s, crouched)"), ("B", "Ballast Boots on / off"), ("1-4 / wheel", "Select weapon"),
                 ("I", "Satchel, crafting, logbook"), ("Tab / M", "Map"), ("Esc / P", "Pause"), ("F11", "Fullscreen"),
             };
+            if (Hollow.owned) k = k.Concat(new[] { ("5", "Take the Mere's Hollow in hand"), ("H", "Sing the verse (brimming, hold the Calling to turn the tide)"), ("Y", "Change verse") }).ToArray();
             foreach (var (a, b) in k)
             {
                 var key = Lbl(grid, a, 5, WARM); key.SizeFlagsHorizontal = Control.SizeFlags.Fill; key.CustomMinimumSize = new Vector2(60, 0);
@@ -491,6 +495,7 @@ public partial class UiRoot : CanvasLayer
                 ("{weapon}", "Change weapon"), ("{shutter}", "Shutter the lantern"),
                 ("{journal}", "Map, satchel and logbook; the bumpers turn the page"), ("{pause}", "Pause"),
             };
+            if (Hollow.owned) rows = rows.Concat(new[] { ("{hollow}", "Take the Mere's Hollow in hand (it sits after your weapons)"), ("{sing}", "With the Hollow in hand: sing the verse. Brimming, hold the Calling to turn the tide"), ("{verse}", "With the Hollow in hand: change verse") }).ToArray();
             foreach (var (a, b) in rows)
             {
                 var g = new RichLabel(() => a, 6, WARM) { MinWidth = 50 };
@@ -557,6 +562,10 @@ public partial class UiRoot : CanvasLayer
         Btn(r2, Settings.Bloom ? "Glow: on" : "Glow: off", () => { Settings.Bloom = !Settings.Bloom; Settings.Apply(); Settings.Save(); Pause(); }, selected: Settings.Bloom);
         Btn(r2, Settings.Shake ? "Shake: on" : "Shake: off", () => { Settings.Shake = !Settings.Shake; Settings.Save(); Pause(); }, selected: Settings.Shake);
         Btn(r2, Settings.Hints ? "Hints: on" : "Hints: off", () => { Settings.Hints = !Settings.Hints; Settings.Save(); Pause(); }, selected: Settings.Hints);
+        H3(c, "Gore");
+        var r3 = Row(c);
+        foreach (var (v, label) in new[] { ("full", "Full"), ("reduced", "Reduced"), ("off", "Off (salt only)") })
+            Btn(r3, label, () => { Settings.Gore = v; Settings.Save(); Pause(); }, selected: Settings.Gore == v);
         var col = Col(c);
         Btn(col, "Resume", Close, primary: true);
         Btn(col, "Controls", () => Controls(() => Pause()));
@@ -797,6 +806,15 @@ public partial class UiRoot : CanvasLayer
             H3(b, "Brine Grafts");
             if (p.grafts.Count == 0) Small(b, "None. The Choir offers them.");
             foreach (var k in p.grafts) { var d = Data.Grafts.P(k); ItemRow(b, d.S("name"), d.S("power") + ". " + d.S("cost") + ".", "(" + d.S("knot") + " knot)"); }
+            if (Hollow.owned)
+            {
+                // the verses Maren has learned, each a line of the Choir's hymn
+                var hl = Data.Lore.P("hollow");
+                H3(b, hl.S("name") + $" · resonance {(int)Hollow.resonance}/{(int)Hollow.MAX}");
+                foreach (var v in Hollow.VERSES.Where(v => Hollow.Has(v.id)))
+                    ItemRow(b, v.name + "  \u201c" + v.line + "\u201d", Glyphs.Plain(hl.P("verses").P(v.id).S("desc"), Glyphs.Current).Split("\n\n")[0], "costs " + (int)v.cost);
+                if (Hollow.verses.Count < Hollow.VERSES.Length) Small(b, "The hymn has more verses. The Hollow learns them by listening.");
+            }
         }
         if (satTab == "log")
         {
@@ -917,9 +935,11 @@ public partial class UiRoot : CanvasLayer
     }
 
     // Words cut into the island, shown like an inscription.
-    public void Inscription(string title, string text)
+    public void Inscription(string title, string text, Action done = null)
     {
+        if (kind == "inscription" && inscDone != null) { var prev = inscDone; inscDone = null; Callable.From(prev).CallDeferred(); }
         Show("inscription");
+        inscDone = done;
         var center = new CenterContainer();
         center.SetAnchorsPreset(Control.LayoutPreset.FullRect);
         root.AddChild(center);

@@ -31,6 +31,8 @@ public partial class Tester : Node
             if (args.Contains("--test")) await Tests();
         }
         catch (Exception e) { Errors.Add(e.ToString()); }
+        int di = Array.IndexOf(args, "--dump-sounds");
+        if (di >= 0 && di + 1 < args.Length) GD.Print("dumped " + Snd.DumpCache(args[di + 1]) + " sounds");
         foreach (var e in Errors.Distinct()) GD.Print("ERROR: " + e);
         GD.Print($"RESULT pass={pass} fail={fail} errors={Errors.Count}");
         GetTree().Quit(fail > 0 || Errors.Count > 0 ? 1 : 0);

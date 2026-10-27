@@ -96,7 +96,7 @@ public class Player : Mover
         hp -= n;
         invulnT = 0.9f;
         Snd.Hurt(); G.Shake(3); G.flash = 0.25f; G.HitStop(0.07f);
-        FX.Blood(Cx(), Cy(), 6);
+        Gore.Bleed(Cx(), Cy(), src?.Cx() ?? Cx() - facing);
         // A hit cancels the remainder of a poultice; interrupts a Stitch Kit.
         if (healT > 0) { if (healKind == "stitch") H.ToastMsg("Stitching interrupted. The kit is kept."); healT = 0; }
         craftT = 0; reloadT = 0;
@@ -226,22 +226,38 @@ public class Player : Mover
             }
             else if (healKind == "stitch" && healT <= 0) { bag.Remove("stitchkit", 1); hp = maxHp; Snd.Heal(); H.ToastMsg("Stitched. Full health."); }
         }
-        if (Inp.Hit("reload")) StartReload();
+        if (Inp.Hit("reload")) { if (Hollow.held) Hollow.NextVerse(); else StartReload(); }
+        if (Inp.Hit("verse")) Hollow.NextVerse();
         if (Inp.Hit("poultice")) UsePoultice();
         if (Inp.Hit("stitch")) UseStitch();
         if (Inp.Hit("quickcraft")) QuickCraft("rivets");
         if (Inp.Hit("shutter")) { shut = !shut; Snd.Ui(); Hints.Did("shutter"); H.ToastMsg(shut ? "Lantern shuttered. You are nearly invisible, and blind to weak points." : "Lantern open.", 2); }
         if (Inp.Hit("boots") && Has("boots")) { boots = !boots; Snd.Thud(); Hints.Did("boots"); H.ToastMsg(boots ? "Ballast Boots: on. You sink." : "Ballast Boots: off.", 1.5f); }
-        for (int i = 1; i <= 4; i++) if (Inp.Hit("w" + i) && weaponOrder.Count >= i) SelectWeapon(weaponOrder[i - 1]);
+        for (int i = 1; i <= 4; i++) if (Inp.Hit("w" + i) && weaponOrder.Count >= i) { Hollow.Hold(false); SelectWeapon(weaponOrder[i - 1]); }
+        if (Inp.Hit("w5")) Hollow.Hold(true);
         int cycle = Inp.mouse.wheel + (Inp.Hit("wnext") ? 1 : 0) - (Inp.Hit("wprev") ? 1 : 0);
         if (cycle != 0)
         {
-            int i = weaponOrder.IndexOf(cur), n = weaponOrder.Count;
-            if (n > 1) SelectWeapon(weaponOrder[((i + cycle) % n + n) % n]);
+            // the Mere's Hollow sits after the weapons in the cycle
+            var order = new List<string>(weaponOrder);
+            if (Hollow.owned) order.Add("hollow");
+            int n = order.Count, i = Hollow.held ? n - 1 : order.IndexOf(cur);
+            if (n > 1)
+            {
+                string next = order[((i + cycle) % n + n) % n];
+                if (next == "hollow") Hollow.Hold(true);
+                else if (next == cur && Hollow.held) { Hollow.Hold(false); Snd.Ui(); Hints.Did("weapon"); }
+                else { Hollow.Hold(false); SelectWeapon(next); }
+            }
         }
         if (!Locked() && healKind != "stitch")
         {
-            if (Inp.mouse.l || Inp.Held("fire")) Fire();
+            if (Hollow.held) Hollow.Play(this, Inp.mouse.l || Inp.Held("fire") || Inp.Held("sing"), Inp.mouse.lp || Inp.Hit("fire") || Inp.Hit("sing"), dt);
+            else
+            {
+                if (Inp.mouse.l || Inp.Held("fire")) Fire();
+                if (Hollow.owned) Hollow.Play(this, Inp.Held("sing"), Inp.Hit("sing"), dt);
+            }
             if (Inp.Hit("gaff")) GaffStrike();
             if (Inp.Hit("burn")) BurnBody();
             if (Inp.Hit("interact")) G.Interact();
@@ -313,8 +329,10 @@ public class Player : Mover
                 H.ToastMsg("Broke free!", 1.2f);
             }
         }
-        // You can still shoot the grabbing arm.
-        if ((Inp.mouse.lp || Inp.Hit("fire")) && fireCool <= 0) Fire(true);
+        // You can still shoot the grabbing arm, or sing the Riptide and let the sea tear it off you.
+        bool sing = Inp.Hit("sing") || (Hollow.held && (Inp.mouse.lp || Inp.Hit("fire")));
+        if (sing && Hollow.owned && Hollow.verse == "riptide") Hollow.Sing(this);
+        else if ((Inp.mouse.lp || Inp.Hit("fire")) && fireCool <= 0 && !Hollow.held) Fire(true);
         if (grabbedBy != null && (grabbedBy.gone || grabbedBy.mode == "downed")) { grabbedBy = null; state = "normal"; }
     }
 
@@ -1102,6 +1120,14 @@ public class Player : Mover
         // satchel on the hip
         c.Fill = H.Col("#2a2016"); c.FillRect(x0 - f * 5.2f - 1.6f, hipY - 0.5f, 3.2f, 3.6f);
         c.Fill = H.Col("#1a140c"); c.FillRect(x0 - f * 5.2f - 1.6f, hipY - 0.5f, 3.2f, 1.2f);
+        // the Mere's Hollow on her belt, its seam glowing sea-green while it has a verse in it
+        if (Hollow.owned && !Hollow.held)
+        {
+            float bx2 = x0 + f * 3.2f - 1.3f;
+            c.Fill = H.Col("#d8ccae"); c.FillRect(bx2, hipY + 0.2f, 2.6f, 2.2f);
+            c.Fill = H.Col("#8a7a54"); c.FillRect(bx2, hipY + 0.9f, 2.6f, 0.4f);
+            if (Hollow.resonance >= Hollow.Cur.cost) { c.Fill = H.Rgba(170, 255, 225, 0.9f); c.FillRect(bx2 + 0.2f, hipY + 0.9f, 2.2f, 0.4f); c.Glow(bx2 + 1.3f, hipY + 1.2f, 4, H.Rgba(120, 240, 210, 0.3f)); }
+        }
 
         Leg(footA, false);
 
@@ -1156,6 +1182,13 @@ public class Player : Mover
         c.Fill = glowing ? H.Col("#ffd98e") : under ? H.Col("#4a7a88") : H.Col("#141c20"); c.FillCircle(px, py, pr);
         if (glowing) { c.Fill = H.Rgba(255, 250, 230, 0.95f); c.FillCircle(px + f * 0.4f, py - 0.3f, pr * 0.45f); }
         if (!glowing) { c.Fill = H.Rgba(160, 200, 210, under ? 0.4f : 0.22f); c.BeginPath(); c.Arc(px, py, pr * 0.8f, H.PI * 1.05f, H.PI * 1.55f); c.LineTo(px, py); c.FillPath(); }
+        // the glass cracks as she takes hits
+        if (hp <= 2)
+        {
+            c.Stroke = H.Rgba(235, 245, 250, hp <= 1 ? 0.9f : 0.6f); c.LineWidth = 0.35f;
+            c.Line(px - f * 0.6f, py - 0.4f, px + f * 1.9f, py - 2.1f); c.Line(px - f * 0.6f, py - 0.4f, px - f * 1.8f, py + 1.6f);
+            if (hp <= 1) { c.Line(px - f * 0.6f, py - 0.4f, px + f * 2.2f, py + 1.2f); c.Line(px + f * 0.8f, py - 1.3f, px + f * 0.4f, py - 2.6f); }
+        }
         c.Stroke = H.Col("#d4a85a"); c.LineWidth = 0.9f; c.BeginPath(); c.Arc(px, py, pr, 0, H.PI * 2); c.StrokePath();
         c.Stroke = H.Col("#7a5a24"); c.LineWidth = 0.45f; c.Line(px - 1, py - pr + 0.4f, px - 1, py + pr - 0.4f); c.Line(px + 1, py - pr + 0.4f, px + 1, py + pr - 0.4f);
         if (glowing) c.Glow(px, py, 6, H.Rgba(255, 210, 140, 0.35f));
@@ -1231,6 +1264,13 @@ public class Player : Mover
     // The weapon in her hand, drawn along the aim and kept upright whichever way she faces.
     void DrawWeapon(Canvas c, float hx, float hy, float a)
     {
+        if (Hollow.held)
+        {
+            // the Hollow held out at arm's length, lid open toward what she sings to
+            float g = Hollow.resonance >= Hollow.Cur.cost ? 0.7f + 0.3f * MathF.Sin(G.Now * 4) : 0.15f;
+            Hollow.DrawIcon(c, hx + MathF.Cos(a) * 2.5f, hy + MathF.Sin(a) * 2.5f - 0.5f, 6, g + (Hollow.singCool > 0.3f ? 1 : 0));
+            return;
+        }
         c.Save();
         c.Translate(hx, hy); c.Rotate(a);
         if (MathF.Cos(a) < 0) c.Scale(1, -1);

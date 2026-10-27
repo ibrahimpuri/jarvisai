@@ -44,7 +44,10 @@ H.LORE = {
     nave: [{ tx: 30, ty: 16, title: 'A brass plaque on a pew', text: 'Here sat the Bell-Ropers, who rang the Hours for the fishing fleet. The last of them rang the warning a full tide too late, and the sea took him still holding the rope.' }],
     priors: [{ tx: 26, ty: 16, title: 'Cut beside the Prior\'s door', text: 'I keep this door for the Ebb, when the sea turns its back. Even the Saint must breathe out.' }],
     choirsteps: [{ tx: 30, ty: 16, title: 'A hymn, one line on each step', text: 'Sing to the bone and the bone will answer. Sing to the salt and the salt will rise. Sing to the sea and the sea will take you home, home, under the skies.' }],
-    choir: [{ tx: 23, ty: 16, title: 'Above the font', text: 'Take of the Saint and the Saint takes of you. This is not a curse. This is communion. - H.V.' }],
+    choir: [
+      { tx: 23, ty: 16, title: 'Above the font', text: 'Take of the Saint and the Saint takes of you. This is not a curse. This is communion. - H.V.' },
+      { tx: 9, ty: 16, title: 'Carved around the rim of an empty niche', text: 'HERE THE HOLLOW LAY, AND HEARD US, AND THE SEA CAME WHEN WE SANG. SING SOFTLY, BROTHER. IT HEARS EVERYTHING.' },
+    ],
     choirbell: [{ tx: 30, ty: 16, title: 'Scratched low on the wall, at a child\'s height', text: 'A lighthouse, a little boat, two figures holding hands. Underneath, in careful capitals: MAREN AND MAMA.' }],
     ribshaft: [{ tx: 20, ty: 41, title: 'Tally marks cut into the bone', text: 'Years of climbers counted in notches. One mark is bigger than the rest: AGATHE, AGE NINE, ALL THE WAY TO THE TOP.' }],
     ribbell: [{ tx: 26, ty: 16, title: 'Burned into the lintel', text: 'The light is for ships. The light is not for us. Remember who it is for.' }],
@@ -116,6 +119,16 @@ H.LORE = {
     choir: 'They\'re singing. Under the water, they\'re singing.',
     skull: 'Two hundred and twelve steps.',
     agathe: 'Mama.',
+    firstSever: 'The knot let go, and the arm went with it. There was nothing else holding it on.',
+    saltLimb: 'It grew the arm back. Out of salt.',
+    giftWave: 'The sea came all the way up the pier to leave this at my feet. Then it slid back down, as if it were shy.',
+    firstSing: 'It hums when I sing to it. Somewhere under the island, something hums back.',
+    singWake: 'Everything down here heard that.',
+    calledWater: 'The water I called is the same water. It will stand them up at High like any tide.',
+    turnTide: 'I held the note, and the Saint breathed. Mama would hate this.',
+    learn_riptide: 'The Hollow sang back to the thing outside the glass. It kept a little of what it heard.',
+    learn_salting: 'The salt in the pans is humming the same note as the box.',
+    learn_answer: 'Every brother in the cloister turned his head as I passed. All of them, together.',
   },
 
   // Hints: a glyph and a word or two over Maren's head. Each appears only when it is relevant and the
@@ -143,6 +156,9 @@ H.LORE = {
     jet: '{dash} in water or mid-air',
     shutter: '{shutter} shutter the lantern',
     sneak: '{sneak} creep',
+    sing: '{sing} sing',
+    hollow: '{hollow} the Hollow',
+    verse: '{verse} change verse',
   },
 
   // A dream while resting at a Bell Room, one each time, in order.
@@ -152,6 +168,7 @@ H.LORE = {
     'You dream of bells. Hundreds of them, under the sea, all ringing at once, all a little out of time with each other.',
     'You dream that the island is breathing. In, at the Rising. Out, at the Ebb. You are something small inside a ribcage.',
     'You dream of a man holding a bell rope, waiting for the right moment to pull. The moment passes. He keeps waiting.',
+    'You dream you are a bone at the bottom of the sea, listening. Far above, a small light goes out, and you are sorry about it. So you start to sing.',
     'You dream of the mainland, lit up and warm. Nobody there is thinking about you. That is all right. That is the point.',
     'You dream of your mother\'s handwriting. Every page says the same thing, and you cannot read any of it.',
     'You dream of a choir singing under the sea. The song is very beautiful, and it is about you.',
@@ -186,6 +203,27 @@ H.LORE = {
       'The hymn has seven verses. We know six. The seventh is the one the Saint sings back.',
       'Your mother and I were novices together. She was braver than me. I was more curious. Look where it got us both.',
     ],
+  },
+
+  // The Mere's Hollow: a reliquary box of Mere-ivory holding the Saint's ear-bone, which the sea gives Maren on
+  // the Long Pier. Whale ear-bones are the densest bone there is and the last part of a whale to wash ashore;
+  // the first brothers found this one on the strand and named the island for it. Its verses are lines of the
+  // Choir's hymn, carved on the Choir Steps. (Godot build only.)
+  hollow: {
+    name: "The Mere's Hollow",
+    reveal: 'A reliquary box of Mere-ivory, no bigger than a hymnal, its lid carved with a whale that has too many ribs. Inside, on salt-white velvet, lies a curled bone like a seashell, heavier than lead and faintly warm. Brass letters run around the lid: AUDIT ET RESPONDET. It hears, and it answers.\n\nHold it to your helmet and you can hear the tide breathing.',
+    verses: {
+      calling: { desc: 'Take it in hand ({hollow}) and sing ({sing}) toward where you want the water to be. The sea in this room rises or falls to meet the mark, holds a while, then settles back. Only the tide answers; still water does not hear it.\n\nWhen the Hollow is brimming, hold the note ({singhold}) and the Saint breathes early. The tide turns.' },
+      riptide: { desc: 'Sing it ({sing}) and a rush of the sea throws back whatever stands before you, puts out fire, and tears loose any hand that has hold of you. Under water it carries you the way you point.' },
+      salting: { desc: 'Sing it ({sing}) at the drowned and salt crusts them where they stand, so the next blow shatters a limb. Sing it at stone and a pillar of salt grows out of it for a while. Fire still cracks it.' },
+      answer: { desc: 'Sing it ({sing}) at one of the drowned, standing or fallen. It turns on its own kind, and sings while it does, until the verse runs out and its knots let go for good.' },
+    },
+    // what each islander says the first time they see Maren carrying it
+    npc: {
+      ansel: 'Is that... no. Keep it, keep it. The first brothers found that bone on the strand, curled like a shell and humming, and named the island for it: the Mere\'s Hollow. Then they dug, and found the rest of the Saint underneath it, and stopped naming things.',
+      odile: 'That\'s an ear-bone you\'re carrying. Whale ears wash up when everything else has rotted away; they\'re the densest bone there is. I\'ve found little ones on the mainland strand. Never one that size. Never one that was warm.',
+      hesper: 'The Choir sang into the Hollow every Hour for three hundred years, and the tide came when it was called. When the Abbot wanted it for his pans, I rowed it out past the reef and gave it back to the sea. Now the sea has given it to you. I would very much like to know why.',
+    },
   },
 
   // Epilogue lines shown one by one after the ending, chosen by what happened.

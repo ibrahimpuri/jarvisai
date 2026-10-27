@@ -44,6 +44,7 @@ public static class Scenarios
 
         ["shucker"] = async t =>
         {
+            World.flags.Set("hollowGift", true);   // the first Shucker standing with the tide, without the sea's gift (see "hollow")
             t.Place("pier", 30, 16);
             t.Ok("pier intro set tide near Rising", t.State().phase == "low", t.State());
             Tide.AdvanceTo("rising");
@@ -83,6 +84,311 @@ public static class Scenarios
             var m2 = Find("first_shucker").mode;
             t.Ok("re-knots and stands at High", m2 is "hunt" or "windup" or "attack", m2);
             t.Snap("play_shucker");
+        },
+
+        ["audit"] = async t =>
+        {
+            t.Place("pier", 26, 16);
+            Tide.AdvanceTo("rising");
+            for (int i = 0; i < 200; i++) { await t.Run(0.1f); if (Find("first_shucker").mode != "dormant") break; }
+            G.god = true; G.player.bag.Add("rivets", 30);
+            await t.Run(0.6f); t.Snap("audit_0_stand");
+            int n = 0;
+            foreach (var id in new[] { "elbowL", "kneeL", "kneeR", "crown" })
+            {
+                for (int i = 0; i < 12; i++)
+                {
+                    var e = Find("first_shucker"); var k = e.K(id);
+                    if (k.broken) break;
+                    var kp = e.KnotPos(k).Value;
+                    t.AimAt(kp.X, kp.Y); t.Down("focus");
+                    await t.Click(); await t.Run(0.05f); t.Snap($"audit_{++n}_{id}_hit");
+                    await t.Run(0.27f);
+                    if (G.player.weapons["driver"].mag == 0) { await t.Tap("reload"); await t.Run(1.4f); }
+                }
+                await t.Run(0.05f); t.Snap($"audit_{++n}_{id}_broken");
+            }
+            t.Release("focus");
+            await t.Run(1f); t.Snap("audit_downed");
+        },
+
+        ["gore"] = async t =>
+        {
+            Settings.Gore = "full";
+            World.flags.Set("hollowGift", true);   // this test is about the drowned, not the sea's gift
+            t.Place("pier", 26, 16);
+            Tide.AdvanceTo("rising");
+            int sprayed = 0;
+            for (int i = 0; i < 200; i++) { await t.Run(0.1f); if (Find("first_shucker").mode != "dormant") break; }
+            G.god = true; G.player.bag.Add("rivets", 30);
+            async Task Shoot(string id, string snap)
+            {
+                for (int i = 0; i < 12; i++)
+                {
+                    var e = Find("first_shucker"); var k = e.K(id);
+                    if (k.broken) break;
+                    var kp = e.KnotPos(k).Value;
+                    t.AimAt(kp.X, kp.Y); t.Down("focus");
+                    await t.Click();
+                    if (Find("first_shucker").K(id).broken) { sprayed = Math.Max(sprayed, Gore.DropCount); await t.Run(0.08f); t.Snap(snap); }
+                    await t.Run(0.3f);
+                    if (G.player.weapons["driver"].mag == 0) { await t.Tap("reload"); await t.Run(1.4f); }
+                }
+            }
+            await Shoot("elbowL", "gore_1_arm");
+            var sh = Find("first_shucker");
+            t.Ok("breaking an elbow tears off the forearm", sh.severed.Contains("forearmL"), string.Join(",", sh.severed));
+            t.Ok("the forearm flies off as a piece", Gore.gibs.Any(g => g.kind == "forearm"));
+            t.Ok("blood sprays", sprayed > 10, sprayed);
+            await Shoot("kneeL", "gore_2_leg");
+            t.Ok("breaking a knee takes the shin", Find("first_shucker").severed.Contains("shinL"));
+            await t.Run(1.2f);
+            t.Ok("pieces come to rest", Gore.gibs.Any(g => g.rest));
+            await Shoot("kneeR", "gore_3_crawl");
+            await Shoot("crown", "gore_4_down");
+            t.Release("focus");
+            await t.Run(1.5f); t.Snap("gore_5_after");
+            Tide.AdvanceTo("high");
+            await t.Run(0.6f);
+            sh = Find("first_shucker");
+            t.Ok("re-knotted, it grows the torn limbs back in salt", sh.severed.Count == 0 && sh.saltLimbs.Contains("forearmL") && sh.saltLimbs.Contains("shinL"), $"{sh.mode} salt={string.Join(",", sh.saltLimbs)} cut={string.Join(",", sh.severed)}");
+            await t.Run(0.8f); t.Snap("gore_6_salt_limbs");
+            var saved = sh.Serialize(); var copy = new Shucker(sh.spec, sh.room); copy.Restore(saved);
+            t.Ok("salt limbs are saved", copy.saltLimbs.SetEquals(sh.saltLimbs));
+            // a dry, lit room, with the body held at a distance: the spray has stone to land on
+            t.Place("kilns", 15, 18);
+            foreach (var e in G.ents.OfType<Body>()) e.gone = true;
+            var hall = Data.Room["kilns"];
+            var sp = Props.Empty(); sp.Set("x", hall.Px + 23 * 16 + 8); sp.Set("y", hall.Py + 19 * 16); sp.Set("key", "gore_test"); sp.Set("pose", "standing"); sp.Set("facing", -1);
+            var dummy = new Shucker(sp, hall); G.ents.Add(dummy);
+            await t.Run(0.3f);
+            async Task Hit(string id, string snap)
+            {
+                for (int i = 0; i < 10 && !dummy.K(id).broken; i++)
+                {
+                    dummy.stun = 99; dummy.vx = 0;
+                    var kp = dummy.KnotPos(dummy.K(id)).Value;
+                    t.AimAt(kp.X, kp.Y); t.Down("focus");
+                    await t.Click(); await t.Run(0.32f);
+                    if (G.player.weapons["driver"].mag == 0) { await t.Tap("reload"); await t.Run(1.4f); }
+                }
+                await t.Run(0.05f); t.Snap(snap);
+            }
+            await Hit("elbowR", "gore_7_kilns_arm");
+            await Hit("kneeR", "gore_8_kilns_leg");
+            t.Release("focus");
+            await t.Run(1.5f);
+            t.Ok("the spray stains the stone", Gore.Stains("kilns").Count > 8, Gore.Stains("kilns").Count);
+            t.Snap("gore_9_kilns_stains");
+            dummy.Down("rivet"); dummy.StandUp(); dummy.stun = 99; dummy.vx = 0;
+            await t.Run(0.6f); t.Snap("gore_10_salt_regrown");
+            t.Ok("the kilns body regrew its arm and leg in salt", dummy.saltLimbs.Contains("forearmR") && dummy.saltLimbs.Contains("shinR"), string.Join(",", dummy.saltLimbs));
+            // with gore off the drowned only shed salt
+            Settings.Gore = "off";
+            Gore.Clear();
+            var fresh = new Shucker(sp, hall); G.ents.Add(fresh);
+            fresh.DamageKnot(fresh.K("elbowL"), 99, "rivet");
+            t.Ok("gore off: limbs stay on", fresh.K("elbowL").broken && fresh.severed.Count == 0 && Gore.gibs.Count == 0 && Gore.DropCount == 0, $"{fresh.severed.Count} {Gore.gibs.Count} {Gore.DropCount}");
+            Settings.Gore = "full";
+        },
+
+        ["hollow"] = async t =>
+        {
+            // the gift: when the tide first turns on the Long Pier, the sea comes up over the boards and leaves it there
+            t.Place("pier", 31, 16);
+            G.god = true;
+            float deck = World.SurfaceAt(G.player.Cx(), G.player.Cy());
+            bool rose = false;
+            for (int i = 0; i < 260 && !G.ents.OfType<HollowRelic>().Any(); i++)
+            {
+                await t.Run(0.1f);
+                if (Hollow.surge > 1.5f && !rose) { rose = true; t.Snap("hollow_1_wave"); }
+            }
+            t.Ok("the sea heaves up over the pier", rose && World.flags.B("hollowGift"));
+            var relic = G.ents.OfType<HollowRelic>().FirstOrDefault();
+            t.Ok("and leaves the Hollow on the boards", relic != null);
+            await t.Run(1.2f); t.Snap("hollow_2_relic");
+            // take it up: what it is, then its first verse
+            G.player.x = relic.Cx() - G.player.w / 2; G.player.y = relic.y + relic.h - G.player.h; G.player.vx = 0;
+            await t.Run(0.2f);
+            await t.Tap("interact");
+            t.Ok("taking it shows what it is", UI.Kind == "inscription" && Hollow.owned, UI.Kind);
+            await t.Run(0.3f); t.Snap("hollow_3_reveal");
+            await t.Tap("interact"); await t.Run(0.3f);
+            t.Ok("then the first verse, the Calling", UI.Kind == "inscription" && Hollow.Has("calling"), UI.Kind);
+            t.Snap("hollow_4_calling_card");
+            await t.Tap("interact"); await t.Run(0.2f);
+            t.Ok("it is in her hand", Hollow.held && !UI.IsOpen());
+            t.Ok("the relic is gone from the pier", !G.ents.OfType<HollowRelic>().Any(e => !e.done));
+            // the Calling: point above the water and sing, and the sea climbs to meet it
+            foreach (var b in G.ents.OfType<Body>()) b.gone = true;
+            t.Place("pier", 30, 16); await t.Run(0.3f);
+            Hollow.resonance = 60;
+            float s0 = World.SurfaceAt(G.player.Cx(), G.player.Cy());
+            t.AimAt(G.player.Cx() + 30, s0 - 4.5f * 16);
+            await t.Click(); await t.Run(2.2f);
+            float s1 = World.SurfaceAt(G.player.Cx(), G.player.Cy());
+            t.Ok("the Calling raises the sea", s0 - s1 > 3 * 16, $"rose {(s0 - s1) / 16:0.0} tiles");
+            t.Ok("and costs resonance (it drinks the sea back in slowly)", Hollow.resonance < 45, Hollow.resonance);
+            t.Snap("hollow_5_calling");
+            Hollow.surgeHold = 0; await t.Run(4f);
+            t.Ok("then the sea settles back", MathF.Abs(World.SurfaceAt(G.player.Cx(), G.player.Cy()) - s0) < 8);
+            // pointing down sends it back
+            Hollow.resonance = 60;
+            t.AimAt(G.player.Cx() + 40, s0 + 4 * 16);
+            await t.Click(); await t.Run(2f);
+            t.Ok("the Calling can send the sea down", World.SurfaceAt(G.player.Cx(), G.player.Cy()) - s0 > 2 * 16);
+            Hollow.surgeHold = 0; await t.Run(4f);
+            // still water does not hear it
+            t.Place("brineshaft", 20, 18); Hollow.resonance = 60; await t.Run(0.2f);
+            await t.Click(); await t.Run(0.2f);
+            t.Ok("still water does not answer", Hollow.surgeRoom == null && Hollow.resonance == 60, Hollow.resonance);
+            // brimming, a held note turns the tide
+            t.Place("pier", 30, 16); await t.Run(0.2f);
+            string ph0 = Tide.PhaseId();
+            Hollow.resonance = Hollow.MAX;
+            t.AimAt(G.player.Cx() + 40, G.player.y - 40);
+            t.Down("fire"); await t.Run(1.4f); t.Release("fire");
+            t.Ok("the held note spends everything", Hollow.resonance < 5 && Hollow.rush > 0, Hollow.resonance);
+            await t.Run(0.6f); t.Snap("hollow_6_turning");
+            for (int i = 0; i < 120 && Tide.PhaseId() == ph0; i++) await t.Run(0.1f);
+            t.Ok("holding the note brimming turns the tide", Tide.PhaseId() != ph0, $"{ph0} -> {Tide.PhaseId()}");
+            // the Riptide throws the drowned back
+            Hollow.Learn("riptide", false); await t.Run(0.2f); UI.Close();
+            t.Ok("verses can be learned", Hollow.verse == "riptide" && Hollow.verses.Count == 2);
+            var kilns = Data.Room["kilns"];
+            t.Place("kilns", 15, 18);
+            foreach (var b in G.ents.OfType<Body>()) b.gone = true;
+            Shucker Spawn(string key, int tx)
+            {
+                var sp = Props.Empty(); sp.Set("x", kilns.Px + tx * 16 + 8); sp.Set("y", kilns.Py + 19 * 16); sp.Set("key", key); sp.Set("pose", "standing"); sp.Set("facing", -1);
+                var b = new Shucker(sp, kilns); G.ents.Add(b); return b;
+            }
+            var a = Spawn("rip_a", 19);
+            await t.Run(0.2f);
+            Hollow.resonance = 60;
+            float ax = a.Cx();
+            t.AimAt(a.Cx(), a.Cy());
+            await t.Click(); await t.Run(0.1f); t.Snap("hollow_7_riptide");
+            await t.Run(0.5f);
+            t.Ok("the Riptide throws the drowned back", a.Cx() - ax > 30, $"moved {a.Cx() - ax:0}");
+            // the Salting crusts them, and the next blow shatters a limb
+            Hollow.Learn("salting", false); await t.Run(0.2f); UI.Close();
+            var sb = Spawn("salt_a", 21); await t.Run(0.3f);
+            Hollow.resonance = 60;
+            t.AimAt(sb.Cx(), sb.Cy() - 4);
+            await t.Click(); await t.Run(0.4f);
+            t.Ok("the Salting crusts a body in salt", sb.saltT > 0, sb.saltT);
+            t.Snap("hollow_8_salted");
+            Hollow.Hold(false);
+            var hip = sb.KnotPos(sb.K("kneeL")).Value;
+            t.AimAt(sb.Cx(), sb.y + 6);
+            await t.Click(); await t.Run(0.3f);
+            t.Ok("one blow shatters a salted limb", sb.knots.Count(k => k.broken) >= 1 && sb.severed.Count >= 1, string.Join(",", sb.severed));
+            // at stone, salt rises in a pillar
+            Hollow.Hold(true); Hollow.verse = "salting";
+            foreach (var b in G.ents.OfType<Body>()) b.gone = true;
+            Hollow.resonance = 60;
+            t.AimAt(G.player.Cx() + 40, G.player.y + G.player.h + 8);
+            await t.Click(); await t.Run(0.3f);
+            t.Ok("sung at stone, a pillar of salt rises", Hollow.Pillars > 0, Hollow.Pillars);
+            t.Snap("hollow_9_pillar");
+            await t.Run(16f);
+            t.Ok("and crumbles again", Hollow.Pillars == 0);
+            // the Answer: one of them turns on its own kind
+            Hollow.Learn("answer", false); await t.Run(0.2f); UI.Close();
+            var th = Spawn("answer_a", 19); var foe = Spawn("answer_b", 25);
+            await t.Run(0.3f);
+            Hollow.resonance = 60;
+            t.AimAt(th.Cx(), th.Cy());
+            await t.Click(); await t.Run(0.2f);
+            t.Ok("the Answer turns a body", th.thrallT > 0, th.thrallT);
+            for (int i = 0; i < 80 && foe.knots.All(k => !k.broken); i++) { foe.stun = 0; await t.Run(0.1f); }
+            t.Snap("hollow_10_answer");
+            t.Ok("and it tears at its own kind", foe.knots.Any(k => k.broken));
+            th.thrallT = 0.05f; await t.Run(0.3f);
+            t.Ok("when the verse runs out it falls apart for good", th.gone);
+            // the bell drowns it out
+            t.Place("chapel", 20, 16); await t.Run(0.3f);
+            Hollow.Hold(true); Hollow.resonance = 60;
+            await t.Click(); await t.Run(0.2f);
+            t.Ok("nothing answers in a Bell Room", Hollow.resonance == 60);
+            // it is kept
+            G.Save(); G.LoadGame(); await t.Run(0.3f);
+            t.Ok("the Hollow and its verses are saved", Hollow.owned && Hollow.verses.Count == 4, string.Join(",", Hollow.verses));
+            G.god = false;
+        },
+
+        ["voices"] = async t =>
+        {
+            // the dormant dead breathe when you are close; true corpses are silent
+            World.flags.Set("hollowGift", true);
+            t.Place("tithe", 9, 16);
+            Snd.Heard.Clear();
+            foreach (var b in G.ents.OfType<Body>()) b.voiceT = 0.1f;
+            await t.Run(1.5f);
+            t.Ok("a dormant Shucker murmurs when Maren is close", Snd.Heard.Contains("shucker:murmur"), string.Join(" ", Snd.Heard.Distinct().Take(8)));
+            t.Ok("a true corpse says nothing", !Snd.Heard.Any(k => k.StartsWith("corpse:")));
+            // a hunter cries out the moment it sees her, and the strings sting once
+            var hall = Data.Room["tithe"];
+            foreach (var b in G.ents.OfType<Body>()) b.gone = true;
+            var sp = Props.Empty(); sp.Set("x", hall.Px + 16 * 16); sp.Set("y", hall.Py + 17 * 16); sp.Set("key", "voice_test"); sp.Set("pose", "standing");
+            var sh = new Shucker(sp, hall); G.ents.Add(sh);
+            Snd.Heard.Clear(); int stings = Voices.Stings; Voices.stingCool = 0;
+            G.god = true;
+            await t.Run(1.2f);
+            t.Ok("it cries out when it sees her", Snd.Heard.Contains("shucker:alert"));
+            await t.Run(0.4f);
+            t.Ok("and the strings sting", Voices.Stings == stings + 1 && Snd.Heard.Contains("sting"), Voices.Stings - stings);
+            await t.Run(2f);
+            t.Ok("its wet footsteps carry", Snd.Heard.Any(k => k.StartsWith("step:")));
+            Snd.Heard.Clear();
+            sh.DamageKnot(sh.K("kneeL"), 99, "rivet");
+            t.Ok("it wails when a limb comes off", Snd.Heard.Contains("shucker:wail") && Snd.Heard.Contains("sever"), string.Join(" ", Snd.Heard));
+            sh.DamageKnot(sh.K("kneeR"), 99, "rivet"); sh.DamageKnot(sh.K("crown"), 99, "rivet");
+            t.Ok("and rattles when it goes down", Snd.Heard.Contains("shucker:rattle"));
+            G.god = false;
+        },
+
+        // Staged moments for screenshots of the new systems (run with rendering and --out).
+        ["showcase"] = async t =>
+        {
+            World.flags.Set("hollowGift", true);
+            Hollow.owned = true; Hollow.verses = new() { "calling", "riptide", "salting", "answer" }; Hollow.held = true;
+            G.god = true;
+            var kilns = Data.Room["kilns"];
+            Shucker Spawn(string key, int tx, int facing = -1)
+            {
+                var sp = Props.Empty(); sp.Set("x", kilns.Px + tx * 16 + 8); sp.Set("y", kilns.Py + 19 * 16); sp.Set("key", key); sp.Set("pose", "standing"); sp.Set("facing", facing);
+                var b = new Shucker(sp, kilns); G.ents.Add(b); return b;
+            }
+            t.Place("kilns", 14, 18);
+            foreach (var b in G.ents.OfType<Body>()) b.gone = true;
+            // the Riptide
+            var a = Spawn("show_rip", 19);
+            await t.Run(0.4f);
+            Hollow.verse = "riptide"; Hollow.resonance = 100;
+            t.AimAt(a.Cx(), a.Cy());
+            await t.Click(); await t.Run(0.12f); t.Snap("show_1_riptide");
+            await t.Run(1.5f);
+            // the Answer: one turns on the other, singing
+            foreach (var b in G.ents.OfType<Body>()) b.gone = true;
+            var th = Spawn("show_th", 19); var foe = Spawn("show_foe", 24);
+            await t.Run(0.3f);
+            Hollow.verse = "answer"; Hollow.resonance = 100;
+            t.AimAt(th.Cx(), th.Cy());
+            await t.Click();
+            for (int i = 0; i < 60 && foe.knots.Count(k => k.broken) < 2; i++) { foe.stun = 0; await t.Run(0.1f); }
+            t.Snap("show_2_answer");
+            t.Ok("the answered body tore at the other", foe.knots.Any(k => k.broken));
+            // low health: the faceplate crazes and she breathes hard in the helmet
+            foreach (var b in G.ents.OfType<Body>()) b.gone = true;
+            G.player.hp = 1; await t.Run(1.8f); t.Snap("show_3_cracked");
+            t.Ok("badly hurt, she breathes hard in the helmet", Snd.Heard.Contains("breathTrue"));
+            G.player.hp = G.player.maxHp;
+            // the journal: the Hollow and its verses
+            UI.Satchel("gear"); await t.Run(0.3f); t.Snap("show_4_gear"); UI.Close();
+            G.god = false;
         },
 
         ["dragburn"] = async t =>
@@ -557,6 +863,22 @@ public static class Scenarios
                 }
                 GD.Print($"PERF {room}: painters {DrawLayer.DrawMs / n:0.00} ms/frame, draw calls {calls / n:0}, wall {sw.Elapsed.TotalMilliseconds / n:0.0} ms/frame (software renderer)");
                 GD.Print("  " + string.Join(", ", DrawLayer.ByLayer.OrderByDescending(kv => kv.Value).Take(6).Select(kv => $"{kv.Key} {kv.Value / n:0.00}")));
+            }
+            // the worst case for gore: a room after a massacre, every piece and stain at its cap
+            {
+                t.Place("kilns", 15, 18); Settings.Gore = "full";
+                var kr = Data.Room["kilns"];
+                for (int i = 0; i < 12; i++)
+                {
+                    var sp = Props.Empty(); sp.Set("x", kr.Px + (17 + i * 1.5f) * 16); sp.Set("y", kr.Py + 19 * 16); sp.Set("key", "perf" + i); sp.Set("pose", "standing");
+                    var b = new Shucker(sp, kr); G.ents.Add(b);
+                    foreach (var k in b.knots.Where(k => k.type != "crown")) b.DamageKnot(k, 99, "rivet");
+                }
+                for (int i = 0; i < 40; i++) { Gore.Spray(kr.Px + H.Rand(200, 500), kr.Py + H.Rand(200, 290), -H.PI / 2, 1.5f, 20, 40, 200); await t.Run(0.05f); }
+                double before = DrawLayer.DrawMs; int frames = 60; DrawLayer.ByLayer.Clear();
+                for (int i = 0; i < frames; i++) { Gore.Spray(kr.Px + 350, kr.Py + 260, -H.PI / 2, 1.5f, 12, 40, 200); await t.Run(1 / 60f); }
+                GD.Print($"PERF gore: painters {(DrawLayer.DrawMs - before) / frames:0.00} ms/frame with {Gore.Stains("kilns").Count} stains, {Gore.gibs.Count} pieces, {Gore.DropCount} drops");
+                GD.Print("  " + string.Join(", ", DrawLayer.ByLayer.OrderByDescending(kv => kv.Value).Take(6).Select(kv => $"{kv.Key} {kv.Value / frames:0.00}")));
             }
             t.Ok("perf probe ran", true);
         },

@@ -28,6 +28,7 @@ public class Body : Ent
     public bool reknot, dragged, tetherable, corpse, boss, breach, hesper, teodor, sailor, passive, shed;
     public Vector2? target, lastHeard;
     public Dictionary<string, float> crust = new();
+    public HashSet<string> severed = new(), saltLimbs = new();   // limbs torn off; limbs the Brine grew back in salt
     protected Dictionary<string, Vector2> _skel;
 
     public Body(Props spec, RoomDef room)
@@ -44,6 +45,9 @@ public class Body : Ent
     }
     public override bool Hears => true;
     public virtual (float x, float y, float w, float h) HitBox() => (x, y, w, h);
+    // The robed, jointed dead: they come apart limb by limb.
+    public virtual bool Humanoid => false;
+    public virtual Palette Pal() => new() { robe = "#3a3530", skin = "#7f8b80", cowl = "#2c2824" };
 
     public Knot AddKnot(string id, string type, string joint, float hp, float r = 4.5f, int sealedNeeds = 0)
     {
@@ -73,6 +77,9 @@ public class Body : Ent
         for (int i = 0; i < 8 && Phys.BoxSolid(x, y, w, h); i++) x += (i % 2 == 1 ? -1 : 1) * (i + 1) * 2;
     }
     public float hitFlash;          // white flash when struck
+    public float voiceT = H.Rand(2, 9), footT, senseT, busyT, lostT;   // the voice: next murmur, stride, senses
+    public bool spotted;            // has seen Maren (it cried out)
+    public float saltT, thrallT, flungT;   // the Hollow's verses: crusted in salt, answering the song, thrown by the sea
     public Dictionary<string, Vector2> Skel() => _skel ??= Skeleton();
     static Vector2 V(float x, float y) => new(x, y);
     public virtual Dictionary<string, Vector2> Skeleton()
@@ -195,6 +202,12 @@ public class Body : Ent
         if (k.broken || gone) return false;
         float pan = Pan();
         var kp = KnotPos(k) ?? new Vector2(Cx(), Cy());
+        // crusted in salt, a joint is brittle as glass: one blow shatters it (a plate just flies off)
+        if (saltT > 0 && src is "rivet" or "gaff" or "harpoon" or "stomp" or "thrall")
+        {
+            if (k.plated) { k.plated = false; FX.Salt(kp.X, kp.Y, 10); }
+            else if (!IsSealed(k)) { dmg = 99; FX.Salt(kp.X, kp.Y, 24); Snd.Crystal(pan); }
+        }
         if (IsSealed(k)) { Snd.Tink(pan); FX.Sparks(kp.X, kp.Y, 3); Flinch(); return false; }
         if (k.plated)
         {
@@ -227,10 +240,13 @@ public class Body : Ent
             if (!G.stats.byAct.TryGetValue(G.act, out var ba)) G.stats.byAct[G.act] = ba = new Dictionary<string, int>();
             ba[k.type] = ba.GetValueOrDefault(k.type) + 1;
             OnKnotBroken(k, src);
+            Gore.OnKnotBroken(this, k, src);
+            Hollow.OnKnotBroken(this, src);
         }
         else
         {
             Snd.Tink(pan);
+            Voices.Hurt(this, false);
             Flinch();
         }
         G.AddSwell(0.3f);
@@ -239,8 +255,14 @@ public class Body : Ent
     public virtual void DamageFlesh(float dmg, float hx, float hy, string src)
     {
         if (gone) return;
+        // a blow anywhere on a salted body shatters the limb nearest it
+        if (saltT > 0 && src is "rivet" or "gaff" or "harpoon" or "stomp" or "thrall")
+        {
+            var limb = knots.Where(k => !k.broken && k.type != "crown" && KnotPos(k) != null).OrderBy(k => (KnotPos(k).Value - new Vector2(hx, hy)).LengthSquared()).FirstOrDefault();
+            if (limb != null) { DamageKnot(limb, 99, src); return; }
+        }
         Snd.Thud(Pan());
-        FX.Blood(hx, hy, 3);
+        Gore.Wound(hx, hy);
         if (src == "rivet" && !corpse && knots.Any(k => !k.broken)) Narr.Think("torso");
         Wake(true);
         // 10% of the hit reaches the nearest open knot.
@@ -255,7 +277,8 @@ public class Body : Ent
         if (best != null)
         {
             best.hp -= dmg * 0.1f;
-            if (best.hp <= 0) { best.broken = true; Snd.Crack(Pan()); OnKnotBroken(best, src); }
+            if (best.hp <= 0) { best.broken = true; Snd.Crack(Pan()); OnKnotBroken(best, src); Gore.OnKnotBroken(this, best, src); Hollow.OnKnotBroken(this, src); }
+            else if (H.Rand() < 0.4f) Voices.Hurt(this, false);
         }
         Flinch();
     }
@@ -273,11 +296,12 @@ public class Body : Ent
     public virtual void Down(string src)
     {
         mode = "downed";
+        saltT = 0; thrallT = 0; flungT = 0;
         ReleaseGrab();
         vx = 0;
         SetPose("lying");
         reknot = false;
-        Snd.Groan(Pan(), 0.1f);
+        Voices.Die(this);
         G.OnBodyDowned(this, src);
     }
     // Re-knotting: the Brine grows new knots and the body stands again.
@@ -286,11 +310,13 @@ public class Body : Ent
         if (gone || corpse) return;
         reknot = false;
         foreach (var k in knots) { k.broken = false; k.hp = k.max; k.plated = k.basePlated; }
+        // what was torn off grows back as salt
+        if (severed.Count > 0) { saltLimbs.UnionWith(severed); severed.Clear(); Narr.Think("saltLimb"); }
         G.ApplyEncrustation(this);
         SetPose("stand");
         mode = "hunt";
         anim = 0;
-        Snd.Groan(Pan(), 0.25f);
+        Voices.Rise(this);
         FX.Salt(Cx(), Cy(), 20);
     }
     public virtual void Burn() { burnT = 3; Snd.Fire(Pan()); }
@@ -326,7 +352,7 @@ public class Body : Ent
         if (mode != "dormant" || corpse) return;
         if (!force && !G.CanWake()) return;
         mode = "rise"; atkT = 0.9f;
-        Snd.Groan(Pan());
+        Voices.Rise(this);
         G.AddSwell(1);
     }
     public virtual bool Perceives()
@@ -367,7 +393,34 @@ public class Body : Ent
             }
         }
         if (mode == "downed" || mode == "captured") { Physics(dt); return; }
-        if (stun > 0) { stun -= dt; vx *= 0.8f; Physics(dt); return; }
+        if (saltT > 0) { saltT -= dt; if (saltT <= 0) { stun = MathF.Min(stun, 0.3f); FX.Salt(Cx(), Cy(), 20); Snd.Crack(Pan()); } }
+        // thrown by the Riptide: it flies until it lands, and a wall it meets hard breaks something
+        if (flungT > 0)
+        {
+            flungT -= dt;
+            float speed = MathF.Abs(vx);
+            Physics(dt);
+            if (hitWall != 0 && speed > 140)
+            {
+                flungT = 0; vx = -hitWall * 30;
+                var k = knots.Where(q => !q.broken && !q.plated && !IsSealed(q)).OrderBy(q => H.Rand()).FirstOrDefault();
+                if (k != null) DamageKnot(k, 1.5f, "riptide");
+                G.Shake(2); Snd.Thud(Pan());
+            }
+            if (onGround && flungT < 0.5f) vx *= 0.85f;
+            return;
+        }
+        if (stun > 0 && thrallT <= 0) { stun -= dt; vx *= 0.8f; Physics(dt); return; }
+        if (thrallT > 0)
+        {
+            if (stun > 0) stun -= dt;
+            thrallT -= dt;
+            Hollow.ThrallThink(this, dt);
+            Physics(dt);
+            Voices.Tick(this, dt);
+            if (thrallT <= 0) Hollow.ThrallEnds(this);
+            return;
+        }
         if (pinT > 0)
         {
             pinT -= dt; vx = 0;
@@ -382,6 +435,7 @@ public class Body : Ent
         foreach (var id in crust.Keys.ToArray()) { crust[id] -= dt; if (crust[id] <= 0) crust.Remove(id); }
         Think(dt);
         Physics(dt);
+        Voices.Tick(this, dt);
     }
     public virtual void Think(float dt) { }
     public virtual void Physics(float dt, bool pinned = false)
@@ -441,8 +495,8 @@ public class Body : Ent
         var sh = (sl + sr) / 2;
         float seed = (key?.Length ?? 3) * 0.37f + x * 0.013f;
         // back limbs, in shadow
-        DrawLimb(c, j["hip"], j["kneeR"], 2.6f, dark); DrawLimb(c, j["kneeR"], j["footR"], 2.0f, dark);
-        DrawLimb(c, j["shoulderR"], j["elbowR"], 2.2f, dark); DrawLimb(c, j["elbowR"], j["handR"], 1.6f, dark);
+        DrawLimb(c, j["hip"], j["kneeR"], 2.6f, dark); Limb(c, "shinR", j["kneeR"], j["footR"], 2.0f, dark);
+        Arm(c, "R", dark, dark, 2.2f, 1.6f);
         DrawLimb(c, j["hip"], j["kneeL"], 2.8f, robe);
 
         // the robe
@@ -508,16 +562,21 @@ public class Body : Ent
         }
 
         // front shin and bare foot under the hem, front arm in its sleeve
-        DrawLimb(c, j["kneeL"], j["footL"], 2.1f, skin);
-        c.Fill = skinC; c.BeginPath(); c.Ellipse(j["footL"].X + f * 1, j["footL"].Y - 0.6f, 2, 0.9f, 0, 0, H.PI * 2); c.FillPath();
-        DrawLimb(c, j["shoulderL"], j["elbowL"], 2.7f, robe);
-        DrawLimb(c, j["elbowL"], j["handL"], 1.8f, skin);
-        var hand = j["handL"];
-        c.Stroke = skinC; c.LineWidth = 0.6f;
-        var fd = (j["handL"] - j["elbowL"]).Normalized();
-        for (int i = -1; i <= 1; i++) { var tip = hand + fd.Rotated(i * 0.35f) * 2.4f; c.Line(hand.X, hand.Y, tip.X, tip.Y); }
-        // sleeve cuff
-        c.Fill = robeC; c.FillCircle(j["elbowL"].X, j["elbowL"].Y, 1.6f);
+        if (Limb(c, "shinL", j["kneeL"], j["footL"], 2.1f, skin))
+        {
+            c.Fill = saltLimbs.Contains("shinL") ? Gore.SALT : skinC;
+            c.BeginPath(); c.Ellipse(j["footL"].X + f * 1, j["footL"].Y - 0.6f, 2, 0.9f, 0, 0, H.PI * 2); c.FillPath();
+        }
+        if (Arm(c, "L", robe, skin, 2.7f, 1.8f))
+        {
+            var hand = j["handL"];
+            bool saltHand = saltLimbs.Contains("armL") || saltLimbs.Contains("forearmL");
+            c.Stroke = saltHand ? Gore.SALT : skinC; c.LineWidth = 0.6f;
+            var fd = (j["handL"] - j["elbowL"]).Normalized();
+            for (int i = -1; i <= 1; i++) { var tip = hand + fd.Rotated(i * 0.35f) * 2.4f; c.Line(hand.X, hand.Y, tip.X, tip.Y); }
+            // sleeve cuff
+            if (!saltLimbs.Contains("armL")) { c.Fill = robeC; c.FillCircle(j["elbowL"].X, j["elbowL"].Y, 1.6f); }
+        }
 
         // the head: grey and swollen, eye hollows, the jaw slack
         c.Fill = maskC; c.FillCircle(head.X, head.Y, 3.3f);
@@ -525,6 +584,15 @@ public class Body : Ent
         c.Fill = new Color(0.03f, 0.03f, 0.04f, 0.92f); c.BeginPath(); c.Ellipse(head.X + f * 1.5f, head.Y - 0.4f, 1.1f, 1.4f, 0, 0, H.PI * 2); c.FillPath();
         c.BeginPath(); c.Ellipse(head.X - f * 0.4f, head.Y - 0.6f, 0.8f, 1.1f, 0, 0, H.PI * 2); c.FillPath();
         c.FillRect(head.X + f * 1.2f - 0.6f, head.Y + 1.6f, 1.6f, 0.6f);
+        if (severed.Contains("jaw"))
+        {
+            // the jaw torn away: a wet gape under the face
+            var jw = j["jaw"];
+            c.Fill = Gore.BLOOD_DARK; c.BeginPath(); c.Ellipse(jw.X - f * 0.6f, jw.Y - 0.4f, 1.9f, 1.4f, 0, 0, H.PI * 2); c.FillPath();
+            c.Fill = Gore.RAW; c.FillCircle(jw.X - f * 0.4f, jw.Y - 0.6f, 0.8f);
+            c.Stroke = Gore.BLOOD_DARK; c.LineWidth = 0.5f; c.Line(jw.X, jw.Y + 0.6f, jw.X + f * 0.3f, jw.Y + 2.6f + MathF.Sin(anim * 3) * 0.4f);
+        }
+        else if (saltLimbs.Contains("jaw")) { var jw = j["jaw"]; c.Fill = Gore.SALT; c.BeginPath(); c.Ellipse(jw.X - f * 0.5f, jw.Y - 0.6f, 1.8f, 1.1f, 0, 0, H.PI * 2); c.FillPath(); }
         bool hostile = mode is "hunt" or "windup" or "attack" or "grab" or "inhale";
         if (hostile && !corpse) { c.Fill = new Color(0.7f, 0.95f, 1f, 0.9f); c.FillCircle(head.X + f * 1.6f, head.Y - 0.4f, 0.45f); c.Glow(head.X + f * 1.6f, head.Y - 0.4f, 2.5f, new Color(0.6f, 0.9f, 1f, 0.5f)); }
         if (pal.cowl != null)
@@ -565,6 +633,23 @@ public class Body : Ent
             c.BeginPath(); c.Arc(jaw.X, jaw.Y, 1.2f, 0, H.PI * 2); c.FillPath();
         }
     }
+    // A limb segment: drawn whole, grown back in salt, or gone with a stump left behind. True if it is there.
+    bool Limb(Canvas c, string chain, Vector2 a, Vector2 b, float w, string col)
+    {
+        if (severed.Contains(chain)) { var d = b - a; Gore.DrawStump(c, a, d.LengthSquared() > 0.01f ? d.Normalized() : new Vector2(0, 1)); return false; }
+        if (saltLimbs.Contains(chain)) { Gore.DrawSaltLimb(c, a, b, w); return true; }
+        DrawLimb(c, a, b, w, col);
+        return true;
+    }
+    bool Arm(Canvas c, string side, string upper, string fore, float wu, float wf)
+    {
+        var j = Skel();
+        Vector2 sh = j["shoulder" + side], el = j["elbow" + side], hd = j["hand" + side];
+        if (!Limb(c, "arm" + side, sh, el, wu, upper)) return false;
+        if (saltLimbs.Contains("arm" + side)) { Gore.DrawSaltLimb(c, el, hd, wf); return true; }
+        return Limb(c, "forearm" + side, el, hd, wf, fore);
+    }
+
     public override void DrawKnots(Canvas c)
     {
         foreach (var k in knots)
@@ -607,6 +692,7 @@ public class Body : Ent
         {
             ["x"] = x, ["y"] = y, ["mode"] = mode == "rise" ? "hunt" : mode, ["pose"] = pose, ["facing"] = facing, ["gone"] = gone,
             ["reknot"] = reknot,
+            ["severed"] = new JsonArray(severed.Select(v => (JsonNode)v).ToArray()), ["salt"] = new JsonArray(saltLimbs.Select(v => (JsonNode)v).ToArray()),
             ["knots"] = new JsonArray(knots.Select(k => (JsonNode)new JsonObject { ["hp"] = k.hp, ["broken"] = k.broken, ["plated"] = k.plated }).ToArray()),
         };
         return new Props(o);
@@ -618,6 +704,7 @@ public class Body : Ent
         x = s.F("x"); y = s.F("y"); facing = s.I("facing", facing); gone = s.B("gone"); reknot = s.B("reknot");
         mode = s.S("mode") ?? mode;
         if (AWAKE.Contains(mode)) mode = awakeMode ?? "hunt";
+        severed = new HashSet<string>(s.Strings("severed")); saltLimbs = new HashSet<string>(s.Strings("salt"));
         if (s.A("knots") is JsonArray ka)
             for (int i = 0; i < ka.Count && i < knots.Count; i++)
             {
@@ -727,7 +814,7 @@ public class Shucker : Body
                 mode = "windup"; atkT = 0.6f; cool = 1.4f;
                 int s = (int)H.Sign(p.Cx() - Cx()); if (s != 0) facing = s;
                 foreach (var k in knots) if (!k.broken) k.flare = 0.6f;
-                Snd.Groan(Pan(), 0.25f);
+                Voices.Windup(this);
             }
             // Armless Shuckers still body-check.
             var hb = HitBox();
@@ -736,15 +823,19 @@ public class Shucker : Body
         else
         {
             vx = H.Approach(vx, 0, 300 * dt);
-            if (H.Rand() < dt * 0.1f) Snd.Groan(Pan(), 0.05f);
         }
+    }
+    public override bool Humanoid => true;
+    public override Palette Pal()
+    {
+        var tint = teodor ? new Palette { robe = "#2f3b44", skin = "#8b968c", cowl = null, dark = "#1b2228" } : new Palette { robe = "#3a3530", skin = "#7f8b80", cowl = "#2c2824" };
+        if (burnT > 0) { tint.robe = "#1a1410"; tint.skin = "#3a2a20"; }
+        return tint;
     }
     public override void Draw(Canvas c)
     {
         if (gone) return;
-        var tint = teodor ? new Palette { robe = "#2f3b44", skin = "#8b968c", cowl = null, dark = "#1b2228" } : new Palette { robe = "#3a3530", skin = "#7f8b80", cowl = "#2c2824" };
-        if (burnT > 0) { tint.robe = "#1a1410"; tint.skin = "#3a2a20"; }
-        DrawHuman(c, tint);
+        DrawHuman(c, Pal());
         if (teodor) { c.FillStyle = "#c9a85a"; var n = Skel()["neck"]; c.FillRect(n.X - 1, n.Y, 2, 2); }
     }
 }

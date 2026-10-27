@@ -185,7 +185,8 @@ public static class World
             return (r.Oy + lvl) * TS;
         }
         if (r.FixedWater != null) return (r.Oy + r.FixedWater.Value) * TS;
-        float sea = Tide.SeaLevel() * TS;
+        // the Mere's Hollow can call the sea up into a room, or send it back down
+        float sea = Tide.SeaLevel() * TS - Hollow.SurgePx(r);
         if (st.flood != null) sea = MathF.Min(sea, (r.Oy + st.flood.Value) * TS);
         if (sea >= r.Py + r.Ph) return float.PositiveInfinity;
         return sea;

@@ -57,6 +57,9 @@ public static class Hints
         new("jet", "jet", 0, () => sinceJet >= 0 && sinceJet < 10 && (P.InWater() || !P.onGround)),
         new("weapon", "weapon", 0, () => sinceWeapon >= 0 && sinceWeapon < 8),
         new("map", "map", 0, () => sinceTurn >= 0 && sinceTurn < 7),
+        new("sing", "sing", 3, () => Hollow.owned && Hollow.held && Hollow.resonance >= Hollow.Cur.cost && !P.inBellRoom && !UI.IsOpen()),
+        new("hollow", "hollow", 6, () => Hollow.owned && !Hollow.held && Hollow.resonance >= Hollow.MAX * 0.6f && Bodies(220).Any(Hostile)),
+        new("verse", "verse", 6, () => Hollow.held && Hollow.verses.Count > 1),
     };
 
     static HashSet<string> Done => G.narr.hints;

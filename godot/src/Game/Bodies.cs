@@ -72,7 +72,7 @@ public class Gullet : Body
         x = ax - w / 2; y = ay + len - h;
         vy = 50; stunOnLand = stunned;
         K("tendril").broken = true;
-        Snd.Groan(Pan(), 0.2f);
+        Voices.Alert(this);
     }
     public override void OnKnotBroken(Knot k, string src)
     {
@@ -140,7 +140,7 @@ public class Gullet : Body
             {
                 mode = "windup"; atkT = 0.5f; cool = 1.8f;
                 foreach (var k in knots) if (!k.broken) k.flare = 0.5f;
-                Snd.Groan(Pan(), 0.2f);
+                Voices.Windup(this);
             }
         }
         else vx *= 0.9f;
@@ -248,6 +248,8 @@ public class Bellmouth : Body
         home = spec.F("x");
     }
     public override void SetPose(string p) { if (p == "lying") base.SetPose("lying"); }
+    public override bool Humanoid => true;
+    public override Palette Pal() => new() { robe = "#d8d4c8", skin = "#8e9e98", cowl = null, dark = "#6a6a62" };
     bool SeesLight()
     {
         var p = G.player;
@@ -313,6 +315,7 @@ public class Bellmouth : Body
             mode = "windup"; atkT = 0.7f; cool = 2;
             int s = (int)H.Sign(p.Cx() - Cx()); facing = s != 0 ? s : 1;
             foreach (var k in knots) if (!k.broken) k.flare = 0.7f;
+            Voices.Windup(this);
         }
     }
     public override Dictionary<string, Vector2> Skeleton()
@@ -331,7 +334,7 @@ public class Bellmouth : Body
     {
         if (gone) return;
         var j = Skel();
-        DrawHuman(c, new Palette { robe = "#d8d4c8", skin = "#8e9e98", cowl = null, dark = "#6a6a62" });
+        DrawHuman(c, Pal());
         if (pose == "stand")
         {
             float b = belly + 5;
@@ -365,7 +368,7 @@ public class Driftling : Body
     public override Dictionary<string, Vector2> Skeleton() => new() { ["core"] = new Vector2(Cx(), Cy()) };
     public override void Hear(float hx, float hy, float d, float r, string src) { }
     public override void Wake(bool force = false) { }
-    public override void OnKnotBroken(Knot k, string src) { gone = true; dead = true; FX.Salt(Cx(), Cy(), 4); }
+    public override void OnKnotBroken(Knot k, string src) { gone = true; dead = true; FX.Salt(Cx(), Cy(), 4); Gore.Spray(Cx(), Cy(), -H.PI / 2, 1.6f, 6, 20, 90); }
     public override void DamageFlesh(float dmg, float hx, float hy, string src) => OnKnotBroken(knots[0], src);
     public override void Update(float dt)
     {
@@ -467,6 +470,8 @@ public class Saltwright : Body
         mode = "idle"; awakeMode = "hunt";
     }
     public override void SetPose(string p) { if (p == "lying") base.SetPose("lying"); }
+    public override bool Humanoid => true;
+    public override Palette Pal() => new() { robe = "#5a4a3a", skin = "#8a8a7e", cowl = "#3a3028", dark = "#2a221a" };
     public override void Think(float dt)
     {
         var p = G.player;
@@ -509,7 +514,7 @@ public class Saltwright : Body
                 mode = "windup"; atkT = 0.8f; cool = 2.2f;
                 int s = (int)H.Sign(p.Cx() - Cx()); facing = s != 0 ? s : 1;
                 foreach (var k in knots) if (!k.broken) k.flare = 0.8f;
-                Snd.Groan(Pan(), 0.3f);
+                Voices.Windup(this);
             }
         }
         else vx *= 0.9f;
@@ -524,14 +529,15 @@ public class Saltwright : Body
     {
         if (gone) return;
         var j = Skel();
-        DrawHuman(c, new Palette { robe = "#5a4a3a", skin = "#8a8a7e", cowl = "#3a3028", dark = "#2a221a" });
+        DrawHuman(c, Pal());
         if (pose == "stand")
         {
-            // salt armour plates on shoulders and a pick
+            // salt armour plates on shoulders and a pick (gone with the arm that held it)
             var sl = j["shoulderL"];
             c.FillStyle = "#cfc8b8"; c.FillRect(sl.X - 5, sl.Y - 3, 10, 4);
             c.Fill = H.Rgba(255, 255, 255, 0.25f); c.FillRect(sl.X - 5, sl.Y - 3, 10, 1);
             var hand = j["handL"];
+            if (severed.Contains("forearmL") || severed.Contains("armL")) return;
             float ang = mode == "windup" ? -2.2f * facing : mode == "recover" ? 0.9f * facing : 0.3f * facing;
             c.Save(); c.Translate(hand.X, hand.Y); c.Rotate(ang);
             c.StrokeStyle = "#6a5030"; c.LineWidth = 2; c.BeginPath(); c.MoveTo(0, 0); c.LineTo(0, -16); c.StrokePath();
@@ -557,6 +563,8 @@ public class Grafted : Body
         boss = spec.B("boss");
         if (boss) { foreach (var k in knots) { k.max += 3; k.hp = k.max; } AddKnot("graft2", "graft", "hip", 4); }
     }
+    public override bool Humanoid => true;
+    public override Palette Pal() => new() { robe = boss ? "#4a2f5a" : "#3a3a5a", skin = "#9aa6b0", cowl = boss ? "#c0a060" : "#2a2a40", dark = "#1a1a2a" };
     public override bool Perceives() => !passive && base.Perceives();
     public override void Hear(float hx, float hy, float d, float r, string src) { if (!passive) base.Hear(hx, hy, d, r, src); }
     public override bool DamageKnot(Knot k, float dmg, string src) { if (passive) { passive = false; mode = "hunt"; G.OnChoirAttacked(); } return base.DamageKnot(k, dmg, src); }
@@ -614,7 +622,7 @@ public class Grafted : Body
     {
         if (gone) return;
         var j = Skel();
-        DrawHuman(c, new Palette { robe = boss ? "#4a2f5a" : "#3a3a5a", skin = "#9aa6b0", cowl = boss ? "#c0a060" : "#2a2a40", dark = "#1a1a2a" });
+        DrawHuman(c, Pal());
         if (pose == "stand" && mode != "downed")
         {
             c.FillStyle = "#ffd080"; c.FillRect(j["handL"].X - 1.5f, j["handL"].Y - 1, 3, 3);
@@ -644,8 +652,9 @@ public class Corpse : Body
     }
     public override void Hear(float hx, float hy, float d, float r, string src) { }
     public override void Wake(bool force = false) { }
+    public override Palette Pal() => sailor ? new Palette { robe = "#2a3a4a", skin = "#8c9890", dark = "#1a242c" } : new Palette { robe = "#3b3631", skin = "#7a837a", cowl = "#2c2824" };
     public override bool DamageKnot(Knot k, float dmg, string src) => false;
-    public override void DamageFlesh(float d, float hx, float hy, string src) { Snd.Thud(Pan()); FX.Blood(hx, hy, 2); }
+    public override void DamageFlesh(float d, float hx, float hy, string src) { Snd.Thud(Pan()); Gore.Wound(hx, hy, 3); }
     public override void Update(float dt)
     {
         _skel = null;
@@ -668,7 +677,7 @@ public class Corpse : Body
     public override void Draw(Canvas c)
     {
         if (gone) return;
-        DrawHuman(c, sailor ? new Palette { robe = "#2a3a4a", skin = "#8c9890", dark = "#1a242c" } : new Palette { robe = "#3b3631", skin = "#7a837a", cowl = "#2c2824" });
+        DrawHuman(c, Pal());
     }
     public override Props Serialize() => new(new JsonObject { ["x"] = x, ["y"] = y, ["gone"] = gone, ["pose"] = pose, ["facing"] = facing, ["knots"] = new JsonArray() });
     public override void Restore(Props s) { x = s.F("x"); y = s.F("y"); gone = s.B("gone"); facing = s.I("facing", facing); SetPose(s.S("pose") ?? pose); if (sailor) knots.Clear(); }

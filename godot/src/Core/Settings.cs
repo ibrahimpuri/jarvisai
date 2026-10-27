@@ -12,6 +12,7 @@ public static class Settings
     public static float Vibration = 1;            // 0, 0.5 or 1
     public static bool AimAssist = true, Gyro, NintendoConfirm = true, Hints = true;
     public static string Prompts = "auto";        // auto, xbox, playstation, switch
+    public static string Gore = "full";           // full, reduced, off
     public static WorldEnvironment Env;
 
     public static void Load()
@@ -30,6 +31,7 @@ public static class Settings
             Hints = !p.Has("hints") || p.B("hints");
             NintendoConfirm = !p.Has("nintendoConfirm") || p.B("nintendoConfirm");
             if (p.Has("prompts")) Prompts = p.S("prompts");
+            if (p.Has("gore")) Gore = p.S("gore");
         }
         catch { }
     }
@@ -38,7 +40,7 @@ public static class Settings
         var o = new JsonObject
         {
             ["fullscreen"] = Fullscreen, ["bloom"] = Bloom, ["shake"] = Shake, ["volume"] = Snd.Volume,
-            ["vibration"] = Vibration, ["aimAssist"] = AimAssist, ["gyro"] = Gyro, ["nintendoConfirm"] = NintendoConfirm, ["prompts"] = Prompts, ["hints"] = Hints,
+            ["vibration"] = Vibration, ["aimAssist"] = AimAssist, ["gyro"] = Gyro, ["nintendoConfirm"] = NintendoConfirm, ["prompts"] = Prompts, ["hints"] = Hints, ["gore"] = Gore,
         };
         using var f = FileAccess.Open(PATH, FileAccess.ModeFlags.Write);
         f?.StoreString(o.ToJsonString());
