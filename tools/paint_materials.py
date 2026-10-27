@@ -95,7 +95,8 @@ def save(name, grain, accent, cav, h, strength):
 # ---- the surfaces ---------------------------------------------------------------------------------------------
 # Each surface is mostly mid-scale form (chips, swells, strata) with only a little fine grain on top: stone seen
 # from a few metres away, not sandpaper.
-def grain_of(rng, broad=0.8, mid=0.55, fine=0.05):
+def grain_of(rng, broad=0.3, mid=0.55, fine=0.05):
+    # broad swells are kept low: at a room's scale they read as camouflage blotches, not stone
     return (spectral(rng, 3.0, 0.002, 0.03) * broad + spectral(rng, 2.6, 0.01, 0.1) * mid
             + blur(spectral(rng, 1.8, 0.08, 0.35), 0.6) * fine)
 
@@ -136,7 +137,7 @@ def rock(rng):
     strata = np.sin((yy + w * 26) * (2 * math.pi * 7 / N)) * 0.5 + np.sin((yy + w * 34) * (2 * math.pi * 19 / N)) * 0.2
     cracks = cracks_of(rng, 14, 2.0, 0.5, 16)
     chips = sstep(0.6, 1.6, spectral(rng, 2.2, 0.01, 0.1))
-    h = grain_of(rng, 0.9, 0.7, 0.1) + strata * 0.8 - cracks * 1.8 - chips * 0.6
+    h = grain_of(rng, 0.3, 0.7, 0.1) + strata * 0.8 - cracks * 1.8 - chips * 0.6
     moss = patches(rng, 1.0, 1.8) * (1 - cracks)
     save('rock', norm(h), moss * 0.65, cavity_of(h, 4) * 0.8 + cracks * 0.6, blur(h, 1.2), 0.2)
 
@@ -145,7 +146,7 @@ def brick(rng):
     pocks = pits_of(rng, density=0.004, radius=1.4)
     craters = pits_of(rng, density=0.0006, radius=3.5)
     salt = patches(rng, 0.8, 1.7)
-    h = grain_of(rng, 0.6, 0.7, 0.15) - pocks * 1.3 - craters * 0.8 + salt * 0.9
+    h = grain_of(rng, 0.25, 0.7, 0.15) - pocks * 1.3 - craters * 0.8 + salt * 0.9
     save('brick', norm(h), salt * 0.9, cavity_of(h) * 0.8 + pocks * 0.5, blur(h, 1.0), 0.24)
 
 def saltrock(rng):
@@ -154,7 +155,7 @@ def saltrock(rng):
     facet = (rng.random(110)[idx] - 0.5) * 1.0 - (f1 / max(1, f1.max())) * 0.6
     crystals = sstep(1.1, 1.8, spectral(rng, 2.6, 0.003, 0.06))
     edges = sstep(1.4, 0.2, f2 - f1)
-    base = grain_of(rng, 0.9, 0.6, 0.1)
+    base = grain_of(rng, 0.3, 0.6, 0.1)
     h = base * (1 - crystals) + (facet * 1.4 + 1.0) * crystals - edges * crystals * 0.6
     save('saltrock', norm(h), crystals * 0.85, cavity_of(h) * 0.8 + edges * crystals * 0.3, blur(h, 0.8), 0.22)
 
@@ -163,7 +164,7 @@ def bone(rng):
     fib = spectral(rng, 2.4, 0.004, 0.2, stretch=(0.15, 1.0))
     fib = warp(fib, spectral(rng, 3.0, 0.001, 0.03), spectral(rng, 3.0, 0.001, 0.03), 22)
     pores = pits_of(rng, density=0.003, radius=1.3)
-    h = fib * 0.55 + spectral(rng, 3.0, 0.001, 0.03) * 0.8 - pores * 1.6
+    h = fib * 0.55 + spectral(rng, 3.0, 0.001, 0.03) * 0.3 - pores * 1.6
     stain = patches(rng, 0.9, 1.8)
     save('bone', norm(h), stain * 0.45, cavity_of(h) * 0.8 + pores * 0.5, blur(h, 1.0), 0.2)
 
@@ -172,7 +173,7 @@ def flesh(rng):
     folds = spectral(rng, 3.2, 0.001, 0.05)
     swell = spectral(rng, 2.6, 0.008, 0.1)
     veins = cracks_of(rng, 22, 1.4, 0.55, 22)
-    h = folds * 1.0 + swell * 0.6 - veins * 0.8 + spectral(rng, 1.8, 0.08, 0.3) * 0.06
+    h = folds * 0.5 + swell * 0.7 - veins * 0.8 + spectral(rng, 1.8, 0.08, 0.3) * 0.06
     save('flesh', norm(h), veins * 0.9, cavity_of(h, 4) * 0.7 + veins * 0.2, blur(h, 1.4), 0.2)
 
 def shore(rng):
@@ -181,7 +182,7 @@ def shore(rng):
     f1, _, _ = cells(rng, 160)
     clus = sstep(0.8, 1.5, spectral(rng, 2.4, 0.003, 0.06))
     ring = np.exp(-((f1 - 3.0) ** 2) / 1.0) * clus
-    h = grain_of(rng, 0.9, 0.6, 0.1) - pits * 1.3 + ring * 1.4
+    h = grain_of(rng, 0.3, 0.6, 0.1) - pits * 1.3 + ring * 1.4
     weed = patches(rng, 0.9, 1.7) * (0.4 + pits)
     save('shore', norm(h), np.clip(weed, 0, 1) * 0.75, cavity_of(h) * 0.8 + pits * 0.4, blur(h, 0.9), 0.24)
 

@@ -31,13 +31,13 @@ public static class Art
     public record Surface(string Name, float Scale, float Grain, float Bump, float Accent, float Cavity);
     public static readonly Dictionary<string, Surface> SURFACES = new()
     {
-        ["ashlar"] = new("ashlar", 200, 0.42f, 0.9f, 0.3f, 0.4f),
-        ["rock"] = new("rock", 240, 0.5f, 1.0f, 0.35f, 0.5f),
-        ["brick"] = new("brick", 170, 0.42f, 0.9f, 0.28f, 0.4f),
-        ["saltrock"] = new("saltrock", 220, 0.36f, 0.8f, 0.4f, 0.35f),
-        ["bone"] = new("bone", 220, 0.45f, 0.9f, 0.25f, 0.4f),
+        ["ashlar"] = new("ashlar", 200, 0.42f, 0.9f, 0.18f, 0.4f),
+        ["rock"] = new("rock", 240, 0.5f, 1.0f, 0.16f, 0.5f),
+        ["brick"] = new("brick", 170, 0.42f, 0.9f, 0.14f, 0.4f),
+        ["saltrock"] = new("saltrock", 220, 0.36f, 0.8f, 0.1f, 0.35f),
+        ["bone"] = new("bone", 220, 0.45f, 0.9f, 0.15f, 0.4f),
         ["flesh"] = new("flesh", 260, 0.45f, 1.1f, 0.6f, 0.4f),
-        ["shore"] = new("shore", 220, 0.5f, 1.0f, 0.4f, 0.45f),
+        ["shore"] = new("shore", 220, 0.5f, 1.0f, 0.22f, 0.45f),
     };
     // which surfaces a room is made of: its back wall, and the rock Maren walks on
     public static (Surface wall, Surface rock) SurfacesFor(RoomDef r) => Strata.Style(r) switch
