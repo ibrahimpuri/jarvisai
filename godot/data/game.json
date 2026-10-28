@@ -2750,15 +2750,66 @@
    "agathe": "Maren. What is in your hand? No. Look at me, not at the window. The sea is up to the sill tonight, and the tables say it cannot be. It is waiting for you. If you go down to it, there will be no lamp, and no ferry, and no daughter. Only the sea, with your face.",
    "choice": "There is a fourth thing, and only you can do it now. Go to the window. The sea is waiting under it."
   },
+  "saint": {
+   "opening": "Tonight the Saint is awake under the island. It has been waiting a long time for a Hult to hear it.",
+   "margin": "In the margin, smaller, in pencil, a line of the song she used to sing you:",
+   "lullaby": [
+    "Hush now, my small one, the tide is a door,",
+    "and the Saint is a hill with a heart in its floor.",
+    "It breathes with the Rising, it breathes with the Ebb,",
+    "and it sings as it sleeps in its cold salt bed.",
+    "It has sung for so long that it can't find the end,",
+    "so hush, and we'll sing it the end, little friend.",
+    "Then the bells can lie down, and the drowned can lie still,",
+    "and the lamp can burn kind on the top of the hill.",
+    "Hush now, my Maren. The Saint wants to sleep."
+   ],
+   "agatheHint": "And read the margins of my pages, if you find them. Not the log. The margins.",
+   "agathe": [
+    "You found every page. Then you have the song as well, the one in the margins.",
+    "Maren, that is not a lullaby. I made it one, so that it would never be lost, and so that the Choir would never have it whole. It is the seventh verse: the one the Saint sings back, and has never been able to finish.",
+    "The Saint is not angry. It is dying, and it is frightened, and it has been singing for three hundred years trying to reach the end. The Brine is only its song, getting into everything.",
+    "There is one more thing a Keeper could do tonight, and only a Hult can do it. Wind my music box, and sing it the end."
+   ],
+   "box": "Agathe's music box",
+   "noHollow": "The music box plays the tune, thin and sweet, and nothing under the island hears it. A song needs something to carry it to the Saint.",
+   "ask": "Wind the music box and sing the seventh verse? This ends the night.",
+   "title": "The Seventh Verse",
+   "ending": [
+    "You do not light the lamp, or ring the bell, or fire the beacon. You wind your mother's music box, lift the Hollow to the open window, and sing the song she sang you every night until you were seven.",
+    "Agathe knows it by the second line. She sings the third with you, and her voice is still the one you remember.",
+    "Under the island the Saint stops singing. For the first time in three hundred years, it is listening.",
+    "It has been trying to reach the end of its song since before the brothers came. The Brine was only the song, getting into everything: the salt, the drowned, the bells. You give it the end.",
+    "The ribs settle. The Skull lowers itself onto its bones as gently as a head onto a pillow. In every flooded room on Hollowmere the knots go dark one by one, and the drowned lie down in the water, and do not get up, and are not sorry."
+   ],
+   "grafted": "The salt falls out of your skin like frost off a window, and out of Agathe's, and far below, out of everyone the Choir ever grafted.",
+   "clean": "The salt falls from Agathe's hands like frost off a window. She looks at them for a long time.",
+   "dawn": "At dawn you light the lamp together. There is nothing left for it to burn. It is only a light, and it is for the ships.",
+   "glimpse": [
+    "Nine nights later.",
+    "The sea off Hollowmere is flat and grey and ordinary. Maren is cleaning the great lens when the beam, swinging out past the reef, finds a light where there is no land.",
+    "It is answering hers. Three short, one long: a Keeper's signal, from the open sea.",
+    "In the Prior's cell, under a stone the Choir never lifted, she finds a fifth tide table. It is not a table. It is a chart of the whole sea, and on it, in the Prior's hand, are eleven more islands, each drawn as a whale with too many ribs.",
+    "Beside the last of them, out where the chart runs off the edge, he has written: THE MOTHER. SHE HAS NOT STOPPED SINGING."
+   ],
+   "sequel": {
+    "name": "HOLLOWMERE",
+    "part": "PART II",
+    "title": "THE DEEP HOURS",
+    "tag": "The light is for the ships. The song is for something else."
+   }
+  },
   "fates": {
    "ansel": {
     "alive": "Brother Ansel rang the chapel bell every hour until the end of his life, and it was a long one.",
     "burned": "Brother Ansel was ringing his bell when the beam found him. The bell went on swinging for a while after.",
     "sold": "The chapel bell never rang again. Nobody found Brother Ansel.",
+    "verse": "The crust fell from Brother Ansel's chest the morning after. He rang the chapel bell once more, for no reason at all, and never had to again.",
     "sunk": "Brother Ansel rang the chapel bell as the island went under, until the water reached the rope.",
     "host": "Brother Ansel rang the chapel bell until the sea came in under the door. Then he set down the rope, and went out to meet it."
    },
    "odile": {
+    "verse": "Odile Marrow rowed the first boat to the mainland in forty-one nights, and the second, and the tenth, and the island's dead came home in them to be buried above the tide line.",
     "alive": "Odile Marrow built a boat out of salvage and a stubborn temper, and was the first to row back to the mainland in forty nights.",
     "lost": "Odile Marrow's bench stands in the Saltworks, tools still laid out, waiting for someone who does not come.",
     "host": "Odile Marrow rowed for the mainland alone, and made it, and told them. They thought the island had driven her mad. Then the ships started coming in on the reef."
@@ -2768,6 +2819,7 @@
     "dead": "Teodor's tags hang above Odile's bench, where the light catches them."
    },
    "hesper": {
+    "verse": "Hesper Vane heard the seventh verse sung at last. She wept, and said it was not how she had imagined it, and that it was better.",
     "alive": "Hesper Vane sang the last verse alone on the shore, and nobody could say afterwards whether the sea had answered.",
     "burned": "Hesper Vane walked into the beam with her arms open. She did not look afraid.",
     "dead": "The Choir buried Hesper Vane in the drained shrine, and sang over her with no water to carry the song.",
@@ -2775,12 +2827,14 @@
     "host": "Hesper Vane knelt on the Choir Steps as the new Saint went down past her into the deep, and wept, and was the first to sing for it."
    },
    "agathe": {
+    "verse": "Agathe Hult gave the lamp to her daughter, taught her every step of all two hundred and twelve, and slept at night.",
     "dark": "Agathe Hult rowed the ferry herself, and did not once look back at the dark lamp.",
     "relight": "Agathe Hult kept the lamp beside her daughter, and taught her every step of all two hundred and twelve.",
     "hymn": "Agathe Hult watched from the rope ferry until there was nothing left to watch.",
     "host": "Agathe Hult was the first to drown for the new Saint. Her daughter called her by name, and she came."
    },
    "maren": {
+    "verse": "Maren Hult kept the lamp of Hollowmere. Ships pass the reef safely now, and she sleeps, mostly. Some nights she hears something very far out at sea, singing the first verse.",
     "dark": "Maren Hult never kept a light. She dove wrecks for a living, and every one she found had a name she remembered.",
     "relight": "Maren Hult became the Keeper of Hollowmere. Ships pass the reef safely now. She does not sleep well.",
     "relightGrafted": "The beam found the salt in Maren Hult too. The Keepers' log records her name, and that she lit the lamp first.",

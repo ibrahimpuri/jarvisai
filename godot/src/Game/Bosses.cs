@@ -127,7 +127,7 @@ public class Undertow : Body
             vy = H.Approach(vy, MathF.Sin(a) * sp, 200 * dt);
             if (cool <= 0 && H.Dist(Cx(), Cy(), p.Cx(), p.Cy()) < 110 && (pIn || boss))
             {
-                mode = "windup"; atkT = 0.8f; cool = boss ? 2.2f : 3;
+                mode = "windup"; atkT = Wind(0.8f); cool = Cool(boss ? 2.2f : 3);
                 foreach (var k in knots) if (!k.broken) k.flare = 0.8f;
                 Voices.Windup(this);
             }
@@ -411,7 +411,7 @@ public class Abbot : Body
             }
             else
             {
-                mode = "windup"; atkT = 1.2f; cool = 2.6f;
+                mode = "windup"; atkT = Wind(1.2f); cool = Cool(2.6f);
                 slamX = H.Clamp(p.Cx(), room.Px + 40, room.Px + room.Pw - 40);
                 foreach (var k in knots) if (!k.broken) k.flare = 1.2f;
                 Voices.Windup(this);
@@ -564,7 +564,8 @@ public class Shoal : Body
         spec.Set("x", Cx()); spec.Set("y", Feet()); spec.Set("key", "shed" + H.Uid()); spec.Set("pose", "standing");
         var sp = new Shucker(spec, room);
         sp.K("kneeL").broken = true; sp.K("kneeR").broken = true; sp.SetPose("crawl"); sp.mode = "hunt";
-        foreach (var q in sp.knots) { q.max = 2; if (!q.broken) q.hp = 2; }
+        float shedHp = Diff.Knot(2, false);
+        foreach (var q in sp.knots) { q.max = shedHp; if (!q.broken) q.hp = shedHp; }
         sp.shed = true;
         G.ents.Add(sp);
         if (knots.All(q => q.broken))

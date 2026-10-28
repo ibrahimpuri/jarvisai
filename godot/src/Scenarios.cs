@@ -1244,6 +1244,92 @@ public static class Scenarios
             t.Ok("a jump clipping a ceiling corner slips past it", p.y < G.room.Py + 2 * 16 - 4, $"y {p.y - G.room.Py:0}");
         },
 
+        ["difficulty"] = async t =>
+        {
+            // every crossing, from the table out to the drowned: rivets to put a Shucker down, Maren's pips, how hard a
+            // blow lands, and on the gentlest, her breath coming back and her satchel staying with her
+            async Task Begin(string id)
+            {
+                G.NewGame(id, 1); await t.Run(0.2f);
+                for (int i = 0; i < 20 && UI.IsOpen(); i++) { if (UI.Kind == "death") await t.ClickButton("Wake at the bell"); else UI.Inst.TestCancel(); await t.Run(0.1f); }
+            }
+            var expect = new Dictionary<string, int> { ["pilgrim"] = 3, ["keeper"] = 7, ["drowned"] = 9, ["saint"] = 10 };
+            foreach (var c in Diff.ALL)
+            {
+                await Begin(c.id);
+                var p = G.player;
+                t.Ok($"{c.name}: Maren starts with {c.pips} pips", p.maxHp == c.pips && p.hp == c.pips, $"{p.hp}/{p.maxHp}");
+                G.god = true; t.Place("tithe", 20, 16); await t.Run(0.2f);
+                var sh = G.ents.OfType<Shucker>().FirstOrDefault(b => b.Alive());
+                int shots = 0;
+                while (sh != null && sh.Alive() && shots < 40)
+                {
+                    var crown = sh.K("crown");
+                    var k = sh.IsSealed(crown) ? sh.knots.First(x => !x.broken && x.type != "crown") : crown;
+                    sh.DamageKnot(k, 2, "rivet"); shots++;
+                }
+                t.Ok($"{c.name}: a Shucker falls to {expect[c.id]} rivets", sh != null && !sh.Alive() && shots == expect[c.id] && shots == Diff.ShuckerRivets(c), $"{shots} (table says {Diff.ShuckerRivets(c)})");
+                G.god = false; p.invulnT = 0; int hp0 = p.hp;
+                p.Hurt(2, null);
+                int lost = hp0 - p.hp;
+                t.Ok($"{c.name}: a heavy blow costs {(c.softHeavy ? 1 : 2)}{(c.extraHit > 0 ? " or 3" : "")}", c.softHeavy ? lost == 1 : lost == 2 || (c.extraHit > 0 && lost == 3), lost);
+            }
+            // Pilgrim: a pip back while nothing hunts her, and the satchel kept on death
+            await Begin("pilgrim");
+            var pp = G.player;
+            float every = Diff.Get("pilgrim").regen; Diff.Get("pilgrim").regen = 0.5f;
+            t.Place("reef", 28, 12); await t.Run(0.2f);
+            pp.hp = pp.maxHp - 2; await t.Run(1.3f);
+            Diff.Get("pilgrim").regen = every;
+            t.Ok("Pilgrim: she heals while nothing hunts her", pp.hp == pp.maxHp, $"{pp.hp}/{pp.maxHp}");
+            pp.bag.Add("kelp", 3); int kelp = pp.bag.Count("kelp");
+            pp.invulnT = 0; pp.Hurt(99); await t.Run(1.4f);
+            t.Ok("Pilgrim: dying keeps the satchel", UI.Kind == "death" && pp.bag.Count("kelp") == kelp && G.satchelDrop == null, $"{UI.Kind} kelp {pp.bag.Count("kelp")}");
+            await t.ClickButton("Wake at the bell"); await t.Run(0.3f);
+            // the fourth crossing sleeps until a night is finished
+            Profile.finished.Clear(); Profile.endings.Clear();
+            G.ToTitle(); await t.Run(0.3f);
+            await t.ClickButton("Row out"); await t.Run(0.2f);
+            t.Ok("the Mere-Saint crossing is asleep at first", UI.Inst.AllText().Contains("Asleep") && !UI.Inst.AllText().Contains("Mere-Saint"), UI.Kind);
+            Profile.Record("keeper", "dark");
+            t.Ok("finishing a night wakes it", Profile.SaintUnlocked && Profile.JustUnlocked);
+            UI.Inst.Voyage(); await t.Run(0.2f);
+            await t.ClickButton("Mere-Saint"); await t.Run(0.2f); t.Snap("diff_crossing");
+            t.Ok("and it can be chosen", UI.Inst.AllText().Contains("The Saint is awake"), UI.Kind);
+            await t.ClickButton("Cast off"); await t.Run(0.3f);
+            t.Ok("the night begins on the Mere-Saint crossing", G.difficulty == "saint" && Diff.Saint, G.difficulty);
+            for (int i = 0; i < 20 && UI.IsOpen(); i++) { UI.Inst.TestCancel(); await t.Run(0.1f); }
+            // the seventh verse, one line in the margin of each page
+            var lull = Data.Lore.P("saint").Strings("lullaby");
+            t.Ok("on this crossing Agathe's pages carry the lullaby", Story.PageText(3).Contains(lull[2]) && Story.PageText(9).Contains("Hush now, my Maren"));
+            // the true ending: all nine pages, the Hollow, and the music box at the lamp
+            G.god = true; G.act = 3; World.flags.Set("skullOpen", true); Hollow.owned = true;
+            for (int i = 1; i <= 8; i++) G.pages.Add(i);
+            t.Place("lamp", 16, 16); await t.Run(0.2f);
+            t.Ok("with eight pages there is no music box", !G.ents.OfType<MusicBox>().Any());
+            G.pages.Add(9); t.Place("reef", 28, 12); await t.Run(0.1f); t.Place("lamp", 20, 16); await t.Run(0.3f);
+            var box = G.ents.OfType<MusicBox>().FirstOrDefault();
+            t.Ok("with all nine, Agathe's music box stands by the lamp", box != null);
+            if (box != null) { G.player.x = box.Cx() - G.player.w / 2; await t.Run(0.1f); }
+            await t.Tap("interact"); await t.Run(0.2f);
+            t.Ok("it asks before the verse is sung", UI.Kind == "confirm", UI.Kind);
+            await t.ClickButton("Yes"); await t.Run(0.3f);
+            t.Ok("the seventh verse plays out", UI.Kind == "cinematic" && G.ended == "verse" && Profile.SawTrueEnding, $"{UI.Kind} {G.ended}");
+            UI.Inst.TestCancel(); await t.Run(0.4f); t.Snap("diff_true_ending");
+            t.Ok("its epitaph", UI.Kind == "ending" && UI.Inst.AllText().Contains("The Seventh Verse") && UI.Inst.AllText().Contains("first verse"), UI.Kind);
+            await t.ClickButton("Turn the page"); await t.Run(0.6f); t.Snap("diff_glimpse_text");
+            t.Ok("then a glimpse of what comes after", UI.Kind == "cinematic", UI.Kind);
+            UI.Inst.TestCancel(); await t.Run(0.6f); t.Snap("diff_glimpse_title");
+            t.Ok("and the title of the next part", UI.Kind == "glimpse" && UI.Inst.AllText().Contains("THE DEEP HOURS"), UI.Kind);
+            // the other crossings never show the box or the margins
+            await Begin("keeper");
+            for (int i = 1; i <= 9; i++) G.pages.Add(i);
+            G.act = 3; World.flags.Set("skullOpen", true);
+            t.Place("lamp", 20, 16); await t.Run(0.2f);
+            t.Ok("on Keeper the margins are blank and there is no box", !Story.PageText(3).Contains(lull[2]) && !G.ents.OfType<MusicBox>().Any());
+            G.god = false; Profile.finished.Clear(); Profile.endings.Clear();
+        },
+
         ["controller"] = async t =>
         {
             // which family a controller belongs to

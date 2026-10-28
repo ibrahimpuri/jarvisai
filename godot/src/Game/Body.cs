@@ -23,7 +23,10 @@ public class Body : Ent
     public float anim, stun, pinT, burnT, atkT, cool, alert, speed = 45, hpScale = 1, fireT;
     // How much faster and quicker to strike the drowned are than the old margins: the Brine grows stronger with each
     // act (the spring tide most of all), and the crossing chosen at the start scales it.
-    public static float Menace => (1 + 0.08f * (G.act - 1)) * (G.difficulty == "pilgrim" ? 0.85f : G.difficulty == "drowned" ? 1.1f : 1);
+    public static float Menace => (1 + 0.08f * (G.act - 1)) * Diff.C.menace;
+    // How long a blow is telegraphed, and the pause before the next, on this crossing.
+    public static float Wind(float t) => t * Diff.C.windup;
+    public static float Cool(float t) => t * Diff.C.strikeCool;
     public float? barbT, climbT;
     public Knot pinKnot;
     public List<Knot> knots = new();
@@ -54,6 +57,7 @@ public class Body : Ent
 
     public Knot AddKnot(string id, string type, string joint, float hp, float r = 4.5f, int sealedNeeds = 0)
     {
+        hp = Diff.Knot(hp, boss);
         var k = new Knot { id = id, type = type, joint = joint, hp = hp, max = hp, r = r, sealedNeeds = sealedNeeds };
         knots.Add(k);
         return k;
@@ -786,7 +790,7 @@ public class Shucker : Body
             vx = 0;
             if (p == null || p.grabbedBy != this) { mode = "recover"; atkT = 0.6f; return; }
             atkT -= dt;
-            if (atkT <= 0) { atkT = G.difficulty == "pilgrim" ? 1.3f : 1.0f; p.Hurt(1, this); }
+            if (atkT <= 0) { atkT = Cool(1.0f); p.Hurt(1, this); }
             return;
         }
         if (mode == "windup")
@@ -825,7 +829,7 @@ public class Shucker : Body
             Pursue(dt, target.Value.X, lurchT > 0 ? (crawling ? 135 : 118) * menace : spd);
             if (p != null && !p.dead && d < 32 && cool <= 0 && ArmsOK() && sees)
             {
-                mode = "windup"; atkT = 0.5f / menace + Legend.Hesitation; cool = 1.3f; lurchT = 0;
+                mode = "windup"; atkT = Wind(0.5f / menace) + Legend.Hesitation; cool = Cool(1.3f); lurchT = 0;
                 int s = (int)H.Sign(p.Cx() - Cx()); if (s != 0) facing = s;
                 foreach (var k in knots) if (!k.broken) k.flare = 0.6f;
                 Voices.Windup(this);

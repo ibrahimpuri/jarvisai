@@ -283,7 +283,7 @@ public partial class UiRoot
         {
             var rr = r;
             bool here = where == "bench" || r.S("where") == "any";
-            bool ok = here && p.bag.Has(r.Counts("cost")) && p.bag.Room(r.S("makes")) >= r.I("n");
+            bool ok = here && p.bag.Has(r.Counts("cost")) && p.bag.Room(r.S("makes")) >= Diff.Yield(r);
             var b = Btn(list, $"{Data.ItemName(r.S("makes"))}", () => { Snd.Ui(); FocusFirstIn(card); });
             b.AddThemeStyleboxOverride("normal", Room(24, 3, 7, 3)); b.AddThemeStyleboxOverride("focus", Room(24, 3, 7, 3)); b.AddThemeStyleboxOverride("hover", Room(24, 3, 7, 3)); b.AddThemeStyleboxOverride("pressed", Room(24, 3, 7, 3));
             if (!ok) b.AddThemeColorOverride("font_color", MUTED);
@@ -316,12 +316,12 @@ public partial class UiRoot
         string makes = r.S("makes"); var def = Data.Item(makes);
         var cost = r.Counts("cost");
         bool here = where == "bench" || r.S("where") == "any";
-        bool room = p.bag.Room(makes) >= r.I("n"), have = p.bag.Has(cost);
+        bool room = p.bag.Room(makes) >= Diff.Yield(r), have = p.bag.Has(cost);
         var top = Row(card); top.AddThemeConstantOverride("separation", 8);
         top.AddChild(new ItemView(makes) { CustomMinimumSize = new Vector2(64, 52), Glow = have && here ? 1 : 0.3f });
         var tc = Col(top);
         Lbl(tc, def.S("name"), 10, GOLD);
-        Lbl(tc, $"Makes {r.I("n")}  ·  " + (r.S("where") == "any" ? (where == "bench" ? "at once, at the bench" : $"{r.F("time")} s, crouched") : "at a bench, at once"), 5, MUTED, caps: true);
+        Lbl(tc, $"Makes {Diff.Yield(r)}  ·  " + (r.S("where") == "any" ? (where == "bench" ? "at once, at the bench" : $"{r.F("time")} s, crouched") : "at a bench, at once"), 5, MUTED, caps: true);
         Lbl(tc, def.S("desc"), 6, TEXT);
         Rule(card);
         Lbl(card, "Needs", 6, WARM, caps: true);
@@ -339,8 +339,8 @@ public partial class UiRoot
         Btn(br, "Craft", () =>
         {
             if (where == "any") { Close(); p.QuickCraft(r.S("id")); return; }
-            if (!p.bag.Has(cost) || p.bag.Room(makes) < r.I("n")) return;
-            p.bag.Pay(cost); p.bag.Add(makes, r.I("n")); Snd.Craft(); H.ToastMsg($"{r.I("n")} {def.S("name")}.", 1.2f); again();
+            if (!p.bag.Has(cost) || p.bag.Room(makes) < Diff.Yield(r)) return;
+            p.bag.Pay(cost); p.bag.Add(makes, Diff.Yield(r)); Snd.Craft(); H.ToastMsg($"{Diff.Yield(r)} {def.S("name")}.", 1.2f); again();
         }, primary: true, disabled: why != null);
         if (why != null) Lbl(br, why, 6, BAD, italic: true).VerticalAlignment = VerticalAlignment.Center;
     }
@@ -471,7 +471,7 @@ public partial class UiRoot
         if (G.pages.Count < 9) Lbl(rc, "Your mother's pages are scattered across the island. All nine show the ferry's tides: the Keeper's Dark ending needs them, and two others alive to row.", 5, INK_SOFT);
         var pr = new HFlowContainer(); pr.AddThemeConstantOverride("h_separation", 3); pr.AddThemeConstantOverride("v_separation", 3); rc.AddChild(pr);
         if (G.pages.Count == 0) Lbl(pr, "No pages yet.", 5, INK_SOFT, italic: true);
-        foreach (var n in G.pages.OrderBy(x => x)) Btn(pr, "Page " + n, () => Dialogue("Agathe's log", new List<string> { Story.PAGES[n] }, () => Satchel("log")));
+        foreach (var n in G.pages.OrderBy(x => x)) Btn(pr, "Page " + n, () => Dialogue("Agathe's log", new List<string> { Story.PageText(n) }, () => Satchel("log")));
         Lbl(rc, $"Prior's tide tables ({G.tables.Count}/4)", 6, INK_SOFT, caps: true);
         var tr2 = new HFlowContainer(); tr2.AddThemeConstantOverride("h_separation", 3); rc.AddChild(tr2);
         if (G.tables.Count == 0) Lbl(tr2, "No tables yet.", 5, INK_SOFT, italic: true);

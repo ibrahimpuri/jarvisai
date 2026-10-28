@@ -84,6 +84,7 @@ The game saves when you rest or save at a Bell Room. Continue from the title scr
 - **The Mere's Hollow** (`Hollow.cs`), a relic the sea gives Maren on the Long Pier, with four water verses on an energy bar. See [The Mere's Hollow](#the-meres-hollow).
 - **A guide, a journal and a new chart** (`Guide.cs`, `Chart.cs`): the next main objective on the HUD, in the world, in the journal and on a hand-drawn chart with the route marked. See [The guide](#the-guide-the-journal-and-the-chart).
 - **Combat tuned so Maren is the prey**, and **two Act III legendary weapons**, the Burning Glass and the Saint's Tine (`Legend.cs`), with the sea's hold on her and a fourth ending, Host of the Mere. See [Maren is the prey](#maren-is-the-prey), [The last night](#the-last-night-the-burning-glass-and-the-saints-tine) and [godot/docs/COMBAT.md](godot/docs/COMBAT.md).
+- **Four crossings and a true ending** (`Difficulty.cs`): one difficulty table from Pilgrim (seven pips, three rivets to a Shucker) to Drowned, and an unlockable Mere-Saint crossing whose hidden lullaby opens a fifth ending and a glimpse of part II. See [The crossings](#the-crossings-the-mere-saint-and-the-true-ending).
 - **Climbing that works on a pad** (`Player.cs`, `Inp.cs`): Cross climbs ladders, a softer stick, the d-pad on ladders, a mid-air catch, a ledge grab that respects the level's walls, and smaller movement fixes. See [Climbing and movement](#climbing-and-movement).
 - **Handmade menus grown over by the sea** (`MenuArt.cs`, `MenuWidgets.cs`, `UiTitle.cs`, `UiSatchel.cs`, `UiBell.cs`): every menu drawn as driftwood, slate, planks, parchment or stone with kelp, wrack, barnacles and salt over its edges, and a satchel, crafting page, upgrade bench and item box modelled on the Resident Evil remakes. See [The menus](#the-menus) and [godot/docs/MENUS.md](godot/docs/MENUS.md).
 - **Lighting and depth** (`LightingManager.cs`, `shaders/world.gdshader`). Direct light from every lamp, fire and the lantern with 2D shadows, shading painted relief (each brick turns toward the light, wet stone below the tide line glints); indirect light as a sky/ground hemisphere plus a bounce buffer every lamp splats into, so light spills round corners and warms whatever stands near a fire; a key light per region (the moon outdoors, with shadows). Each region has a mood (ambient, key light, fog, wetness, depth of field and a colour grade) that blends over a few seconds when you cross into the next. Fog with a body hangs between the depths and the play, lit from inside by the lamps, with light shafts falling at the region's angle and dust turning in them; in front of it the ruin's own bones stand in near-black silhouette (the vault's broken ribs and piers, a candle corona on its chains, the Saltworks' pipes and hoists, the Saint's spine); the depths darken toward the vault and are out of focus, as is the foreground, which thins to a window wherever it would hide Maren; and bloom lets every lamp glow into the air. See [the graphics blueprint](godot/docs/GRAPHICS.md).
@@ -180,6 +181,17 @@ Every menu is made from the island and the sea has grown over it: kelp hangs fro
 
 [godot/docs/MENUS.md](godot/docs/MENUS.md) has the details and the sources.
 
+## The crossings, the Mere-Saint and the true ending
+
+Difficulty is one table now, and the crossings differ a lot.
+- **Pilgrim:** Maren has seven pips and a Shucker falls to three rivets. Scrap makes three rivets and a poultice restores three pips. She heals while nothing hunts her, the knots glint in the dark, hints come quickly and she keeps her satchel when she dies.
+- **Keeper:** the island as it was made: five pips, seven rivets.
+- **Drowned:** four pips and nine rivets. The drowned are faster, some blows land harder, and every save costs a tallow candle.
+
+The crossing screen shows each one's numbers.
+
+Finishing the night once, any way, wakes a fourth crossing, the **Mere-Saint**. The Saint is awake under the island and listening: ten rivets to a Shucker, the hardest blows, sharper hearing and a faster tide. On that crossing Agathe's nine pages each carry a line of the lullaby she sang Maren in their margins. Find them all, and the lullaby turns out to be the seventh verse of the Choir's hymn. Agathe's music box then appears at the lamp, and opens the true ending, **The Seventh Verse**, followed by a glimpse of part II. [godot/docs/DIFFICULTY.md](godot/docs/DIFFICULTY.md) has the whole table and the story (spoilers).
+
 ## Climbing and movement
 
 Climbing was the worst of the controls on a PlayStation pad. Cross at a ladder now climbs it, and holding Cross keeps climbing. A third of a push up on the stick climbs, a stick that leans a little no longer drops her off, the d-pad climbs while she is on a ladder, and holding jump in the air catches one. A jump that only just reaches a ledge catches the lip and pulls her up onto it. The grab only catches lips her last jump could have reached anyway, so the island's 4-tile walls still need a ladder, a rope, timber or the tide.
@@ -270,10 +282,10 @@ Every core system in the design document is implemented and wired together:
 - **Build choices.** Seven fittings under a Pressure Rating raised by six Brass Seals. Three Brine Grafts, each with its own vulnerability; Ansel can cut one out once at the cost of a health pip. Four weapons with three behaviour-changing tiers paid in scrap and Mere-ivory.
 - **Traversal.** Gaff Swing, Ballast Boots (sink through buoyant brine, stomp), Jet Valve, Tide Key, Pressure Seal (the Gullet's pressure won't let an unsealed suit dive) and Saltsight Lens.
 - **World.** Seven regions, 26 hand-built rooms, six Bell Rooms. Puzzles: Sluice Ladder barge, Hymn of Hours, Tuned Bells (the Tide Key becomes a tuning fork), Lamp Prisms (bend the focused beam) and Dead Weight (drag knotless bodies onto the lift).
-- **RPG layer.** Four NPCs (Ansel, Odile, Hesper, Agathe). Four quests with physical consequences: Lines Gone Slack, The Choir's Water, The Prior's Tables and A Keeper's Log. The Brine breaches a Bell Room in Act III. Three endings: Relight the Lamp, The Saint's Hymn and Keeper's Dark, each gated as the design describes.
+- **RPG layer.** Four NPCs (Ansel, Odile, Hesper, Agathe). Four quests with physical consequences: Lines Gone Slack, The Choir's Water, The Prior's Tables and A Keeper's Log. The Brine breaches a Bell Room in Act III. Three endings: Relight the Lamp, The Saint's Hymn and Keeper's Dark, each gated as the design describes. The Godot edition adds a fourth, Host of the Mere, and a true ending, The Seventh Verse, on the Mere-Saint crossing.
 - **Fairness and tension.** A pacing valve after fights, readable dormancy (true corpses have no knots), adaptive encrustation (new bodies grow plates over the knot type you break most, always leaving two open, and Ansel remarks on it), tells before damage, and the logbook map that only records water lines for tide phases you have seen.
 - **The opening.** The Breakers teach movement without words (see above). Then the Wrackline and the Tithe Hall set piece play as written: the first Shucker stands when the water reaches it, lifting the crank tolls the bell and floods the hall, you escape by chandelier rings to the gallery, and the Undertow passes behind the glass.
-- **Difficulty.** Pilgrim, Keeper and Drowned, plus a separate 100% / 150% / 200% tide-length setting.
+- **Difficulty.** Pilgrim, Keeper and Drowned, plus a separate 100% / 150% / 200% tide-length setting. The Godot edition reads them from one table (`Difficulty.cs`) and adds the Mere-Saint, unlocked by finishing the night.
 
 ## Scope compared with the document
 

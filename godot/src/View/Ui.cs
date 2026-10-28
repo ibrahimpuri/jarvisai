@@ -26,7 +26,7 @@ public static class UI
     public static void Inscription(string title, string text, Action done = null) => Inst?.Inscription(title, text, done);
     public static void Cinematic(List<string> lines, Action done, string first = null) => Inst?.Cinematic(lines, done, first);
     public static void Death(string title, string line, string detail, Action onWake) => Inst?.Death(title, line, detail, onWake);
-    public static void Ending(string title, List<string> paras, string stats, List<string> fates) => Inst?.Ending(title, paras, stats, fates);
+    public static void Ending(string title, List<string> paras, string stats, List<string> fates, bool glimpse = false) => Inst?.Ending(title, paras, stats, fates, glimpse);
     public static void Close() => Inst?.Close();
     public static bool CinematicOpen => Inst != null && Inst.cine != null;
     public static string Kind => Inst?.kind;
@@ -520,7 +520,7 @@ public partial class UiRoot : CanvasLayer
 
     // ---- end screens -----------------------------------------------------------------------------
     // After the last line of an ending: an epitaph on a page of the Keeper's log.
-    public void Ending(string title, List<string> paras, string stats, List<string> fates)
+    public void Ending(string title, List<string> paras, string stats, List<string> fates, bool glimpse = false)
     {
         void PanelView()
         {
@@ -534,7 +534,10 @@ public partial class UiRoot : CanvasLayer
             if (fates != null && fates.Count > 0) { InkRule(c); Lbl(c, "Afterwards", 6, INK_SOFT, caps: true); foreach (var t in fates) Lbl(c, t, 5, INK); }
             InkRule(c);
             Lbl(c, stats, 5, INK_SOFT, italic: true, center: true);
-            Btn(Row(c, true), "Return to title", () => { Close(); G.ToTitle(); }, primary: true);
+            // the first night finished wakes the Saint: a new crossing on the title screen
+            if (Profile.JustUnlocked) Lbl(c, "Far below the island, something has opened its eye. The Mere-Saint crossing waits on the title screen.", 5, H.Col("#2f6f66"), italic: true, center: true);
+            if (glimpse) Btn(Row(c, true), "Turn the page", Glimpse, primary: true);
+            else Btn(Row(c, true), "Return to title", () => { Close(); G.ToTitle(); }, primary: true);
             FocusFirst();
         }
         var lines = new List<string> { title }; lines.AddRange(paras); if (fates != null) lines.AddRange(fates);
@@ -631,23 +634,139 @@ public partial class UiRoot : CanvasLayer
         var f = Footer(c, ("confirm", "close")); f.Align = 1;
     }
 
+    // ---- the glimpse ---------------------------------------------------------------------------------------
+    // After the true ending: nine nights later, from the lamp gallery. The beam swings out over a flat sea and finds a
+    // light where there is no land, answering it; far below, something enormous turns over in its sleep.
+    public void Glimpse()
+    {
+        var S = Data.Lore.P("saint");
+        Cinematic(S.Strings("glimpse"), GlimpseTitle, "glimpse");
+    }
+    void GlimpseTitle()
+    {
+        var q = Data.Lore.P("saint").P("sequel");
+        Show("glimpse");
+        dim.Dim = 0; dim.Kelp = false; dim.Shafts = false;
+        var v = new Painted(GlimpseVista, Vector2.Zero); v.SetAnchorsPreset(Control.LayoutPreset.FullRect); root.AddChild(v); root.MoveChild(v, 0);
+        var center = new CenterContainer(); center.SetAnchorsPreset(Control.LayoutPreset.FullRect); root.AddChild(center);
+        var col = new VBoxContainer { CustomMinimumSize = new Vector2(360, 0) }; col.AddThemeConstantOverride("separation", 4);
+        center.AddChild(col);
+        col.AddChild(new Control { CustomMinimumSize = new Vector2(0, 90) });
+        var n = Lbl(col, q.S("name"), 18, GOLD, center: true, caps: true);
+        n.AddThemeColorOverride("font_shadow_color", new Color(0, 0, 0, 0.9f)); n.AddThemeConstantOverride("shadow_offset_y", 2);
+        Lbl(col, q.S("part"), 7, H.Col("#9fe0d0"), center: true, caps: true);
+        var t = Lbl(col, q.S("title"), 11, H.Col("#bff0e4"), center: true, caps: true);
+        t.AddThemeColorOverride("font_shadow_color", new Color(0.2f, 0.8f, 0.7f, 0.35f)); t.AddThemeConstantOverride("shadow_outline_size", 4);
+        Rule(col);
+        Lbl(col, q.S("tag"), 6, H.Col("#c8c0a8"), italic: true, center: true);
+        col.AddChild(new Control { CustomMinimumSize = new Vector2(0, 8) });
+        Btn(Row(col, true), "Return to title", () => { Close(); G.ToTitle(); }, primary: true);
+        FocusFirst();
+    }
+    static void GlimpseVista(Canvas c, Vector2 sz, float t)
+    {
+        float W = sz.X, Hh = sz.Y, hz = Hh * 0.42f;
+        Color skyTop = H.Col("#03060a"), skyLow = H.Col("#0b1820");
+        // the sky and its stars, a thin moon
+        c.FillRectGradV(0, 0, W, hz, skyTop, skyLow);
+        for (int i = 0; i < 90; i++)
+        {
+            float a = 0.25f + 0.55f * MathF.Abs(MathF.Sin(t * (0.3f + TileArt.Hash(i, 3)) + i)), sy = TileArt.Hash(i, 2) * hz * 0.85f;
+            float r = TileArt.Hash(i, 4) > 0.9f ? 1.1f : 0.6f;
+            c.FillRect(TileArt.Hash(i, 1) * W, sy, r, r, new Color(0.85f, 0.9f, 1, a * (0.7f - 0.5f * sy / hz)));
+        }
+        float mx = W * 0.78f, my = hz * 0.32f;
+        c.Glow(mx, my, 34, new Color(0.7f, 0.8f, 0.85f, 0.06f));
+        c.Fill = new Color(0.86f, 0.88f, 0.8f, 0.85f); c.BeginPath(); c.Arc(mx, my, 9, 0, H.PI * 2); c.FillPath();
+        // the bite out of the moon is the sky behind it, so it leaves no ring
+        c.Fill = skyTop.Lerp(skyLow, my / hz); c.BeginPath(); c.Arc(mx + 4, my - 2, 9, 0, H.PI * 2); c.FillPath();
+        // the sea, flat and grey and ordinary: a haze on the horizon, and the swell in rows that widen toward her
+        c.FillRectGradV(0, hz, W, Hh - hz, H.Col("#0b181c"), H.Col("#020507"));
+        c.FillRectGradV(0, hz - 6, W, 10, new Color(0.3f, 0.42f, 0.45f, 0), new Color(0.3f, 0.42f, 0.45f, 0.12f));
+        for (int i = 0; i < 170; i++)
+        {
+            float d = TileArt.Hash(i, 5), y = hz + 2 + d * d * (Hh - hz - 30), near = (y - hz) / (Hh - hz);
+            float len = 4 + near * 34 * (0.5f + TileArt.Hash(i, 6)), drift = t * (2 + near * 9);
+            float x = ((TileArt.Hash(i, 7) * (W + 80) + drift) % (W + 80)) - 40;
+            float a = (0.035f + near * 0.05f) * (0.6f + 0.4f * MathF.Sin(t * 0.8f + i));
+            c.FillRect(x, y, len, 0.5f + near * 0.5f, new Color(0.55f, 0.7f, 0.72f, a));
+        }
+        // the moon's road across the water, broken by the swell
+        for (int i = 0; i < 26; i++)
+        {
+            float y = hz + 2 + i * i * 0.3f, near = (y - hz) / (Hh - hz), w = 3 + near * 26;
+            float x = mx - w / 2 + MathF.Sin(t * 0.9f + i * 1.7f) * (2 + near * 8);
+            c.FillRect(x, y, w * (0.4f + 0.6f * TileArt.Hash(i, 8)), 0.7f, new Color(0.8f, 0.85f, 0.8f, 0.1f * (1 - near * 0.7f)));
+        }
+        // far below: something enormous, with too many ribs, turning over in its sleep
+        float roll = MathF.Sin(t * 0.07f), wx = W * 0.5f + MathF.Sin(t * 0.05f) * 50, wy = Hh * 0.79f, half = W * 0.36f;
+        c.Glow(wx, wy, W * 0.46f, Hh * 0.13f, new Color(0.15f, 0.5f, 0.46f, 0.07f + 0.02f * MathF.Sin(t * 0.6f)));
+        // its shadow: a long dark back, a little darker than the deep
+        var back = new List<Vector2>();
+        for (int i = 0; i <= 40; i++) { float u = i / 40f, x = wx - half + u * half * 2; back.Add(new Vector2(x, wy - MathF.Sin(u * H.PI) * (16 + 4 * roll) - u * 4)); }
+        for (int i = 40; i >= 0; i--) { float u = i / 40f, x = wx - half + u * half * 2; back.Add(new Vector2(x, wy + MathF.Sin(u * H.PI) * (12 - 3 * roll))); }
+        c.Fill = new Color(0, 0.02f, 0.03f, 0.5f); c.Poly(back.ToArray());
+        // the ribs, palely lit from inside: far too many, and they lean as it rolls
+        for (int i = 0; i < 23; i++)
+        {
+            float u = (i + 0.5f) / 23f, x = wx - half * 0.86f + u * half * 1.72f, h = MathF.Sin(u * H.PI) * (14 + 3 * roll) + 3;
+            float lean = roll * 5 + (u - 0.5f) * 6, a = 0.05f + 0.06f * MathF.Sin(u * H.PI) + 0.03f * MathF.Sin(t * 0.9f - i * 0.5f);
+            c.Stroke = new Color(0.45f, 0.85f, 0.76f, a); c.LineWidth = 0.9f;
+            c.BeginPath(); c.MoveTo(x, wy - h * 0.55f); c.QuadraticCurveTo(x + lean, wy, x + lean * 0.4f, wy + h * 0.7f); c.StrokePath();
+        }
+        c.Stroke = new Color(0.45f, 0.85f, 0.76f, 0.08f); c.LineWidth = 1.1f;
+        c.BeginPath(); c.MoveTo(back[0].X, back[0].Y); for (int i = 1; i <= 40; i++) c.LineTo(back[i].X, back[i].Y); c.StrokePath();
+        // and one eye, opening
+        float open = MathF.Max(0, MathF.Sin(t * 0.35f)), ex = wx + half * 0.8f, ey = wy - 5;
+        c.Glow(ex, ey, 9, new Color(0.5f, 1, 0.88f, 0.08f + 0.2f * open));
+        c.Fill = new Color(0.7f, 1, 0.92f, 0.15f + 0.5f * open); c.BeginPath(); c.Ellipse(ex, ey, 2.6f, 0.3f + 1.3f * open, 0, 0, H.PI * 2); c.FillPath();
+        // the beam from the lamp behind her, swinging out across the water
+        float ba = -0.08f + MathF.Sin(t * 0.25f) * 0.22f, bx = -10, by = hz - 26;
+        var tip1 = new Vector2(bx + MathF.Cos(ba - 0.05f) * W * 1.2f, by + MathF.Sin(ba - 0.05f) * W * 1.2f);
+        var tip2 = new Vector2(bx + MathF.Cos(ba + 0.05f) * W * 1.2f, by + MathF.Sin(ba + 0.05f) * W * 1.2f);
+        c.FillPolyGrad(new[] { new Vector2(bx, by - 3), tip1, tip2, new Vector2(bx, by + 3) },
+            new[] { new Color(1, 0.92f, 0.7f, 0.3f), new Color(1, 0.92f, 0.7f, 0), new Color(1, 0.92f, 0.7f, 0), new Color(1, 0.92f, 0.7f, 0.3f) });
+        // and out past the reef, where there is no land, a light answering it: three short, one long
+        float ph = t % 4.4f;
+        bool on = ph < 0.2f || (ph > 0.45f && ph < 0.65f) || (ph > 0.9f && ph < 1.1f) || (ph > 1.5f && ph < 2.5f);
+        float lx = W * 0.83f, ly = hz - 1;
+        if (on)
+        {
+            c.Glow(lx, ly, 16, new Color(0.6f, 1, 0.9f, 0.5f)); c.Fill = new Color(0.85f, 1, 0.95f); c.FillCircle(lx, ly, 1.3f);
+            for (int i = 0; i < 6; i++) c.FillRect(lx - 1.5f + MathF.Sin(t * 3 + i) * 0.8f, ly + 2.5f + i * 2.2f, 3 - i * 0.35f, 0.6f, new Color(0.6f, 1, 0.9f, 0.3f - i * 0.04f));
+        }
+        else { c.Glow(lx, ly, 5, new Color(0.6f, 1, 0.9f, 0.08f)); c.Fill = new Color(0.6f, 1, 0.9f, 0.3f); c.FillCircle(lx, ly, 0.6f); }
+        // the gallery rail she stands at, black against it all
+        c.Fill = H.Col("#010203"); c.FillRect(0, Hh - 26, W, 3);
+        for (float x = 6; x < W; x += 22) c.FillRect(x, Hh - 26, 2.4f, 26);
+        c.FillRect(0, Hh - 6, W, 6);
+        c.FillRect(0, Hh - 26, W, 0.6f, new Color(0.9f, 0.8f, 0.6f, 0.05f));
+        // a darker band where the words sit
+        c.FillRectGradV(0, Hh * 0.38f, W, Hh * 0.12f, new Color(0, 0, 0, 0), new Color(0, 0, 0, 0.45f));
+        c.FillRectGradV(0, Hh * 0.5f, W, Hh * 0.12f, new Color(0, 0, 0, 0.45f), new Color(0, 0, 0, 0));
+    }
+
     // Black-screen text, one line at a time. Confirm or a click advances; cancel skips.
     public void Cinematic(List<string> lines, Action done, string first = null)
     {
         Show("cinematic");
         dim.Dim = 1; dim.Tint = Colors.Black; dim.Kelp = false; dim.Shafts = false;
         cine = new Cine { lines = lines.Where(l => !string.IsNullOrEmpty(l)).ToList(), done = done, first = first };
+        if (first == "glimpse") { var v = new Painted(GlimpseVista, Vector2.Zero); v.SetAnchorsPreset(Control.LayoutPreset.FullRect); root.AddChild(v); }
         var center = new CenterContainer();
         center.SetAnchorsPreset(Control.LayoutPreset.FullRect);
         root.AddChild(center);
         var label = new Label { AutowrapMode = TextServer.AutowrapMode.WordSmart, HorizontalAlignment = HorizontalAlignment.Center, CustomMinimumSize = new Vector2(253, 0) };
         center.AddChild(label);
         cine.label = label;
-        var skip = new RichLabel(() => "{confirm} continue     {cancel} skip", 4, H.Col("#5a5446"), 2);
-        root.AddChild(skip);
-        skip.SetAnchorsPreset(Control.LayoutPreset.BottomRight);
-        skip.GrowHorizontal = Control.GrowDirection.Begin; skip.GrowVertical = Control.GrowDirection.Begin;
-        skip.OffsetRight = -10; skip.OffsetBottom = -8;
+        // the prompt sits in the bottom-right corner, out of the words' way
+        var corner = new MarginContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
+        corner.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
+        corner.AddThemeConstantOverride("margin_right", 10); corner.AddThemeConstantOverride("margin_bottom", 8);
+        root.AddChild(corner);
+        var skip = new RichLabel(() => "{confirm} continue     {cancel} skip", 4, H.Col("#5a5446"), 2)
+        { SizeFlagsHorizontal = Control.SizeFlags.ShrinkEnd, SizeFlagsVertical = Control.SizeFlags.ShrinkEnd };
+        corner.AddChild(skip);
         NextCine();
     }
     void NextCine()

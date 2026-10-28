@@ -331,6 +331,14 @@ public static class Legend
     {
         lances.Clear(); burning.Clear(); beaming = false;
         if (r.Id == "lamp" && HostReady) SpawnWindow(r);
+        if (r.Id == "lamp" && Story.VerseReady) SpawnMusicBox(r);
+    }
+    // On the Mere-Saint crossing, with all nine pages, Agathe's music box stands open by the lamp.
+    public static void SpawnMusicBox(RoomDef r)
+    {
+        if (G.ents.Any(e => e is MusicBox)) return;
+        var s = Props.Empty(); s.Set("type", "musicbox"); s.Set("x", r.Px + 20 * H.TILE + 8); s.Set("y", r.Py + 17 * H.TILE); s.Set("key", "music_box");
+        G.ents.Add(new MusicBox(s, r));
     }
     static void SpawnWindow(RoomDef r)
     {
@@ -575,5 +583,38 @@ public class SeaWindow : Obj
         c.Fill = H.Col("#3a342a"); c.FillRect(x0 - 3, y0 + hh + 4, ww + 6, 3);
         c.Fill = new Color(0.5f, 0.75f, 0.75f, 0.5f); c.FillRect(x0 - 2, y0 + hh + 4, ww + 4, 0.7f);
         c.Glow(Cx(), y0 + 30, 30, new Color(0.2f, 0.6f, 0.55f, 0.12f));
+    }
+}
+
+// Agathe's music box: Mere-ivory, its lid carved with the lamp and a little boat, the tune it plays the lullaby she sang
+// Maren. On the Mere-Saint crossing, with all nine pages read, it is how the seventh verse is sung.
+public class MusicBox : Obj
+{
+    public MusicBox(Props spec, RoomDef room) : base(spec, room) { w = 12; h = 9; x = spec.F("x") - 6; y = spec.F("y") - 9; }
+    public override string Prompt() => "{interact} " + Data.Lore.P("saint").S("box") + ": sing the seventh verse";
+    public override bool Near(Player p) => NearR(p, 16);
+    public override void Interact() => Story.Ending("verse");
+    public override Props Serialize() => null;
+    public override LightSrc Light() => new() { x = Cx(), y = y, r = 46, i = 0.45f, color = "120,220,200" };
+    public override void Draw(Canvas c)
+    {
+        float t = G.Now, x0 = x, y0 = y;
+        // the box, its lid open, a comb of brass and a turning drum
+        c.Fill = H.Col("#d9ccae"); c.FillRect(x0, y0 + 3, w, h - 3);
+        c.Fill = H.Col("#b8a888"); c.FillRect(x0, y0 + h - 2, w, 2);
+        c.Save(); c.Translate(x0 + 1, y0 + 3); c.Rotate(-1.1f);
+        c.Fill = H.Col("#e8dcc0"); c.FillRect(0, -1.2f, w - 1, 1.6f);
+        c.Restore();
+        c.Fill = H.Col("#8a6a3a"); c.FillRect(x0 + 2, y0 + 4, w - 4, 1);
+        c.Fill = H.Col("#c0a060"); for (int i = 0; i < 5; i++) c.FillRect(x0 + 3 + i * 1.5f, y0 + 5, 0.6f, 2);
+        // the tune, rising off it as little sea-green notes
+        for (int i = 0; i < 4; i++)
+        {
+            float ph = (t * 0.4f + i / 4f) % 1;
+            c.Fill = new Color(0.55f, 0.9f, 0.82f, 0.7f * (1 - ph));
+            float nx = x0 + w / 2 + MathF.Sin(t * 1.5f + i * 2) * 6, ny = y0 - ph * 26;
+            c.FillCircle(nx, ny, 1.1f); c.FillRect(nx + 0.8f, ny - 3.2f, 0.5f, 3.2f);
+        }
+        c.Glow(Cx(), y0 + 4, 14, new Color(0.5f, 0.9f, 0.8f, 0.2f + 0.08f * MathF.Sin(t * 2)));
     }
 }

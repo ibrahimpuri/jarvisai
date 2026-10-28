@@ -11,7 +11,7 @@ public static class Noise
     public static void Emit(float x, float y, float metres, string src)
     {
         if (G.ents == null) return;
-        float r = metres * H.TILE;
+        float r = metres * H.TILE * Diff.C.hearing;
         G.noiseRings.Add(new G.Ring { x = x, y = y, r = r, t = 0.5f });
         foreach (var e in G.ents.ToArray())
             if (e.Hears && !e.dead)

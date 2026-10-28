@@ -42,8 +42,10 @@ public partial class UiRoot
         if (save.HasValue)
         {
             var (bell, act, time, diff) = save.Value;
-            Lbl(foot, $"Last rang the bell at {bell} · Act {new string('I', act)} · {Clock(time)} on the island · {char.ToUpper(diff[0]) + diff[1..]}", 5, H.Col("#b0a080"), italic: true);
+            Lbl(foot, $"Last rang the bell at {bell} · Act {new string('I', act)} · {Clock(time)} on the island · {Diff.Get(diff).name}", 5, H.Col("#b0a080"), italic: true);
         }
+        if (Profile.SawTrueEnding) Lbl(foot, "The seventh verse has been sung. Somewhere far out at sea, something heard it.", 5, H.Col("#8fd8c8"), italic: true);
+        else if (Profile.SaintUnlocked) Lbl(foot, "Far below the island, the Saint is awake. A new crossing waits.", 5, H.Col("#8fd8c8"), italic: true);
         Lbl(foot, "Keyboard and mouse, or an Xbox, PlayStation or Switch controller. Best with headphones, in the dark.", 4, MUTED);
         Lbl(foot, PadLine(), 4, MUTED);
         FocusFirst();
@@ -182,31 +184,43 @@ public partial class UiRoot
         vista.SetAnchorsPreset(Control.LayoutPreset.FullRect);
         root.AddChild(vista);
         root.MoveChild(vista, 0);
-        var c = Panel(286);
+        var c = Panel(340);
         H2(c, "The crossing");
         Lbl(c, "The tide redraws the map every ten minutes, and brings the dead back with it.", 5, MUTED, italic: true);
         Rule(c);
         H3(c, "How hard the night");
-        var r = Row(c, true); r.AddThemeConstantOverride("separation", 8);
-        foreach (var (id, name) in new[] { ("pilgrim", "Pilgrim"), ("keeper", "Keeper"), ("drowned", "Drowned") })
+        if (Diff.Get(difficulty).earned && !Profile.SaintUnlocked) difficulty = "keeper";
+        var r = Row(c, true); r.AddThemeConstantOverride("separation", 7);
+        foreach (var cr in Diff.ALL)
         {
-            string emblem = id;
-            var b = Btn(r, name, () => { difficulty = emblem; Voyage(); }, style: MenuArt.Btn.Flat, selected: difficulty == id);
-            Card(b, 70, 62, difficulty == id, (cv, w, h, st) =>
+            string emblem = cr.id;
+            bool locked = cr.earned && !Profile.SaintUnlocked;
+            var b = Btn(r, locked ? "Asleep" : cr.name, () =>
+            {
+                if (locked) { H.ToastMsg("Finish the night once, any way you can, and the Saint wakes.", 3); Snd.Deny(); return; }
+                difficulty = emblem; Voyage();
+            }, style: MenuArt.Btn.Flat, selected: difficulty == cr.id);
+            Card(b, 70, 62, difficulty == cr.id, (cv, w, h, st) =>
             {
                 float cx = w / 2, cy = 22;
-                if (emblem == "pilgrim") MenuArt.Candle(cv, cx, cy + 3, 13, MenuArt.Now, difficulty == emblem || st > 0 ? 1 : 0.5f);
-                else if (emblem == "keeper") MenuArt.Lantern(cv, cx, cy + 2, 10, MenuArt.Now, difficulty == emblem || st > 0 ? 1 : 0.45f, 2);
-                else MenuArt.Skull(cv, cx, cy, 12, MenuArt.Now, 6);
+                bool hot = difficulty == emblem || st > 0;
+                if (emblem == "pilgrim") MenuArt.Candle(cv, cx, cy + 3, 13, MenuArt.Now, hot ? 1 : 0.5f);
+                else if (emblem == "keeper") MenuArt.Lantern(cv, cx, cy + 2, 10, MenuArt.Now, hot ? 1 : 0.45f, 2);
+                else if (emblem == "drowned") MenuArt.Skull(cv, cx, cy, 12, MenuArt.Now, 6);
+                else MenuArt.SaintEye(cv, cx, cy, 17, MenuArt.Now, !locked);
             });
-            if (difficulty == id) FocusOn(b);
+            if (difficulty == cr.id) FocusOn(b);
         }
-        Lbl(c, difficulty switch
-        {
-            "pilgrim" => "For the story. More scrap in the wrecks, a slower tide, and the dead hit softer.",
-            "keeper" => "As the island was made. The tide is fair and the dead are not.",
-            _ => "Every save costs a tallow candle. Fewer things wash up, and the drowned hit hard.",
-        }, 6, TEXT, italic: true, center: true);
+        var cur = Diff.Get(difficulty);
+        Lbl(c, cur.line, 6, TEXT, italic: true, center: true);
+        // the night in numbers, so the crossings can be told apart at a glance
+        float minutes = 10 * tide * cur.tide;
+        string facts = $"Maren {cur.pips} pips  ·  a Shucker falls to {Diff.ShuckerRivets(cur)} rivets  ·  a tide every {minutes:0.#} min  ·  {cur.rivetsPerScrap} rivets a scrap";
+        if (cur.regen > 0) facts += "  ·  heals while safe";
+        if (cur.keepSatchel) facts += "  ·  satchel kept on death";
+        if (cur.saveCost) facts += "  ·  saving costs tallow";
+        Lbl(c, facts, 5, cur.earned ? H.Col("#8fd8c8") : MUTED, caps: true, center: true);
+        if (cur.earned && !Profile.SawTrueEnding) Lbl(c, "Something under the island has been waiting a long time for a Hult to hear it.", 5, H.Col("#8fd8c8"), italic: true, center: true);
         Rule(c);
         H3(c, "How long the tides");
         var r2 = Row(c, true);
@@ -421,7 +435,7 @@ public partial class UiRoot
         Footer(c, ("confirm", "choose"), ("cancel", "resume"));
         // the night so far, on a scrap of chart
         var n = Sheet(410, 236, 204, 0, MenuArt.Look.Parchment, 0.7f);
-        Lbl(n, $"Act {new string('I', G.act)} · {Tide.PhaseName()} tide, {H.FmtTime(Tide.PhaseRemaining())} left", 5, INK_SOFT, caps: true);
+        Lbl(n, $"Act {new string('I', G.act)} · {Diff.C.name} · {Tide.PhaseName()} tide, {H.FmtTime(Tide.PhaseRemaining())} left", 5, INK_SOFT, caps: true);
         var step = Guide.Current;
         if (step != null)
         {

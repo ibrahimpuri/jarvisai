@@ -65,9 +65,6 @@ public class Player : Mover
     public Player() { w = 10; h = 22; stepUp = true; bag.Add("rivets", 12); bag.Add("poultice", 1); }
 
     public bool Has(string a) => abilities.Contains(a);
-    // She is the prey here. On the gentlest crossing (Pilgrim) she keeps the old margins: longer grace after a hit,
-    // a longer dodge.
-    static bool Gentle => G.difficulty == "pilgrim";
     public bool HasFitting(string f) => fittings.Contains(f);
     public bool Invuln() => invulnT > 0 || (dashT > 0 && dashInv > 0);
     public int WeaponTier(string wn) => weapons.TryGetValue(wn, out var ws) ? ws.tier : 0;
@@ -106,9 +103,12 @@ public class Player : Mover
         if (dead || Invuln() || G.god) return;
         if (inBellRoom) return;
         if (HasFitting("lead") && n >= 2) n -= 1;
-        if (G.difficulty == "drowned" && n >= 1 && H.Rand() < 0.15f) n += 1;
+        // the crossing: on the gentlest, heavy blows land softer; on the hardest, some land harder
+        var C = Diff.C;
+        if (C.softHeavy && n >= 2) n -= 1;
+        if (n >= 1 && C.extraHit > 0 && H.Rand() < C.extraHit) n += 1;
         hp -= n;
-        invulnT = Gentle ? 0.9f : 0.6f;
+        invulnT = C.grace; regenT = 0;
         Snd.Hurt(); G.Shake(3); G.flash = 0.25f; G.HitStop(0.07f);
         Gore.Bleed(Cx(), Cy(), src?.Cx() ?? Cx() - facing);
         // A hit cancels the remainder of a poultice; interrupts a Stitch Kit.
@@ -122,7 +122,7 @@ public class Player : Mover
             if (grafts.Contains("arm") && n >= 2) { gaffLooseT = 2; H.ToastMsg("The crusted wrist jolts. The gaff slips loose!", 1.5f); }
             vx = H.Sign(Cx() - src.Cx()) * (n >= 2 ? 190 : 140); if (!InWater()) vy = -150;
             // a heavy blow knocks the wind out of her
-            if (n >= 2 && !Gentle) staggerT = MathF.Max(staggerT, 0.3f);
+            if (n >= 2 && !C.softHeavy) staggerT = MathF.Max(staggerT, 0.3f);
         }
         G.AddSwell(0.5f);
         if (hp <= 0) { hp = 0; G.OnPlayerDeath(); }
@@ -132,7 +132,7 @@ public class Player : Mover
         if (grabbedBy != null || Invuln() || dead || state == "swing" || G.god) return false;
         grabbedBy = enemy; state = "grabbed";
         bool cracked = enemy.knots.Any(k => (k.type == "elbow" || k.type == "arm") && k.hp < k.max);
-        mash = Gentle ? (cracked ? 3 : 6) : (cracked ? 4 : 8);
+        mash = cracked ? (Diff.C.mash + 1) / 2 : Diff.C.mash;
         healT = 0; reloadT = 0; craftT = 0;
         if (dragging != null) StopDrag();
         H.ToastMsg("Grabbed! Mash {mash} to break free.", 2);
@@ -163,6 +163,7 @@ public class Player : Mover
         if (state != "swing" && dragging == null && !Locked()) facing = MathF.Cos(aim) >= 0 ? 1 : -1;
 
         if (grabbedBy != null) { UpdateGrabbed(dt); return; }
+        Recover(dt);
         UpdateLantern(dt);
         UpdateTimers(dt);
 
@@ -191,6 +192,17 @@ public class Player : Mover
     }
     bool BootsBrine() => boots && World.IsBrine(Cx(), Cy());
 
+    // On the gentlest crossing she gets her breath back: a pip at a time, while nothing is hunting her.
+    float regenT;
+    void Recover(float dt)
+    {
+        float every = Diff.C.regen;
+        if (every <= 0 || hp >= maxHp || healT > 0) { regenT = 0; return; }
+        if (G.ents.OfType<Body>().Any(b => b.Alive() && !b.corpse && !b.passive && b.mode is "hunt" or "windup" or "attack" or "grab" && H.Dist(b.Cx(), b.Cy(), Cx(), Cy()) < 320)) { regenT = 0; return; }
+        regenT += dt;
+        if (regenT >= every) { regenT = 0; hp++; Snd.Heal(); }
+    }
+
     // ---- pad aim ----------------------------------------------------------------------
     // The right stick points the aim; the gyro nudges it like a mouse. With the stick left alone,
     // Maren aims where she walks, and a gentle pull settles the aim on a knot or a barrel.
@@ -212,7 +224,7 @@ public class Player : Mover
         if (len < 20) padVec = len < 0.01f ? new Vector2(facing * 20, 0) : padVec / len * 20;
         else if (len > 160) padVec = padVec / len * 160;
         float a = MathF.Atan2(padVec.Y, padVec.X);
-        return Settings.AimAssist ? Assist(a, manual || Settings.Gyro ? 0.18f : 0.32f) : a;
+        return Settings.AimAssist ? Assist(a, (manual || Settings.Gyro ? 0.18f : 0.32f) * Diff.C.assist) : a;
     }
     public float Assist(float a, float cone)
     {
@@ -249,7 +261,7 @@ public class Player : Mover
         if (craftT > 0)
         {
             craftT -= dt;
-            if (craftT <= 0) { var rc = craftRecipe; bag.Pay(rc.Counts("cost")); bag.Add(rc.S("makes"), rc.I("n")); Snd.Craft(); H.ToastMsg($"Crafted {rc.I("n")} {Data.ItemName(rc.S("makes"))}.", 2); }
+            if (craftT <= 0) { var rc = craftRecipe; int made = Diff.Yield(rc); bag.Pay(rc.Counts("cost")); bag.Add(rc.S("makes"), made); Snd.Craft(); H.ToastMsg($"Crafted {made} {Data.ItemName(rc.S("makes"))}.", 2); }
         }
         if (healT > 0)
         {
@@ -304,7 +316,7 @@ public class Player : Mover
     void UpdateLantern(float dt)
     {
         focusing = (Inp.mouse.r || Inp.Held("focus")) && !shut && oil > 0;
-        if (!shut && oil > 0 && !inBellRoom) oil -= dt * (focusing ? 1 : 0.5f) * (G.room.BellRoom ? 0 : 1);
+        if (!shut && oil > 0 && !inBellRoom) oil -= dt * (focusing ? 1 : 0.5f) * (G.room.BellRoom ? 0 : 1) * Diff.C.oil;
         if (oil <= 0)
         {
             oil = 0;
@@ -750,8 +762,8 @@ public class Player : Mover
         dashVy = dy * sp; dashAir = inAir || water;
         dashT = inAir || water ? 0.22f : 0.15f;
         // the suit is heavy: a short window, and a long breath before the next
-        dashInv = Gentle ? 0.2f : 0.12f; hazardT = 0.3f;
-        dashCool = Gentle ? 0.5f : 0.75f;
+        dashInv = Diff.C.dodge; hazardT = 0.3f;
+        dashCool = Diff.C.dodgeCool;
         if (!inAir && !water) FX.Dust(Cx(), y + h, 6, -dx);
         Snd.Jump();
     }
@@ -1045,7 +1057,7 @@ public class Player : Mover
         if (hp >= maxHp) { H.ToastMsg("You are not hurt.", 1); return; }
         bag.Remove("poultice", 1);
         healKind = "poultice"; healT = 4;
-        healTotal = healLeft = 2 + (HasFitting("bilge") ? 1 : 0);
+        healTotal = healLeft = Diff.C.poultice + (HasFitting("bilge") ? 1 : 0);
         healTick = 4f / healTotal;
         Snd.Heal(); Hints.Did("poultice");
     }
@@ -1063,7 +1075,7 @@ public class Player : Mover
         if (rc == null || craftT > 0 || Locked()) return false;
         string makes = rc.S("makes");
         if (!bag.Has(rc.Counts("cost"))) { H.ToastMsg("Missing materials for " + Data.ItemName(makes) + ".", 1.5f); Snd.Deny(); return false; }
-        if (bag.Room(makes) < rc.I("n")) { H.ToastMsg("No room in the satchel.", 1.5f); Snd.Deny(); return false; }
+        if (bag.Room(makes) < Diff.Yield(rc)) { H.ToastMsg("No room in the satchel.", 1.5f); Snd.Deny(); return false; }
         if (rc.S("where") == "bench") return false;
         craftRecipe = rc; craftT = rc.F("time"); vx = 0; Hints.Did("craft");
         H.ToastMsg($"Crafting {Data.ItemName(makes)}... ({rc.F("time")} s, crouched)", rc.F("time"));

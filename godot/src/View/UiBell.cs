@@ -13,8 +13,8 @@ public partial class UiRoot
     bool PayDrowned()
     {
         var p = G.player;
-        if (G.difficulty != "drowned") return true;
-        if (p.bag.Count("tallow") < 1) { H.ToastMsg("Saving on Drowned costs 1 tallow."); Snd.Deny(); return false; }
+        if (!Diff.C.saveCost) return true;
+        if (p.bag.Count("tallow") < 1) { H.ToastMsg($"Saving on {Diff.C.name} costs 1 tallow."); Snd.Deny(); return false; }
         p.bag.Remove("tallow", 1);
         return true;
     }
@@ -34,7 +34,7 @@ public partial class UiRoot
         Lbl(c, $"{Tide.PhaseName()} tide  ·  {H.FmtTime(Tide.PhaseRemaining())} until it turns", 5, MUTED, caps: true, center: true);
         Rule(c);
         var col = Col(c);
-        Btn(col, "Save" + (G.difficulty == "drowned" ? " (1 tallow)" : ""), () => { if (!PayDrowned()) return; G.SetRespawn(bell); G.Save(); H.ToastMsg("Saved."); BellMenu(bell); });
+        Btn(col, "Save" + (Diff.C.saveCost ? " (1 tallow)" : ""), () => { if (!PayDrowned()) return; G.SetRespawn(bell); G.Save(); H.ToastMsg("Saved."); BellMenu(bell); });
         Btn(col, "Rest: " + (p.grafts.Contains("lung") ? "heal by half (Tide Lung)" : "heal") + ", save, wait for Low tide", () => { if (!PayDrowned()) return; Close(); G.Rest(bell); }, primary: true);
         Btn(col, "Reliquary chest (shared by every Bell Room)", () => Reliquary(() => BellMenu(bell)));
         Btn(col, "Bench: craft, upgrades, fittings" + (bell.room.Id == "chapel" ? ", surgery" : ""), () => Bench(bell.room.Id == "chapel", () => BellMenu(bell)));

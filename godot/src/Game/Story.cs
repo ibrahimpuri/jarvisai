@@ -182,6 +182,9 @@ public static class Story
             // the Tine in her hand, grown all the way: Agathe sees it, and the window
             if (Legend.HostReady) { var L = Data.Lore.P("legend"); lines.Add(L.S("agathe")); lines.Add(L.S("choice")); }
             else if (Legend.merged) lines.Add("And put down whatever that is in your hand. It is breathing, Maren.");
+            // the Saint awake: the song in the margins of her log
+            if (VerseReady) lines.AddRange(Data.Lore.P("saint").Strings("agathe"));
+            else if (Diff.Saint) lines.Add(Data.Lore.P("saint").S("agatheHint"));
             Say(lines);
         }
     }
@@ -207,7 +210,7 @@ public static class Story
         switch (spec.S("type"))
         {
             case "stitch":
-                if (p.maxHp < 9) p.maxHp++;
+                if (p.maxHp < Diff.C.pips + 4) p.maxHp++;   // each of the four stitches adds a pip, whatever she started with
                 p.hp = p.maxHp;
                 H.ToastMsg($"Keeper's Stitch. Health rises to {p.maxHp} pips.");
                 G.collected.Add(spec.S("id"));
@@ -219,7 +222,8 @@ public static class Story
                 break;
             case "page":
                 G.pages.Add(spec.I("n"));
-                UI.Say($"Agathe's log ({G.pages.Count}/9)", PAGES[spec.I("n")]);
+                UI.Say($"Agathe's log ({G.pages.Count}/9)", PageText(spec.I("n")));
+                if (VerseReady && G.room?.Id == "lamp") Legend.SpawnMusicBox(G.room);
                 break;
             case "table":
                 G.tables.Add(spec.I("n"));
@@ -255,6 +259,16 @@ public static class Story
     }
 
     // ---- endings ---------------------------------------------------------------------------
+    // A page of Agathe's log; on the Mere-Saint crossing its margin carries a line of the seventh verse.
+    public static string PageText(int n)
+    {
+        string t = PAGES[n];
+        if (!Diff.Saint) return t;
+        var S = Data.Lore.P("saint"); var lines = S.Strings("lullaby");
+        return n >= 1 && n <= lines.Count ? $"{t}\n\n{S.S("margin")}\n\u201c{lines[n - 1]}\u201d" : t;
+    }
+    public static bool VerseReady => Diff.Saint && G.pages.Count >= 9;
+
     public static List<string> Survivors()
     {
         var q = G.quests;
@@ -265,7 +279,7 @@ public static class Story
         if (q.S("teodor") == "saved") list.Add("Teodor");
         return list;
     }
-    static readonly Dictionary<string, string> TITLES = new() { ["relight"] = "Relight the Lamp", ["hymn"] = "The Saint's Hymn", ["dark"] = "Keeper's Dark", ["host"] = "Host of the Mere" };
+    static readonly Dictionary<string, string> TITLES = new() { ["relight"] = "Relight the Lamp", ["hymn"] = "The Saint's Hymn", ["dark"] = "Keeper's Dark", ["host"] = "Host of the Mere", ["verse"] = "The Seventh Verse" };
     public static void Ending(string kind)
     {
         var p = G.player; var q = G.quests;
@@ -286,6 +300,13 @@ public static class Story
                 UI.Say(null, $"Without Agathe's whole log ({G.pages.Count}/9 pages) and at least two others alive to row the ferry ({s.Count}: {(s.Count > 0 ? string.Join(", ", s) : "none")}), the beacon would only light an empty island.");
                 return;
             }
+        }
+        if (kind == "verse")
+        {
+            if (!VerseReady) return;
+            if (!Hollow.owned && !Legend.merged) { UI.Say(null, Data.Lore.P("saint").S("noHollow")); return; }
+            UI.Confirm(Data.Lore.P("saint").S("ask"), () => Finish(kind));
+            return;
         }
         if (kind == "host" && !Legend.HostReady)
         {
@@ -324,6 +345,14 @@ public static class Story
             text.Add("Your mother says your name. You hear it the way the sea hears it. You take her hand, and she does not let go, and you walk down into the water together, and she stops struggling before the second stair.");
             text.Add("The lamp is never lit again. That winter the reef takes forty ships, and at every High tide their crews come up the Long Pier with knots at their joints, singing in D, to the one who called them home.");
         }
+        else if (kind == "verse")
+        {
+            // the true ending: she sings the Saint the end of its song, and it sleeps
+            var S = Data.Lore.P("saint");
+            text.AddRange(S.Strings("ending"));
+            text.Add(p.grafts.Count > 0 || Legend.merged ? S.S("grafted") : S.S("clean"));
+            text.Add(S.S("dawn"));
+        }
         else
         {
             text.Add("You leave the lamp dark and set fire to the old red beacon. It burns all night, warning every ship away from the reef.");
@@ -331,7 +360,8 @@ public static class Story
             text.Add("The mainland is warned. Somewhere behind you, the Brine keeps the island for itself, and waits.");
         }
         G.ended = kind;
+        Profile.Record(G.difficulty, kind);
         G.DeleteSave();
-        UI.Ending(TITLES[kind], text, G.StatsSummary(), Narr.Fates(kind));
+        UI.Ending(TITLES[kind], text, G.StatsSummary(), Narr.Fates(kind), kind == "verse");
     }
 }

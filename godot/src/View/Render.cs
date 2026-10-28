@@ -13,6 +13,9 @@ public static class Render
         float v = 0;
         float d = H.Dist(p.Cx(), p.Cy(), x, y);
         if (p.Has("lens") && d < 170 && Phys.Los(p.Cx(), p.y + 6, x, y)) v = MathF.Max(v, 0.95f * (1 - d / 260));
+        // on the gentlest crossing the knots near her glint even in the dark
+        float sight = Diff.C.knotSight;
+        if (sight > 0 && d < sight) v = MathF.Max(v, 0.4f * (1 - d / sight) + 0.2f);
         if (p.LanternLit())
         {
             if (p.focusing)

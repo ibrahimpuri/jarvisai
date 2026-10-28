@@ -539,4 +539,42 @@ public static class MenuArt
         c.Stroke = H.Col("#2a2826"); c.LineWidth = 0.8f;
         for (float d = 0; d < len; d += 2.4f) { c.BeginPath(); c.Ellipse(x, y + d + 1.2f, d % 4.8f < 2.4f ? 0.7f : 0.35f, 1.2f, 0, 0, H.PI * 2); c.StrokePath(); }
     }
+    // The Mere-Saint's eye under the water: a great dark eye ringed in too many ribs, sea-green light moving in it.
+    // Asleep (locked) it is shut and crusted over with salt.
+    public static void SaintEye(Canvas c, float x, float y, float s, float t, bool awake)
+    {
+        var sea = SEAGLASS;
+        c.Glow(x, y, s * 2.4f, s * 1.6f, new Color(sea.R, sea.G, sea.B, awake ? 0.2f + 0.06f * MathF.Sin(t * 1.3f) : 0.05f));
+        // the ribs, curving round it like a cage
+        var bone = awake ? new Color(0.86f, 0.83f, 0.74f, 0.9f) : new Color(0.6f, 0.62f, 0.6f, 0.6f);
+        for (int side = -1; side <= 1; side += 2)
+            for (int i = 0; i < 5; i++)
+            {
+                float k = i / 4f, rx = s * (0.75f + k * 0.35f), ry = s * (0.55f + k * 0.28f);
+                c.Stroke = new Color(0, 0, 0, 0.5f); c.LineWidth = s * 0.1f;
+                c.BeginPath(); c.Ellipse(x + side * s * 0.02f, y + 0.6f, rx, ry, 0, side < 0 ? H.PI * 0.62f : -H.PI * 0.38f, side < 0 ? H.PI * 1.38f : H.PI * 0.38f); c.StrokePath();
+                c.Stroke = bone; c.LineWidth = s * 0.07f;
+                c.BeginPath(); c.Ellipse(x + side * s * 0.02f, y, rx, ry, 0, side < 0 ? H.PI * 0.62f : -H.PI * 0.38f, side < 0 ? H.PI * 1.38f : H.PI * 0.38f); c.StrokePath();
+            }
+        if (awake)
+        {
+            float blink = (t % 6.5f) < 0.18f ? 0.15f : 1;
+            float look = MathF.Sin(t * 0.7f) * s * 0.12f;
+            c.Fill = H.Col("#0a1a1a"); c.BeginPath(); c.Ellipse(x, y, s * 0.6f, s * 0.42f * blink, 0, 0, H.PI * 2); c.FillPath();
+            c.Glow(x + look, y, s * 0.5f, s * 0.4f * blink, new Color(sea.R, sea.G, sea.B, 0.5f));
+            c.Fill = new Color(sea.R, sea.G, sea.B, 0.95f); c.BeginPath(); c.Ellipse(x + look, y, s * 0.3f, s * 0.3f * blink, 0, 0, H.PI * 2); c.FillPath();
+            c.Fill = H.Col("#021010"); c.BeginPath(); c.Ellipse(x + look, y, s * 0.07f, s * 0.26f * blink, 0, 0, H.PI * 2); c.FillPath();
+            c.Fill = new Color(1, 1, 1, 0.7f * blink); c.FillCircle(x + look - s * 0.1f, y - s * 0.1f, s * 0.05f);
+            c.Stroke = new Color(sea.R, sea.G, sea.B, 0.6f); c.LineWidth = s * 0.04f;
+            c.BeginPath(); c.Ellipse(x, y, s * 0.6f, s * 0.42f * blink, 0, 0, H.PI * 2); c.StrokePath();
+        }
+        else
+        {
+            // shut, and salted over
+            c.Stroke = new Color(0.5f, 0.55f, 0.55f, 0.85f); c.LineWidth = s * 0.07f;
+            c.BeginPath(); c.MoveTo(x - s * 0.6f, y); c.QuadraticCurveTo(x, y + s * 0.3f, x + s * 0.6f, y); c.StrokePath();
+            Salt(c, x - s * 0.7f, y + s * 0.05f, s * 1.4f, 7, s * 0.3f);
+            Barnacles(c, x + s * 0.45f, y - s * 0.2f, s * 0.2f, 9, 5);
+        }
+    }
 }

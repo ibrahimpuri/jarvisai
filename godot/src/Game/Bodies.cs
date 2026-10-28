@@ -138,7 +138,7 @@ public class Gullet : Body
             vx = H.Approach(vx, facing * 70, 500 * dt);
             if (p != null && H.Dist(Cx(), Cy(), p.Cx(), p.Cy()) < 40 && cool <= 0)
             {
-                mode = "windup"; atkT = 0.5f; cool = 1.8f;
+                mode = "windup"; atkT = Wind(0.5f); cool = Cool(1.8f);
                 foreach (var k in knots) if (!k.broken) k.flare = 0.5f;
                 Voices.Windup(this);
             }
@@ -313,7 +313,7 @@ public class Bellmouth : Body
         }
         if (p != null && ArmsOK() && cool <= 0 && H.Dist(Cx(), Cy(), p.Cx(), p.Cy()) < 30)
         {
-            mode = "windup"; atkT = 0.7f; cool = 2;
+            mode = "windup"; atkT = Wind(0.7f); cool = Cool(2);
             int s = (int)H.Sign(p.Cx() - Cx()); facing = s != 0 ? s : 1;
             foreach (var k in knots) if (!k.broken) k.flare = 0.7f;
             Voices.Windup(this);
@@ -512,7 +512,7 @@ public class Saltwright : Body
             Pursue(dt, target.Value.X, 38);
             if (p != null && ArmsOK() && cool <= 0 && MathF.Abs(p.Cx() - Cx()) < 40 && MathF.Abs(p.Cy() - Cy()) < 30)
             {
-                mode = "windup"; atkT = 0.8f; cool = 2.2f;
+                mode = "windup"; atkT = Wind(0.8f); cool = Cool(2.2f);
                 int s = (int)H.Sign(p.Cx() - Cx()); facing = s != 0 ? s : 1;
                 foreach (var k in knots) if (!k.broken) k.flare = 0.8f;
                 Voices.Windup(this);
@@ -556,13 +556,14 @@ public class Grafted : Body
     {
         type = "grafted";
         passive = spec.B("passive");
-        AddKnot("elbowL", "elbow", "elbowL", 3);
-        AddKnot("elbowR", "elbow", "elbowR", 3);
-        AddKnot("graft", "graft", "neck", 3, 4);
-        AddKnot("crown", "crown", "sternum", 4, 5, 2);
-        mode = passive ? "idle" : "hunt"; awakeMode = passive ? "idle" : "hunt";
         boss = spec.B("boss");
-        if (boss) { foreach (var k in knots) { k.max += 3; k.hp = k.max; } AddKnot("graft2", "graft", "hip", 4); }
+        int more = boss ? 3 : 0;   // grafted Hesper is thicker; the crossing scales it after
+        AddKnot("elbowL", "elbow", "elbowL", 3 + more);
+        AddKnot("elbowR", "elbow", "elbowR", 3 + more);
+        AddKnot("graft", "graft", "neck", 3 + more, 4);
+        AddKnot("crown", "crown", "sternum", 4 + more, 5, 2);
+        if (boss) AddKnot("graft2", "graft", "hip", 4);
+        mode = passive ? "idle" : "hunt"; awakeMode = passive ? "idle" : "hunt";
     }
     public override bool Humanoid => true;
     public override Palette Pal() => new() { robe = boss ? "#4a2f5a" : "#3a3a5a", skin = "#9aa6b0", cowl = boss ? "#c0a060" : "#2a2a40", dark = "#1a1a2a" };
@@ -613,7 +614,7 @@ public class Grafted : Body
             int s = (int)H.Sign(p.Cx() - Cx()); facing = s != 0 ? s : 1;
             if (cool <= 0 && ArmsOK() && Phys.Los(Cx(), y + 10, p.Cx(), p.Cy()))
             {
-                mode = "windup"; atkT = 0.9f; cool = boss ? 1.6f : 2.6f;
+                mode = "windup"; atkT = Wind(0.9f); cool = Cool(boss ? 1.6f : 2.6f);
                 foreach (var k in knots) if (!k.broken) k.flare = 0.9f;
             }
         }

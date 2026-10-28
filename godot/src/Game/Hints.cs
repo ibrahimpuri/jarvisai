@@ -113,7 +113,7 @@ public static class Hints
                 float w = waited.TryGetValue(d.id, out var v) ? v : 0;
                 w = rel ? w + dt : MathF.Max(0, w - dt * 2);
                 waited[d.id] = w;
-                if (rel && w >= d.delay && want == null) want = d.id;
+                if (rel && w >= d.delay * Diff.C.hints && want == null) want = d.id;
             }
         }
         zones.Clear();

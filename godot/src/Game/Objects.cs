@@ -46,12 +46,12 @@ public class Chest : Obj
         // Lifeline rule: scarcity bites without soft-locking anyone.
         int rivets = p.bag.Count("rivets") + (p.weapons.TryGetValue("driver", out var dr) ? dr.mag : 0);
         bool mats = Bag.MATERIALS.Any(m => p.bag.Count(m) > 0);
-        if (rivets < 3 && !mats && !lifeline && (G.difficulty != "drowned" || H.Rand() < 0.5f)) { contents["scrap"] = contents.GetValueOrDefault("scrap") + 2; lifeline = true; }
+        if (rivets < 3 && !mats && !lifeline && H.Rand() < Diff.C.lifeline) { contents["scrap"] = contents.GetValueOrDefault("scrap") + 2; lifeline = true; }
         var got = new List<string>();
         foreach (var kv in contents.ToList())
         {
             string item = kv.Key; int n = kv.Value;
-            int n2 = G.difficulty == "pilgrim" && item == "scrap" ? n + 1 : n;
+            int n2 = item == "scrap" ? n + Diff.C.lootScrap : n;
             int left = p.bag.Add(item, n2);
             if (n2 - left > 0) got.Add($"{n2 - left} {Data.ItemName(item)}");
             if (left > 0) contents[item] = left; else contents.Remove(item);

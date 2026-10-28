@@ -41,6 +41,7 @@ public partial class Main : Node2D
         if (args.Contains("--test") || args.Contains("--shots"))
         {
             UiRoot.Instant = true;
+            Profile.Persist = false; Profile.Load();   // tests start from a player who has finished nothing
             tester = new Tester(args);
             AddChild(tester);
         }

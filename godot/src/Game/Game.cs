@@ -96,6 +96,7 @@ public static class G
             _ => true,
         };
         Data.Load();
+        Profile.Load();
         World.Build();
         FindWrackPools();
         Tide.On(OnPhase);
@@ -135,11 +136,13 @@ public static class G
     {
         timers.Clear();
         difficulty = diff;
-        Tide.scale = tide * (diff == "pilgrim" ? 1.25f : 1);
+        var C = Diff.C;
+        Tide.scale = tide * C.tide;
         Tide.t = 0; Tide.cycle = 0; Tide.spring = 0;
         World.Reset();
         player = new Player();
-        if (difficulty == "pilgrim") player.bag.Add("scrap", 2);
+        player.maxHp = player.hp = C.pips;
+        if (C.startScrap > 0) player.bag.Add("scrap", C.startScrap);
         act = 1; quests = Props.Empty(); stats = new Stats();
         pages = new(); tables = new(); collected = new(); bellsLit = new(); reliquary = new Bag(40);
         respawn = null; satchelDrop = null; swell = 0; valveT = 0; undertow = new UndertowSystem(); bossBar = null;
@@ -154,7 +157,10 @@ public static class G
         EnterRoom(Data.Room["breakers"], true);
         PlaceAtStart();
         titleT = 6;
-        var lines = Data.Lore.Strings("opening").Concat(Data.Lore.Strings("openingAfter")).ToList();
+        var lines = Data.Lore.Strings("opening").ToList();
+        // the Saint awake: one more line before she sets out
+        if (Diff.Saint) lines.Add(Data.Lore.P("saint").S("opening"));
+        lines.AddRange(Data.Lore.Strings("openingAfter"));
         UI.Cinematic(lines, () => After(1.2f, () => Narr.Think("boat")), "title");
     }
 
@@ -678,7 +684,14 @@ public static class G
         bool drowned = p.HeadUnder() && p.breath <= 0.01f;
         if (drowned) Snd.Choke();
         Snd.MarenDies(drowned);
-        // The satchel stays where she fell; weapons and fittings stay with her.
+        // The satchel stays where she fell; weapons and fittings stay with her. (On the gentlest crossing she keeps it.)
+        if (Diff.C.keepSatchel)
+        {
+            Snd.Toll();
+            var (t0, l0) = Narr.DeathText();
+            After(0.9f, () => UI.Death(t0, l0, "The pilgrim's grace: your satchel is still on your shoulder.", Respawn));
+            return;
+        }
         var bag = new Bag(99);
         foreach (var kv in p.bag.List()) bag.items[kv.Key] = kv.Value;
         if (satchelDrop != null) foreach (var kv in satchelDrop.bag.List()) bag.items[kv.Key] = bag.items.GetValueOrDefault(kv.Key) + kv.Value;
@@ -820,7 +833,7 @@ public static class G
     {
         int k = stats.knots.Values.Sum();
         string held = Legend.communion > 0 ? $" · The Tine in hand: {H.FmtTime(Legend.communion)}" : "";
-        return $"Knots broken: {k} · Deaths: {stats.deaths} · Time: {H.FmtTime(stats.time)} · Agathe's pages: {pages.Count}/9 · Grafts: {player.grafts.Count}{held} · Difficulty: {difficulty}";
+        return $"Knots broken: {k} · Deaths: {stats.deaths} · Time: {H.FmtTime(stats.time)} · Agathe's pages: {pages.Count}/9 · Grafts: {player.grafts.Count}{held} · {Diff.C.name}";
     }
 
     // ------------------------------------------------------------------ camera
