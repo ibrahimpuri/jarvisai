@@ -42,6 +42,7 @@ room({
   },
   ents2: [
     {"type": "zone", "tx": 15, "ty": 13, "w": 12, "h": 4, "think": "cottage"},
+    {"type": "wick", "tx": 24, "ty": 16, "fromAct": 3},
   ],
 });
 
@@ -61,7 +62,7 @@ room({
     "_                                      _",
     "_                                      _",
     "_                                      _",
-    "_              1     2 3               _",
+    "_              1 ggg 2 3               _",
     "_            ############              _",
     "_            ############              _",
     "_    =====   ############              _",
@@ -81,7 +82,11 @@ room({
     "1": {"type": "sign", "text": "An iron pole, and on it a lantern with red glass. Before the lamp in the Skull, the island lit this one on bad nights, and waited on the rocks below for what the sea brought in."},
     "2": {"type": "chest", "id": "ch_lookout", "loot": {"scrap": 2, "oil": 1}},
     "3": {"type": "shucker", "pose": "seated"},
+    "g": {"type": "saltgull"},
   },
+  ents2: [
+    {"type": "kite", "tx": 30, "ty": 6, "fromAct": 3},
+  ],
 });
 
 room({
@@ -104,7 +109,7 @@ room({
     "_                                      _",
     "_                                      _",
     "_                                      _",
-    "_                                 4    _",
+    "_                              gg 4 g  _",
     "_                              ======  _",
     "_                                      _",
     "                                    === ",
@@ -122,7 +127,11 @@ room({
     "2": {"type": "bellmouth", "pose": "seated"},
     "3": {"type": "shucker", "pose": "lying"},
     "4": {"type": "pickup", "item": "tallow", "n": 2},
+    "g": {"type": "saltgull"},
   },
+  ents2: [
+    {"type": "kite", "tx": 20, "ty": 8, "fromAct": 2},
+  ],
 });
 
 room({
@@ -182,7 +191,7 @@ room({
     "_                   H                  _",
     "_                   H           o      _",
     "_                   H                  _",
-    "_    TTTTTT         H     o        3   _",
+    "_    TTTTTT         H     o       g3 g _",
     "_    T    T         H            ===== _",
     "_    T             ====                _",
     "_    T 1                               _",
@@ -191,7 +200,7 @@ room({
     "_  TTTTTTTTTTTTT             TTTTTTTTT  ",
     "_  TTTTTTTTTTTTT             TTTTTTTTT  ",
     "_  TTTTTTTTTTTTT             TTTTTTTTT  ",
-    "_  TTTTTTTTTTTTT  2          TTTTTTTTT  ",
+    "_  TTTTTTTTTTTTT  5          TTTTTTTTT  ",
     "#######################      ###########",
     "#######################      ###########",
     "#######################      ###########",
@@ -200,10 +209,13 @@ room({
   ],
   ents: {
     "1": {"type": "chest", "id": "ch_marguerite", "loot": {"scrap": 3, "cord": 2}, "label": "Marguerite's locker"},
+    "5": {"type": "netter", "pose": "lying"},
     "2": {"type": "shucker", "pose": "lying"},
     "3": {"type": "pickup", "item": "scrap", "n": 2},
+    "g": {"type": "saltgull"},
   },
   ents2: [
+    {"type": "bloater", "tx": 25, "ty": 20, "pose": "lying", "fromAct": 2},
     {"type": "driftnest", "tx": 25, "ty": 14, "n": 6},
   ],
 });
@@ -243,7 +255,7 @@ room({
   ],
   ents: {
     "1": {"type": "sign", "text": "The ferry winch. Its rope runs out east into the dark, a mile and a half to the mainland, and it is taut. You put your weight on the handle. Out on the water something heavy turns over, and the rope goes slack."},
-    "2": {"type": "shucker", "pose": "standing"},
+    "2": {"type": "netter", "pose": "standing"},
     "3": {"type": "chest", "id": "ch_ferry", "loot": {"cord": 2, "tallow": 1, "rivets": 4}},
   },
 });
@@ -267,7 +279,7 @@ room({
     "_   #       #   #       #   #       #  _",
     "_   #       #   #       #   #       #  _",
     "_                                      _",
-    "_     1             2          1   3   _",
+    "_     5             2          1   3   _",
     "_===#PPPPPPP#===#PPPPPPP#===#PPPPPPP#==_",
     "     T     T     T     T     T     T    ",
     "     T    4T     T     T     T     T    ",
@@ -282,13 +294,16 @@ room({
     "########################################",
   ],
   ents: {
-    "1": {"type": "shucker", "pose": "seated"},
+    "5": {"type": "netter", "pose": "seated"},
     "2": {"type": "bellmouth", "pose": "seated"},
+    "1": {"type": "shucker", "pose": "seated"},
     "3": {"type": "chest", "id": "ch_hithe", "loot": {"kelp": 3, "salt": 2, "scrap": 2}},
     "4": {"type": "corpse", "pose": "slumped"},
   },
   ents2: [
     {"type": "gullet", "tx": 22, "ty": 12, "len": 2},
+    {"type": "bloater", "tx": 26, "ty": 18, "pose": "lying", "fromAct": 2},
+    {"type": "netter", "tx": 33, "ty": 13, "pose": "standing", "fromAct": 2},
   ],
 });
 
@@ -317,7 +332,7 @@ room({
     "                                        ",
     "                                        ",
     "                                        ",
-    "                                    2   ",
+    "      g                 g g         2   ",
     "#####     ####       #####     ##SS#####",
     "#####     ####       #####        H    #",
     "##############   3   ##########   H    #",
@@ -329,6 +344,7 @@ room({
     "1": {"type": "chest", "id": "ch_pools", "loot": {"scrap": 3, "cord": 1}, "label": "a cave under the pools"},
     "2": {"type": "barrel"},
     "3": {"type": "shucker", "pose": "lying"},
+    "g": {"type": "saltgull"},
   },
 });
 
@@ -346,7 +362,7 @@ room({
     "_                                      _",
     "_                   o                  _",
     "_                                      _",
-    "_                       1              _",
+    "_             g g       1  g g         _",
     "_           ###################        _",
     "_           ###################        _",
     "_        ===###################        _",
@@ -368,6 +384,7 @@ room({
   ents: {
     "1": {"type": "chest", "id": "ch_arch", "loot": {"ivory": 1, "oil": 1}, "label": "a gull-picked bundle"},
     "2": {"type": "corpse", "pose": "seated"},
+    "g": {"type": "saltgull"},
   },
 });
 
@@ -408,6 +425,10 @@ room({
     "2": {"type": "shucker", "pose": "lying"},
     "3": {"type": "sign", "text": "The manifest, nailed to a beam: salt for the mainland, eleven barrels. Crew, nine. Ennis, Bray and Coll have been struck out, and written in again below."},
   },
+  ents2: [
+    {"type": "bloater", "tx": 24, "ty": 19, "pose": "lying", "fromAct": 2},
+    {"type": "diver", "tx": 33, "ty": 19, "fromAct": 3},
+  ],
 });
 
 room({
@@ -449,6 +470,9 @@ room({
     "2": {"type": "sign", "text": "Kelp grows up from the seabed in a long row, all leaning the same way: east, out to sea. At the Ebb you can feel why."},
     "3": {"type": "shucker", "pose": "lying"},
   },
+  ents2: [
+    {"type": "diver", "tx": 30, "ty": 19, "fromAct": 3},
+  ],
 });
 
 room({
@@ -489,6 +513,7 @@ room({
   },
   ents2: [
     {"type": "driftnest", "tx": 16, "ty": 16, "n": 6},
+    {"type": "diver", "tx": 8, "ty": 18, "fromAct": 3},
   ],
 });
 

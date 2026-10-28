@@ -31,6 +31,11 @@ public class Body : Ent
     public Knot pinKnot;
     public List<Knot> knots = new();
     public string mode = "idle", pose = "stand", awakeMode;
+    // which kind of the drowned it sounds like: the newer kinds borrow a voice, pitched by their own throats
+    public string voice;
+    public string Voice => voice ?? type;
+    // the bestiary's name for it: the variants are kinds of their own
+    public virtual string Kind => type;
     public bool reknot, dragged, tetherable, corpse, boss, breach, hesper, teodor, sailor, passive, shed;
     public Vector2? target, lastHeard;
     public Dictionary<string, float> crust = new();
@@ -732,6 +737,7 @@ public class Shucker : Body
     // Once it has her, it does not walk: it lurches, a scrabbling burst nearly as fast as she can run, then has to
     // stop and gather itself, and lurches again.
     public float lurchT, lurchCool;
+    public override string Kind => knots.Any(k => k.braced) ? "braced" : "shucker";
     public Shucker(Props spec, RoomDef room) : base(spec, room)
     {
         type = "shucker";

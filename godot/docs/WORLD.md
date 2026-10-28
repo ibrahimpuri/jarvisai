@@ -104,6 +104,11 @@ The six enemy types, plus four variants that each change the knot puzzle:
 | **Hooded Bellmouth** | Bellmouth | blindfolded with a hymnal page: it ignores the lantern and screams at noise, so shuttering does not help |
 | **Gullet Pair** | Gullet | two tendrils: cut one and it swings, and only cutting both drops it |
 
+Beyond the document's six types and four variants, eleven new kinds fill out three tiers of the night: start
+(Saltgull, Netter, Kilnman), mid (Bloater, Toller, Cantor, Ossuary, Kite) and end (Drowned Diver, Deepwalker, Wick).
+Earlier tiers keep appearing later, and spawns marked `fromAct` bring later kinds into earlier regions on revisits.
+See [ENEMIES.md](ENEMIES.md).
+
 ## Bell Rooms: 14, two per region
 
 | Region | Bell Rooms |

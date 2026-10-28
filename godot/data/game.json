@@ -562,6 +562,12 @@
    },
    "ents2": [
     {
+     "type": "kilnman",
+     "tx": 27,
+     "ty": 18,
+     "pose": "lying"
+    },
+    {
      "type": "wrackpool",
      "tx": 20,
      "ty": 18
@@ -715,6 +721,11 @@
     }
    },
    "ents2": [
+    {
+     "type": "kilnman",
+     "tx": 22,
+     "ty": 18
+    },
     {
      "type": "gullet",
      "tx": 24,
@@ -919,6 +930,18 @@
      "tx": 20,
      "ty": 12,
      "n": 6
+    },
+    {
+     "type": "bloater",
+     "tx": 25,
+     "ty": 19,
+     "pose": "lying"
+    },
+    {
+     "type": "bloater",
+     "tx": 13,
+     "ty": 19,
+     "pose": "lying"
     }
    ]
   },
@@ -1033,6 +1056,11 @@
     }
    },
    "ents2": [
+    {
+     "type": "toller",
+     "tx": 28,
+     "ty": 16
+    },
     {
      "type": "floater",
      "tx": 4,
@@ -1162,6 +1190,11 @@
    },
    "ents2": [
     {
+     "type": "ossuary",
+     "tx": 26,
+     "ty": 16
+    },
+    {
      "type": "lift",
      "tx": 20,
      "ty": 17,
@@ -1241,6 +1274,11 @@
      "tx": 16,
      "ty": 3,
      "len": 5
+    },
+    {
+     "type": "cantor",
+     "tx": 22,
+     "ty": 16
     }
    ]
   },
@@ -1314,6 +1352,11 @@
     }
    },
    "ents2": [
+    {
+     "type": "cantor",
+     "tx": 33,
+     "ty": 16
+    },
     {
      "type": "ability",
      "tx": 2,
@@ -1478,6 +1521,22 @@
    },
    "ents2": [
     {
+     "type": "kite",
+     "tx": 15,
+     "ty": 23
+    },
+    {
+     "type": "kite",
+     "tx": 24,
+     "ty": 32
+    },
+    {
+     "type": "kite",
+     "tx": 36,
+     "ty": 16,
+     "pose": "perched"
+    },
+    {
      "type": "gullet",
      "tx": 26,
      "ty": 22,
@@ -1637,6 +1696,11 @@
    },
    "ents2": [
     {
+     "type": "kite",
+     "tx": 20,
+     "ty": 30
+    },
+    {
      "type": "prism",
      "tx": 12,
      "ty": 24,
@@ -1738,6 +1802,21 @@
    },
    "ents2": [
     {
+     "type": "deepwalker",
+     "tx": 8,
+     "ty": 18
+    },
+    {
+     "type": "diver",
+     "tx": 33,
+     "ty": 18
+    },
+    {
+     "type": "bloater",
+     "tx": 17,
+     "ty": 14
+    },
+    {
      "type": "driftnest",
      "tx": 20,
      "ty": 10,
@@ -1798,7 +1877,19 @@
      "id": "page_lair",
      "n": 9
     }
-   }
+   },
+   "ents2": [
+    {
+     "type": "diver",
+     "tx": 30,
+     "ty": 18
+    },
+    {
+     "type": "diver",
+     "tx": 50,
+     "ty": 18
+    }
+   ]
   },
   {
    "id": "skullstair",
@@ -1834,6 +1925,26 @@
    ],
    "ents": {},
    "ents2": [
+    {
+     "type": "wick",
+     "tx": 10,
+     "ty": 16
+    },
+    {
+     "type": "wick",
+     "tx": 30,
+     "ty": 16
+    },
+    {
+     "type": "toller",
+     "tx": 24,
+     "ty": 16
+    },
+    {
+     "type": "kilnman",
+     "tx": 35,
+     "ty": 16
+    },
     {
      "type": "shoal",
      "tx": 30,
@@ -1962,6 +2073,12 @@
      "w": 12,
      "h": 4,
      "think": "cottage"
+    },
+    {
+     "type": "wick",
+     "tx": 24,
+     "ty": 16,
+     "fromAct": 3
     }
    ]
   },
@@ -1981,7 +2098,7 @@
     "_                                      _",
     "_                                      _",
     "_                                      _",
-    "_              1     2 3               _",
+    "_              1 ggg 2 3               _",
     "_            ############              _",
     "_            ############              _",
     "_    =====   ############              _",
@@ -2013,8 +2130,19 @@
     "3": {
      "type": "shucker",
      "pose": "seated"
+    },
+    "g": {
+     "type": "saltgull"
     }
-   }
+   },
+   "ents2": [
+    {
+     "type": "kite",
+     "tx": 30,
+     "ty": 6,
+     "fromAct": 3
+    }
+   ]
   },
   {
    "id": "cliffpath",
@@ -2045,7 +2173,7 @@
     "_                                      _",
     "_                                      _",
     "_                                      _",
-    "_                                 4    _",
+    "_                              gg 4 g  _",
     "_                              ======  _",
     "_                                      _",
     "                                    === ",
@@ -2075,8 +2203,19 @@
      "type": "pickup",
      "item": "tallow",
      "n": 2
+    },
+    "g": {
+     "type": "saltgull"
     }
-   }
+   },
+   "ents2": [
+    {
+     "type": "kite",
+     "tx": 20,
+     "ty": 8,
+     "fromAct": 2
+    }
+   ]
   },
   {
    "id": "ferrybell",
@@ -2150,7 +2289,7 @@
     "_                   H                  _",
     "_                   H           o      _",
     "_                   H                  _",
-    "_    TTTTTT         H     o        3   _",
+    "_    TTTTTT         H     o       g3 g _",
     "_    T    T         H            ===== _",
     "_    T             ====                _",
     "_    T 1                               _",
@@ -2159,7 +2298,7 @@
     "_  TTTTTTTTTTTTT             TTTTTTTTT  ",
     "_  TTTTTTTTTTTTT             TTTTTTTTT  ",
     "_  TTTTTTTTTTTTT             TTTTTTTTT  ",
-    "_  TTTTTTTTTTTTT  2          TTTTTTTTT  ",
+    "_  TTTTTTTTTTTTT  5          TTTTTTTTT  ",
     "#######################      ###########",
     "#######################      ###########",
     "#######################      ###########",
@@ -2184,9 +2323,23 @@
      "type": "pickup",
      "item": "scrap",
      "n": 2
+    },
+    "5": {
+     "type": "netter",
+     "pose": "lying"
+    },
+    "g": {
+     "type": "saltgull"
     }
    },
    "ents2": [
+    {
+     "type": "bloater",
+     "tx": 25,
+     "ty": 20,
+     "pose": "lying",
+     "fromAct": 2
+    },
     {
      "type": "driftnest",
      "tx": 25,
@@ -2234,7 +2387,7 @@
      "text": "The ferry winch. Its rope runs out east into the dark, a mile and a half to the mainland, and it is taut. You put your weight on the handle. Out on the water something heavy turns over, and the rope goes slack."
     },
     "2": {
-     "type": "shucker",
+     "type": "netter",
      "pose": "standing"
     },
     "3": {
@@ -2267,7 +2420,7 @@
     "_   #       #   #       #   #       #  _",
     "_   #       #   #       #   #       #  _",
     "_                                      _",
-    "_     1             2          1   3   _",
+    "_     5             2          1   3   _",
     "_===#PPPPPPP#===#PPPPPPP#===#PPPPPPP#==_",
     "     T     T     T     T     T     T    ",
     "     T    4T     T     T     T     T    ",
@@ -2302,6 +2455,10 @@
     "4": {
      "type": "corpse",
      "pose": "slumped"
+    },
+    "5": {
+     "type": "netter",
+     "pose": "seated"
     }
    },
    "ents2": [
@@ -2310,6 +2467,20 @@
      "tx": 22,
      "ty": 12,
      "len": 2
+    },
+    {
+     "type": "bloater",
+     "tx": 26,
+     "ty": 18,
+     "pose": "lying",
+     "fromAct": 2
+    },
+    {
+     "type": "netter",
+     "tx": 33,
+     "ty": 13,
+     "pose": "standing",
+     "fromAct": 2
     }
    ]
   },
@@ -2338,7 +2509,7 @@
     "                                        ",
     "                                        ",
     "                                        ",
-    "                                    2   ",
+    "      g                 g g         2   ",
     "#####     ####       #####     ##SS#####",
     "#####     ####       #####        H    #",
     "##############   3   ##########   H    #",
@@ -2362,6 +2533,9 @@
     "3": {
      "type": "shucker",
      "pose": "lying"
+    },
+    "g": {
+     "type": "saltgull"
     }
    }
   },
@@ -2379,7 +2553,7 @@
     "_                                      _",
     "_                   o                  _",
     "_                                      _",
-    "_                       1              _",
+    "_             g g       1  g g         _",
     "_           ###################        _",
     "_           ###################        _",
     "_        ===###################        _",
@@ -2411,6 +2585,9 @@
     "2": {
      "type": "corpse",
      "pose": "seated"
+    },
+    "g": {
+     "type": "saltgull"
     }
    }
   },
@@ -2464,7 +2641,22 @@
      "type": "sign",
      "text": "The manifest, nailed to a beam: salt for the mainland, eleven barrels. Crew, nine. Ennis, Bray and Coll have been struck out, and written in again below."
     }
-   }
+   },
+   "ents2": [
+    {
+     "type": "bloater",
+     "tx": 24,
+     "ty": 19,
+     "pose": "lying",
+     "fromAct": 2
+    },
+    {
+     "type": "diver",
+     "tx": 33,
+     "ty": 19,
+     "fromAct": 3
+    }
+   ]
   },
   {
    "id": "breakersfloor",
@@ -2518,7 +2710,15 @@
      "type": "shucker",
      "pose": "lying"
     }
-   }
+   },
+   "ents2": [
+    {
+     "type": "diver",
+     "tx": 30,
+     "ty": 19,
+     "fromAct": 3
+    }
+   ]
   },
   {
    "id": "smugglers",
@@ -2573,6 +2773,12 @@
      "tx": 16,
      "ty": 16,
      "n": 6
+    },
+    {
+     "type": "diver",
+     "tx": 8,
+     "ty": 18,
+     "fromAct": 3
     }
    ]
   },
@@ -2765,7 +2971,7 @@
     "_                             H        _",
     "                              H         ",
     "                              H         ",
-    "                              H     1   ",
+    "                    gg        H  g  1   ",
     "_TTTTTTTTTTH     TTTTTTTbbbTTTTTTTTTTTTT",
     "_   |    | H      |   |      |    |    _",
     "_   |    | H      |   |      |    |    _",
@@ -2777,8 +2983,19 @@
     "1": {
      "type": "shucker",
      "pose": "lying"
+    },
+    "g": {
+     "type": "saltgull"
     }
-   }
+   },
+   "ents2": [
+    {
+     "type": "kite",
+     "tx": 25,
+     "ty": 8,
+     "fromAct": 2
+    }
+   ]
   },
   {
    "id": "salthouse",
@@ -2881,7 +3098,7 @@
      "type": "barrel"
     },
     "2": {
-     "type": "shucker",
+     "type": "kilnman",
      "pose": "lying"
     },
     "3": {
@@ -2924,16 +3141,16 @@
     "#                                      #",
     "                                       #",
     "                                       #",
-    "                                       #",
-    "#     1     ====                       #",
+    "      1                                #",
     "##########                             #",
-    "##########  xxxx     ====               ",
+    "##########                             #",
+    "##########                              ",
     "###################                     ",
-    "###################  xxxx      2        ",
-    "########################################",
-    "########################################",
-    "########################################",
-    "########################################",
+    "###################                     ",
+    "###################  xxx               #",
+    "############################           #",
+    "############################           #",
+    "############################   2       #",
     "########################################",
     "########################################"
    ],
@@ -3013,7 +3230,15 @@
      "item": "salt",
      "n": 2
     }
-   }
+   },
+   "ents2": [
+    {
+     "type": "deepwalker",
+     "tx": 8,
+     "ty": 21,
+     "fromAct": 3
+    }
+   ]
   },
   {
    "id": "furnace",
@@ -3056,7 +3281,7 @@
      }
     },
     "2": {
-     "type": "shucker",
+     "type": "kilnman",
      "pose": "lying"
     }
    },
@@ -3115,7 +3340,15 @@
      "item": "oil",
      "n": 1
     }
-   }
+   },
+   "ents2": [
+    {
+     "type": "wick",
+     "tx": 26,
+     "ty": 16,
+     "fromAct": 3
+    }
+   ]
   },
   {
    "id": "minebell",
@@ -3330,8 +3563,8 @@
      "text": "The brine seeps out of the rock like sweat. It bears you up like a hand, and nothing you could carry would take you to the bottom."
     },
     "3": {
-     "type": "shucker",
-     "pose": "lying"
+     "type": "kilnman",
+     "pose": "standing"
     }
    }
   },
@@ -3513,7 +3746,15 @@
      "type": "corpse",
      "pose": "seated"
     }
-   }
+   },
+   "ents2": [
+    {
+     "type": "ossuary",
+     "tx": 11,
+     "ty": 16,
+     "fromAct": 2
+    }
+   ]
   },
   {
    "id": "pillars",
@@ -3715,7 +3956,15 @@
      "pose": "seated",
      "hooded": true
     }
-   }
+   },
+   "ents2": [
+    {
+     "type": "toller",
+     "tx": 15,
+     "ty": 16,
+     "fromAct": 2
+    }
+   ]
   },
   {
    "id": "saltchapel",
@@ -3758,7 +4007,15 @@
      "type": "shucker",
      "pose": "seated"
     }
-   }
+   },
+   "ents2": [
+    {
+     "type": "cantor",
+     "tx": 26,
+     "ty": 16,
+     "fromAct": 2
+    }
+   ]
   },
   {
    "id": "chute",
@@ -4621,8 +4878,8 @@
    ],
    "terraces": [
     {
-     "tx": 33,
-     "ty": 16,
+     "tx": 15,
+     "ty": 14,
      "title": "A slate hung on a nail",
      "text": "Pans Seven to Twelve: do not rake. Do not wade. Do not look at what the salt has made of the rake."
     }
@@ -4855,6 +5112,20 @@
    "mon_mitten": "A child's red mitten, tied to the highest peg she could reach. Agathe, age nine. Mama.",
    "mon_swallowed": "A keel, sticking out of the wall like a fishbone in a throat. It's still going down.",
    "mon_lens": "The old lens, cracked clean through. Light against the salt. The salt won, for a while.",
+   "see_gulletpair": "Two tendrils on that one. Cut one and it will only swing.",
+   "see_hooded": "Its eyes are bound with a hymnal page. It will not see my lamp. It will hear my feet.",
+   "see_saltgull": "Gulls on the rocks, white as salt, and not one of them moving. Not asleep. Waiting for a noise.",
+   "see_netter": "A woman wound in net, and more of it coiled in her hands. If that lands on me I am caught.",
+   "see_kilnman": "He is still burning inside. Fire will not hurt him. Water might.",
+   "see_braced": "It has grown salt over the knots I keep breaking. It is learning me.",
+   "see_bloater": "Swollen like a drowned dog. Something is moving in its belly. I do not want to know what.",
+   "see_toller": "A handbell. If he rings it, everything in here comes. The bell arm first.",
+   "see_cantor": "It is singing, and the dead around it are listening. That song will not let them stay down.",
+   "see_ossuary": "Bones. Too many, and not piled the way bones fall.",
+   "see_kite": "Something up there in the wind, with a cloak spread like a sail.",
+   "see_diver": "A diver. Brass helmet, canvas suit, like mine. It has a harpoon gun, and it is aiming it at me.",
+   "see_deepwalker": "Something on the floor down there, as big as a boat. I cannot see its knots. Only the focused beam would show them.",
+   "see_wick": "My lamp dims as it comes. It wants the light, not me.",
    "cottage": "Home. It is smaller than I remember. Everything in it is exactly where she left it, except one thing."
   },
   "hints": {
@@ -5075,6 +5346,113 @@
     "relightGrafted": "The beam found the salt in Maren Hult too. The Keepers' log records her name, and that she lit the lamp first.",
     "hymn": "Maren Hult is part of the hymn now. Fishermen say that on still nights you can hear it under the reef.",
     "host": "There is no Maren Hult. There is the sea off Hollowmere, very deep and very patient, and on still nights it says the names of ships before they wreck."
+   }
+  },
+  "bestiary": {
+   "shucker": {
+    "name": "Shucker",
+    "tier": "start",
+    "text": "A drowned monk. It shambles toward any sound and lunges to grab within two metres. Knots at both knees and both elbows; the crown in its chest is sealed until two of them are broken. Break the knees and it crawls, low and fast, but it cannot climb. Break the elbows and it cannot grab. Break the grabbing arm mid-grab and it lets go at once."
+   },
+   "gullet": {
+    "name": "Gullet",
+    "tier": "start",
+    "text": "It hangs from the ceiling on a crystal tendril and drops on any noise beneath it. Shoot the tendril from range and it lands stunned for three seconds. Then there are three spine knots to break."
+   },
+   "gulletpair": {
+    "name": "Gullet Pair",
+    "tier": "start",
+    "text": "A Gullet hung from two tendrils. Cut one and it swings from the other, hard, through anyone under it. Only cutting both brings it down."
+   },
+   "bellmouth": {
+    "name": "Bellmouth",
+    "tier": "start",
+    "text": "A bloated chorister. Light makes it inhale for a breath and a half, and then it screams, and every sleeping body in the room wakes. Break its jaw during the inhale, or shutter the lamp before it sees you."
+   },
+   "hooded": {
+    "name": "Hooded Bellmouth",
+    "tier": "start",
+    "text": "A Bellmouth with a page of the hymnal tied over its eyes. The lamp means nothing to it, so shuttering will not help: it screams at noise. Walk softly past it, or break its jaw before the breath is in."
+   },
+   "saltgull": {
+    "name": "Saltgull",
+    "tier": "start",
+    "text": "Gulls drowned in the Brine and come back crusted white. They roost on rock and rigging and lift together at a noise, a lamp turned on them, or anyone walking underneath, then come down in long swoops. One knot, at the wing: any hit brings a bird down. There are always several."
+   },
+   "netter": {
+    "name": "Netter",
+    "tier": "start",
+    "text": "A Hithe-wife drowned in her own nets. She throws them from a few strides off: a net holds Maren until she tears it (mash jump), cuts it (the gaff) or it burns. Then she comes in with the gutting knife. Break her right elbow, the throwing arm, and there are no more nets."
+   },
+   "kilnman": {
+    "name": "Kilnman",
+    "tier": "start",
+    "text": "A stoker of the kilns. Fire does not hurt him, and his shovel throws embers that catch on timber, rigging and oil. Get him into water and the heat goes out of him: every knot turns brittle, and rivets break them twice as fast."
+   },
+   "saltwright": {
+    "name": "Saltwright",
+    "tier": "mid",
+    "text": "An armoured salt-miner whose pick breaks walls and floors. Salt plates cover both arm knots. In the second and a half after it swings, pry a plate off with the gaff, then shoot what was under it."
+   },
+   "driftling": {
+    "name": "Driftling",
+    "tier": "mid",
+    "text": "Fist-sized swimmers in swarms of six to ten, only in water at High tide, drawn to light. One knot each. Shutter the lamp, throw a flare to lure them off, or dash through them."
+   },
+   "braced": {
+    "name": "Braced Shucker",
+    "tier": "mid",
+    "text": "The Brine learns. The ones that come back after the first night grow salt plates over the knot she breaks most, and always leave two others open. Change how you fight."
+   },
+   "bloater": {
+    "name": "Bloater",
+    "tier": "mid",
+    "text": "The drowned that floated. At High tide it lifts off the floor and drifts to her through the water, belly first. Its crown is in the belly: break it and the belly bursts, and a swarm of Driftlings with it. Burn it and nothing comes out. On a dry floor it can only drag itself."
+   },
+   "toller": {
+    "name": "Toller",
+    "tier": "mid",
+    "text": "A bell-roper who still carries his handbell. When he sees her he rings it, and every body in the room that can still stand gets up and comes to the sound. Break his right elbow, the bell arm, first, or stay out of his sight."
+   },
+   "cantor": {
+    "name": "Cantor",
+    "tier": "mid",
+    "text": "A singer of the Choir. Its song stands downed bodies back up, knots and all. Break its jaw, or burn or haul away what you have put down before it can sing to it. It keeps its distance, and it is not brave."
+   },
+   "ossuary": {
+    "name": "Ossuary",
+    "tier": "mid",
+    "text": "A heap of bones that stands up when she comes near and knots itself together. While it is assembling its knots are bare and break twice as fast. Afterwards its arms reach twice as far as anything else. Break both wrists and it has nothing to hold her with."
+   },
+   "kite": {
+    "name": "Kite",
+    "tier": "mid",
+    "text": "A drowned brother whose cloak the wind took. It rides the gusts above her and drops on her out of the dark. Break a shoulder and the cloak folds: it falls, and has to crawl."
+   },
+   "grafted": {
+    "name": "Grafted",
+    "tier": "end",
+    "text": "Living members of the Choir with Brine grafts of their own. They carry lamps and harpoons, shut doors, and go back into the water to heal. Fight them one at a time, and keep them from the water."
+   },
+   "diver": {
+    "name": "Drowned Diver",
+    "tier": "end",
+    "text": "A salvage diver in brass and canvas, like her, come for the abbey's salt and kept by it. It keeps to harpoon range and backs away when she closes. Its helmet seals the crown: break the latch at its neck first. Break its right elbow and it has no harpoon."
+   },
+   "deepwalker": {
+    "name": "Deepwalker",
+    "tier": "end",
+    "text": "Something that drowned so deep the weight of the water made it huge. It walks the Gullet's floor and feels her in the water from across the room. Its hands close like a door. Its knots are dark: only a knot held in the focused beam can be broken."
+   },
+   "wick": {
+    "name": "Wick",
+    "tier": "end",
+    "text": "In the Skull the drowned learned to hate the light. Near one, oil runs out of her lantern and flares die in its hands. It hunts the lamp, not her: shutter it and it loses her. The focused beam burns it, and it cannot stand in it."
+   },
+   "undertow": {
+    "name": "The Undertow",
+    "tier": "mid",
+    "text": "A drowned bell-ringer the size of a chapel, fused to a channel buoy whose bell clangs as it moves. It travels only through waist-deep water in late Rising and High tide, never enters a Bell Room or a dry room, and is always heard before it comes. Break its buoy knot to drive it off for the rest of the tide. It cannot be killed until the Gullet."
    }
   }
  }

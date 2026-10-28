@@ -12,7 +12,7 @@ namespace Hollowmere;
 public static class Voices
 {
     // Formants (F1, F2, F3) for the vowels the dead still have.
-    static readonly (float, float, float) A = (730, 1090, 2440), O = (570, 840, 2410), U = (300, 870, 2240), E = (530, 1840, 2480), UH = (520, 1190, 2390), M = (250, 900, 2200), I = (300, 2250, 3000);
+    public static readonly (float, float, float) A = (730, 1090, 2440), O = (570, 840, 2410), U = (300, 870, 2240), E = (530, 1840, 2480), UH = (520, 1190, 2390), M = (250, 900, 2200), I = (300, 2250, 3000);
     static readonly float[] HYMN = { 146.8f, 174.6f, 196f, 220f, 261.6f };   // the Choir sings in D
     public static float stingCool = 8;   // the sting never comes twice in quick succession
     public static int Stings;   // tests
@@ -42,8 +42,14 @@ public static class Voices
     }
 
     // ---- what each of them sounds like ---------------------------------------------------------------------
+    // drowned gulls: a mew that cracks halfway, wet in the throat
+    static void Gull(Body b, string what, float pitch, float vol)
+    {
+        Say(b, "gull" + what, 0.8f, (s, k) => { s.Voice(0.45f, 1, pitch * k, pitch * 0.66f * k, E, I, 0.1f, 0.3f, 0.4f, 0.03f, 0, 0.02f, k, 0.3f, 1); s.NoiseSweep(0.3f, 0.2f, "bandpass", 3200, 1800, 3, 0.25f); }, vol, 0, 3);
+    }
     public static void Idle(Body b)
     {
+        if (b.Voice == "gull") { if (b.mode != "dormant" || H.Rand() < 0.3f) Gull(b, "mew", H.Rand(700, 900), 0.35f); return; }
         // the ones that answered the Hollow sing the hymn while they tear at their brothers
         if (b.thrallT > 0)
         {
@@ -51,7 +57,7 @@ public static class Voices
             Say(b, "answer" + n, 2.4f, (s, k) => s.Voice(2.2f, 1, n, n, U, O, 0.3f, 0.5f, 0.3f, 0.02f, 0, 0.06f, 1, 0.2f, 2), 0.45f, 0, 2);
             return;
         }
-        switch (b.type)
+        switch (b.Voice)
         {
             case "shucker":
                 if (b.mode == "dormant")
@@ -93,7 +99,8 @@ public static class Voices
     // The moment a hunter first sees Maren: a gasp drawn in, then the cry torn out of it.
     public static void Alert(Body b)
     {
-        switch (b.type)
+        if (b.Voice == "gull") { Gull(b, "alarm", H.Rand(1000, 1200), 0.6f); return; }
+        switch (b.Voice)
         {
             case "shucker":
                 Say(b, "alert", 1.5f, (s, k) => { s.Voice(0.95f, 1, H.Rand(170, 200) * k, H.Rand(380, 460) * k, UH, A, 0.3f, 0.3f, 0.5f, 0.02f, 0, 0.03f, k, 0.25f, 2, 0.55f, 0.35f); Bubbles(s, 0.6f, 0.6f, 3); }, 0.95f);
@@ -113,7 +120,8 @@ public static class Voices
 
     public static void Windup(Body b)
     {
-        switch (b.type)
+        if (b.Voice == "gull") { Gull(b, "dive", H.Rand(1200, 1400), 0.7f); return; }
+        switch (b.Voice)
         {
             case "shucker": Say(b, "snarl", 0.8f, (s, k) => s.Voice(0.65f, 1, H.Rand(90, 105) * k, H.Rand(140, 160) * k, E, A, 0.5f, 0.3f, 0.85f, 0, 0, 0.04f, k, 0.8f, 2, 0.55f), 0.85f); break;
             case "saltwright": Say(b, "heave", 0.7f, (s, k) => s.Voice(0.5f, 1, 105 * k, 150 * k, UH, A, 0.4f, 0.1f, 0.6f, 0, 0, 0.02f, 0.9f, 0.6f, 2, 0.4f), 0.85f); break;
@@ -128,7 +136,7 @@ public static class Voices
     public static void Hurt(Body b, bool broke)
     {
         if (b.busyT > 0.3f && !broke) return;
-        switch (b.type)
+        switch (b.Voice)
         {
             case "shucker":
                 if (broke) Say(b, "wail", 2.0f, (s, k) => { s.Voice(0.9f, 1, H.Rand(260, 300) * k, H.Rand(340, 380) * k, A, A, 0.25f, 0.5f, 0.2f, 0.035f, 0, 0.02f, k, 0.3f, 2, 0.65f, 0.2f); s.Voice(0.7f, 0.8f, 330 * k, 150 * k, A, O, 0.3f, 0.6f, 0.4f, 0.03f, 1.0f, 0.03f, k, 0.4f, 2, 0.5f); Sob(s, 1.55f, 160 * k, 0.5f, 3); }, 0.9f, 2.2f);
@@ -144,7 +152,7 @@ public static class Voices
 
     public static void Die(Body b)
     {
-        switch (b.type)
+        switch (b.Voice)
         {
             case "shucker": case "saltwright":
                 // the air and water going out of it, rattling, choking, bubbling; then one last breath going out
@@ -166,7 +174,7 @@ public static class Voices
     static void Step(Body b)
     {
         bool wet = World.IsWater(b.Cx(), b.Feet() - 2) || b.room.Region is "wrackline" or "gullet" or "choir" or "cloister";
-        if (b.type == "saltwright") Snd.At("step:salt", 0.25f, s => { s.Noise(0.05f, 0.7f, "highpass", 2400, 1); s.Noise(0.12f, 0.8f, "lowpass", 180, 0.7f); }, b.Cx(), b.Feet(), 0.3f, 3);
+        if (b.Voice == "saltwright") Snd.At("step:salt", 0.25f, s => { s.Noise(0.05f, 0.7f, "highpass", 2400, 1); s.Noise(0.12f, 0.8f, "lowpass", 180, 0.7f); }, b.Cx(), b.Feet(), 0.3f, 3);
         else if (b.pose == "crawl") Snd.At("step:drag", 0.4f, s => s.NoiseSweep(0.3f, 0.6f, "bandpass", 500, 280, 1.5f, 0.05f), b.Cx(), b.Feet(), 0.18f, 3);
         else if (wet) Snd.At("step:wet", 0.2f, s => { s.Noise(0.05f, 0.8f, "lowpass", 520, 0.7f); s.Noise(0.05f, 0.4f, "bandpass", 1700, 3, 0.002f, 0.015f); }, b.Cx(), b.Feet(), 0.2f, 4);
         else Snd.At("step:bare", 0.15f, s => s.Noise(0.05f, 0.8f, "lowpass", 380, 0.7f), b.Cx(), b.Feet(), 0.14f, 3);
@@ -187,7 +195,7 @@ public static class Voices
             if (b.footT <= 0) { b.footT = 1; if (b.type == "abbot") Snd.At("step:abbot", 0.4f, s => { s.Noise(0.15f, 1, "lowpass", 140, 0.7f); s.Noise(0.06f, 0.4f, "highpass", 2000, 1); }, b.Cx(), b.Feet(), 0.55f, 2); else Step(b); }
         }
         if (b.mode is "downed" or "captured" or "gone") { b.spotted = false; return; }
-        bool hunter = b.thrallT <= 0 && !b.passive && b.mode != "dormant" && b.mode != "hang" && b.type is "shucker" or "saltwright" or "gullet" or "grafted";
+        bool hunter = b.thrallT <= 0 && !b.passive && b.mode != "dormant" && b.mode != "hang" && b.Voice is "shucker" or "saltwright" or "gullet" or "grafted" or "gull";
         b.senseT -= dt;
         if (hunter && b.senseT <= 0)
         {

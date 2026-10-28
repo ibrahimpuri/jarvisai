@@ -7,7 +7,7 @@ using Godot;
 
 namespace Hollowmere;
 
-public class Shot { public float x, y, vx, vy, life, dmg; public object src; }
+public class Shot { public float x, y, vx, vy, life, dmg, grav; public object src; public string kind; }
 
 // ---------------------------------------------------------------- Gullet
 public class Gullet : Body
@@ -17,6 +17,7 @@ public class Gullet : Body
     // The Gullet Pair hangs from two tendrils, a little apart. Cut one and it swings from the other; only cutting
     // both brings it down.
     public bool pair;
+    public override string Kind => pair ? "gulletpair" : "gullet";
     float swingT, swingCool;
     const float SPREAD = 9;
     public Gullet(Props spec, RoomDef room) : base(spec, room)
@@ -285,6 +286,7 @@ public class Bellmouth : Body
     // The Hooded Bellmouth has a hymnal page tied over its eyes. The lantern means nothing to it; noise does, so
     // shuttering will not save her, and only quiet will.
     public bool hooded;
+    public override string Kind => hooded ? "hooded" : "bellmouth";
     public Bellmouth(Props spec, RoomDef room) : base(spec, room)
     {
         type = "bellmouth";
@@ -767,7 +769,25 @@ public static class BodyTypes
         "abbot" => new Abbot(spec, room),
         "undertow" => new Undertow(spec, room),
         "shoal" => new Shoal(spec, room),
+        // the start
+        "saltgull" => new Saltgull(spec, room),
+        "netter" => new Netter(spec, room),
+        "kilnman" => new Kilnman(spec, room),
+        // the middle
+        "bloater" => new Bloater(spec, room),
+        "toller" => new Toller(spec, room),
+        "cantor" => new Cantor(spec, room),
+        "ossuary" => new Ossuary(spec, room),
+        "kite" => new Kite(spec, room),
+        // the end
+        "diver" => new Diver(spec, room),
+        "deepwalker" => new Deepwalker(spec, room),
+        "wick" => new Wick(spec, room),
         _ => null,
     };
-    public static bool Has(string t) => t is "shucker" or "gullet" or "bellmouth" or "driftling" or "saltwright" or "grafted" or "corpse" or "abbot" or "undertow" or "shoal";
+    public static readonly string[] START = { "shucker", "gullet", "bellmouth", "saltgull", "netter", "kilnman" };
+    public static readonly string[] MID = { "saltwright", "driftling", "bloater", "toller", "cantor", "ossuary", "kite" };
+    public static readonly string[] END = { "grafted", "diver", "deepwalker", "wick" };
+    public static bool Has(string t) => t is "shucker" or "gullet" or "bellmouth" or "driftling" or "saltwright" or "grafted" or "corpse" or "abbot" or "undertow" or "shoal"
+        || START.Contains(t) || MID.Contains(t) || END.Contains(t);
 }

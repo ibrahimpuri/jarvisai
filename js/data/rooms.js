@@ -327,6 +327,7 @@ room({
     '9': { type: 'barge', w: 4 },
   },
   ents2: [
+    {"type": "kilnman", "tx": 27, "ty": 18, "pose": "lying"},
     { type: 'wrackpool', tx: 20, ty: 18 },
     { type: 'chest', tx: 2, ty: 3, id: 'ch_pans', loot: { scrap: 2, salt: 2 }, fitting: 'soles' },
   ],
@@ -406,6 +407,7 @@ room({
     '8': { type: 'page', id: 'page_kilns', n: 2 },
   },
   ents2: [
+    {"type": "kilnman", "tx": 22, "ty": 18},
     { type: 'gullet', tx: 24, ty: 7, len: 3 },
     { type: 'weapon', tx: 6, ty: 14, id: 'harpoon' },
   ],
@@ -537,7 +539,11 @@ room({
     '4': { type: 'chest', id: 'ch_cloister', loot: { scrap: 2, kelp: 3, salt: 2 }, fitting: 'bilge' },
     '5': { type: 'page', id: 'page_cloister', n: 3 },
   },
-  ents2: [{ type: 'driftnest', tx: 20, ty: 12, n: 6 }],
+  ents2: [
+    { type: 'driftnest', tx: 20, ty: 12, n: 6 },
+    {"type": "bloater", "tx": 25, "ty": 19, "pose": "lying"},
+    {"type": "bloater", "tx": 13, "ty": 19, "pose": "lying"},
+  ],
 });
 
 room({
@@ -609,6 +615,7 @@ room({
     '8': { type: 'table', id: 'table_2', n: 2 },
   },
   ents2: [
+    {"type": "toller", "tx": 28, "ty": 16},
     { type: 'floater', tx: 4, ty: 16, w: 3 },
     { type: 'floater', tx: 9, ty: 16, w: 3 },
     { type: 'floater', tx: 13, ty: 16, w: 3 },
@@ -657,6 +664,7 @@ room({
     '6': { type: 'table', id: 'table_3', n: 3 },
   },
   ents2: [
+    {"type": "ossuary", "tx": 26, "ty": 16},
     { type: 'lift', tx: 20, ty: 17, w: 4 },
     { type: 'saltwright', tx: 16, ty: 16 },
     { type: 'page', tx: 3, ty: 16, id: 'page_prior', n: 4 },
@@ -697,7 +705,10 @@ room({
     '3': { type: 'stitch', id: 'stitch_steps' },
     '4': { type: 'saltwright' },
   },
-  ents2: [{ type: 'gullet', tx: 16, ty: 3, len: 5 }],
+  ents2: [
+    { type: 'gullet', tx: 16, ty: 3, len: 5 },
+    {"type": "cantor", "tx": 22, "ty": 16},
+  ],
 });
 
 room({
@@ -738,6 +749,7 @@ room({
     '9': { type: 'seal', id: 'seal_choir' },
   },
   ents2: [
+    {"type": "cantor", "tx": 33, "ty": 16},
     { type: 'ability', tx: 2, ty: 20, id: 'tidekey' },
     { type: 'page', tx: 36, ty: 3, id: 'page_choir', n: 5 },
     { type: 'choirmember', tx: 22, ty: 16 },
@@ -839,6 +851,9 @@ room({
     '3': { type: 'seal', id: 'seal_ribs' },
   },
   ents2: [
+    {"type": "kite", "tx": 15, "ty": 23},
+    {"type": "kite", "tx": 24, "ty": 32},
+    {"type": "kite", "tx": 36, "ty": 16, "pose": "perched"},
     { type: 'gullet', tx: 26, ty: 22, len: 3 },
     { type: 'gullet', tx: 12, ty: 2, len: 3 },
   ],
@@ -940,6 +955,7 @@ room({
     '4': { type: 'stitch', id: 'stitch_prisms' },
   },
   ents2: [
+    {"type": "kite", "tx": 20, "ty": 30},
     { type: 'prism', tx: 12, ty: 24, dir: 1, id: 'prismA' },
     { type: 'prism', tx: 26, ty: 24, dir: 2, id: 'prismB' },
     { type: 'prism', tx: 26, ty: 36, dir: 3, id: 'prismC' },
@@ -984,6 +1000,9 @@ room({
     '3': { type: 'shucker', pose: 'lying' },
   },
   ents2: [
+    {"type": "deepwalker", "tx": 8, "ty": 18},
+    {"type": "diver", "tx": 33, "ty": 18},
+    {"type": "bloater", "tx": 17, "ty": 14},
     { type: 'driftnest', tx: 20, ty: 10, n: 8, always: true },
     { type: 'wrackpool', tx: 30, ty: 17 },
     // the Saint's Ear: a hollow in the roof of the dome, where the Hollow was grown (Legend.cs)
@@ -1021,6 +1040,10 @@ room({
   ents: {
     '1': { type: 'page', id: 'page_lair', n: 9 },
   },
+  ents2: [
+    {"type": "diver", "tx": 30, "ty": 18},
+    {"type": "diver", "tx": 50, "ty": 18},
+  ],
 });
 
 // ---------------------------------------------------------------- Lantern Skull
@@ -1053,6 +1076,10 @@ room({
   ],
   ents: {},
   ents2: [
+    {"type": "wick", "tx": 10, "ty": 16},
+    {"type": "wick", "tx": 30, "ty": 16},
+    {"type": "toller", "tx": 24, "ty": 16},
+    {"type": "kilnman", "tx": 35, "ty": 16},
     { type: 'shoal', tx: 30, ty: 16 },
     { type: 'grafted', tx: 8, ty: 16 },
     { type: 'grafted', tx: 33, ty: 9 },

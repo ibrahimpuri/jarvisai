@@ -310,6 +310,12 @@ The full island is now being built from it, one region at a time, with a playabl
 - **Two variants:**
   - the Hooded Bellmouth, which screams at noise rather than light
   - the Gullet Pair, which hangs from two tendrils
+- **Eleven new kinds of the drowned, in three tiers:**
+  - **start:** Saltgull flocks, the net-throwing Netter, the fireproof Kilnman
+  - **mid:** the Bloater, the bell-ringing Toller, the Cantor who sings the dead back up, the Ossuary, the gliding Kite
+  - **end:** the Drowned Diver, the Deepwalker, the light-drinking Wick
+
+  Earlier kinds keep appearing later, and later kinds come into earlier regions on revisits. The journal keeps a bestiary of every kind Maren has seen, with how to put each one down. See [godot/docs/ENEMIES.md](godot/docs/ENEMIES.md).
 - **The engine:** a chart that grows and zooms, saves that move with the island, and bell-cable lifts between a region's Bell Rooms from Act II.
 
 Still smaller than the document: art and audio are procedural (stick-skeleton puppets, tile shading and synthesised sound).

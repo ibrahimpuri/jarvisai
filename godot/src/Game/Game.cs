@@ -196,6 +196,10 @@ public static class G
     {
         var f = World.flags;
         string t = spec.S("type");
+        // As the night goes on the drowned move: later kinds come up into the places she has been, and earlier ones
+        // go down into the deep (spawns marked fromAct appear from that act, untilAct up to it).
+        if (spec.Has("fromAct") && act < spec.I("fromAct")) return null;
+        if (spec.Has("untilAct") && act > spec.I("untilAct")) return null;
         if (t == "gullet")
         {
             int ty = spec.I("ty");
@@ -1005,9 +1009,17 @@ public static class G
         sawlines.RemoveAll(s => s.dead);
         foreach (var s in enemyShots)
         {
+            s.vy += s.grav * dt;
             s.x += s.vx * dt; s.y += s.vy * dt; s.life -= dt;
             if (World.SolidPx(s.x, s.y)) s.life = 0;
-            if (H.RectsOverlap(s.x - 2, s.y - 2, 4, 4, p.x, p.y, p.w, p.h)) { p.Hurt((int)s.dmg, s.src as Mover); s.life = 0; }
+            float sz = s.kind == "net" ? 6 : 2;
+            if (H.RectsOverlap(s.x - sz, s.y - sz, sz * 2, sz * 2, p.x, p.y, p.w, p.h))
+            {
+                // a thrown net does not wound: it holds
+                if (s.kind == "net") { if (!p.Invuln()) p.Entangle(2.6f); }
+                else p.Hurt((int)s.dmg, s.src as Mover);
+                s.life = 0;
+            }
         }
         enemyShots.RemoveAll(s => s.life <= 0);
         Fire.Update(dt);
@@ -1038,6 +1050,14 @@ public static class G
         if (!had.Contains("lowOil") && p.LanternLit() && p.oil < p.OilMax() * 0.15f) Narr.Think("lowOil");
         if (!had.Contains("rings") && p.Has("swing") && RingNear(p, 6)) Narr.Think("rings");
         if (!had.Contains("bellmouth") && ents.OfType<Body>().Any(b => b.type == "bellmouth" && b.Alive() && H.Dist(b.Cx(), b.Cy(), p.Cx(), p.Cy()) < 220)) Narr.Think("bellmouth");
+        // the first of each kind she sees: it goes in the journal's bestiary, and the new ones get a thought of her own
+        foreach (var e0 in ents)
+        {
+            if (e0 is not Body b || b.corpse || b.gone || !b.Alive() || b.boss || narr.kinds.Contains(b.Kind)) continue;
+            if (H.Dist(b.Cx(), b.Cy(), p.Cx(), p.Cy()) > 220 || !Phys.Los(p.Cx(), p.Cy(), b.Cx(), b.Cy())) continue;
+            narr.kinds.Add(b.Kind);
+            Narr.Think("see_" + b.Kind);
+        }
         Hints.Update(dt);
         // Undertow glimpse at the Tithe window.
         if (room.Id == "tithe" && f.B("titheTrapped") && !f.B("glimpse") && p.y < room.Py + 8 * TS)

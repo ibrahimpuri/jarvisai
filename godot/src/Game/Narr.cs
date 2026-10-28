@@ -9,6 +9,7 @@ namespace Hollowmere;
 public class NarrState
 {
     public HashSet<string> thoughts = new(), regions = new(), read = new(), heard = new(), hints = new(), did = new();
+    public HashSet<string> kinds = new();   // the kinds of the drowned she has seen (the journal's bestiary)
     public int dreamIndex;
     public Dictionary<string, int> lore = new();
     public JsonObject ToJson()
@@ -17,7 +18,7 @@ public class NarrState
         return new JsonObject
         {
             ["thoughts"] = A(thoughts), ["regions"] = A(regions), ["read"] = A(read), ["heard"] = A(heard), ["dreamIndex"] = dreamIndex,
-            ["hints"] = A(hints), ["did"] = A(did),
+            ["hints"] = A(hints), ["did"] = A(did), ["kinds"] = A(kinds),
             ["lore"] = new JsonObject(lore.Select(kv => new KeyValuePair<string, JsonNode>(kv.Key, kv.Value))),
         };
     }
@@ -29,6 +30,7 @@ public class NarrState
         s.read = new HashSet<string>(p.Strings("read")); s.heard = new HashSet<string>(p.Strings("heard"));
         s.dreamIndex = p.I("dreamIndex"); s.lore = p.Counts("lore");
         s.hints = new HashSet<string>(p.Strings("hints")); s.did = new HashSet<string>(p.Strings("did"));
+        s.kinds = new HashSet<string>(p.Strings("kinds"));
         return s;
     }
 }

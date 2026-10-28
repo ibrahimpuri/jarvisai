@@ -1339,6 +1339,156 @@ public static class Scenarios
             }
         },
 
+        // The bestiary: each newer kind of the drowned follows the rule that sets it apart, the tiers are where they
+        // should be, later kinds come up into earlier places as the acts go on, and the journal records what she sees.
+        ["bestiary"] = async t =>
+        {
+            G.god = true;
+            var p = G.player;
+            Body Spawn(string type, int tx, int ty, params (string k, object v)[] more)
+            {
+                var r = G.room; var sp = Props.Empty();
+                sp.Set("type", type); sp.Set("x", r.Px + tx * 16 + 8); sp.Set("y", r.Py + (ty + 1) * 16); sp.Set("key", "test_" + type + H.Uid());
+                foreach (var (k, v) in more) { if (v is string sv) sp.Set(k, sv); else if (v is bool bv) sp.Set(k, bv); else sp.Set(k, Convert.ToSingle(v)); }
+                var b = BodyTypes.Make(type, sp, r); G.ents.Add(b); return b;
+            }
+            t.Ok("the tiers name every new kind", BodyTypes.START.Contains("netter") && BodyTypes.MID.Contains("cantor") && BodyTypes.END.Contains("wick"));
+
+            // Saltgulls: a roost lifts together at a noise; one knot brings a bird down
+            t.Place("lookout", 4, 16); await t.Run(0.3f);
+            var gulls = G.ents.OfType<Saltgull>().ToList();
+            t.Ok("the lookout has a roost of Saltgulls", gulls.Count >= 3 && gulls.All(g0 => g0.mode == "dormant"), gulls.Count + "");
+            Noise.Emit(gulls[0].Cx(), gulls[0].Cy() + 20, 6, "rivet"); await t.Run(0.2f);
+            t.Ok("a noise lifts the whole roost", gulls.All(g0 => g0.mode == "fly"), string.Join(",", gulls.Select(g0 => g0.mode)));
+            t.Snap("beast_gulls");
+            gulls[0].DamageKnot(gulls[0].K("wing"), 2, "rivet"); await t.Run(0.5f);
+            t.Ok("one hit at the wing brings a gull down", gulls[0].mode == "downed", gulls[0].mode);
+            for (int i = 0; i < 40 && !G.narr.kinds.Contains("saltgull"); i++) await t.Run(0.1f);
+            t.Ok("and the journal has the Saltgull once she has seen one", G.narr.kinds.Contains("saltgull"));
+
+            // the Netter's net: it holds her, slows her, and the gaff cuts it
+            t.Place("sheds", 10, 16); await t.Run(0.2f);
+            G.god = false; p.hp = p.maxHp; p.invulnT = 0;
+            var nt = Spawn("netter", 20, 16);
+            G.enemyShots.Add(new Shot { x = p.Cx(), y = p.Cy() - 20, vx = 0, vy = 60, grav = 0, life = 1, dmg = 0, src = nt, kind = "net" });
+            await t.Run(0.4f);
+            t.Ok("a net lands and holds her", p.netT > 0, p.netT);
+            t.Snap("beast_net");
+            float x0 = p.x; t.Down("right"); await t.Run(0.5f); t.Release("right");
+            t.Ok("netted, she can hardly move", p.x - x0 < 30, $"moved {p.x - x0:0}");
+            await t.Tap("gaff"); await t.Run(0.1f);
+            t.Ok("the gaff cuts her free", p.netT <= 0, p.netT);
+            nt.DamageKnot(nt.K("elbowR"), 99, "rivet");
+            t.Ok("with her throwing arm broken she has no more nets", !nt.ArmOK("R"));
+            G.god = true; nt.gone = true;
+
+            // the Kilnman: fire will not touch him; water puts him out and makes him brittle
+            t.Place("seep", 4, 16); await t.Run(0.2f);
+            var km = G.ents.OfType<Kilnman>().First();
+            var kk = km.K("kneeL"); float before = kk.hp;
+            km.DamageKnot(kk, 1, "fire");
+            t.Ok("fire does not hurt a Kilnman", kk.hp == before, kk.hp);
+            km.x = G.room.Px + 20 * 16; km.y = G.room.Py + 19 * 16; await t.Run(0.5f);
+            t.Ok("in the brine his heat goes out", km.doused);
+            float hp0 = kk.hp; km.DamageKnot(kk, 1, "rivet");
+            t.Ok("and a doused knot breaks twice as fast", MathF.Abs(hp0 - kk.hp - 2) < 0.01f || kk.broken, $"{hp0} -> {kk.hp}");
+
+            // the Bloater: break the belly and the swarm comes out; burn it and nothing does
+            t.Place("sheds", 4, 16); await t.Run(0.2f);
+            var bl = Spawn("bloater", 20, 16);
+            int drift0 = G.ents.OfType<Driftling>().Count();
+            bl.DamageKnot(bl.K("crown"), 99, "rivet"); await t.Run(0.1f);
+            t.Ok("a Bloater's belly bursts into Driftlings", G.ents.OfType<Driftling>().Count() >= drift0 + 5, G.ents.OfType<Driftling>().Count() - drift0);
+            foreach (var dl in G.ents.OfType<Driftling>()) dl.gone = true;
+            var bl2 = Spawn("bloater", 24, 16); bl2.burnT = 2;
+            int drift1 = G.ents.OfType<Driftling>().Count(e => !e.gone);
+            bl2.DamageKnot(bl2.K("crown"), 99, "fire"); await t.Run(0.1f);
+            t.Ok("a burning one does not", G.ents.OfType<Driftling>().Count(e => !e.gone) == drift1);
+
+            // the Toller: his bell wakes the room
+            var sleeper = G.ents.OfType<Shucker>().FirstOrDefault(e => e.mode == "dormant");
+            var tl = Spawn("toller", 30, 16);
+            p.x = tl.Cx() - 60; p.facing = 1; tl.facing = -1;
+            for (int i = 0; i < 40 && tl.mode != "ring"; i++) await t.Run(0.05f);
+            t.Ok("the Toller lifts his bell when he sees her", tl.mode == "ring", tl.mode);
+            await t.Run(1.6f);
+            t.Ok("and the bell wakes the sleepers", sleeper == null || sleeper.mode != "dormant", sleeper?.mode);
+            tl.gone = true;
+
+            // the Cantor: its song stands the downed back up, until its jaw is broken
+            t.Place("sheds", 4, 16); await t.Run(0.2f);
+            foreach (var e in G.ents.OfType<Body>()) e.gone = true;
+            var vic = Spawn("shucker", 18, 16); vic.Down("rivet");
+            var ca = Spawn("cantor", 26, 16);
+            await t.Run(0.2f);
+            t.Ok("the Cantor sings to the downed body", ca.mode == "sing", ca.mode);
+            await t.Run(3.6f);
+            t.Ok("and it stands back up", vic.mode != "downed", vic.mode);
+            vic.Down("rivet"); ca.DamageKnot(ca.K("jaw"), 99, "rivet"); await t.Run(4);
+            t.Ok("with its jaw broken the dead stay down", vic.mode == "downed", vic.mode);
+            ca.gone = true; vic.gone = true;
+
+            // the Ossuary: a heap until she comes close; brittle while it puts itself together
+            var os = Spawn("ossuary", 26, 16);
+            t.Ok("an Ossuary lies as a heap of bones", os.mode == "pile");
+            p.x = os.Cx() - 40; await t.Run(0.2f);
+            t.Ok("it assembles when she comes near", os.mode == "assemble", os.mode);
+            var ok0 = os.K("kneeL"); float o0 = ok0.hp; os.DamageKnot(ok0, 1, "rivet");
+            t.Ok("and while it does, its knots break twice as fast", MathF.Abs(o0 - ok0.hp - 2) < 0.01f || ok0.broken, $"{o0} -> {ok0.hp}");
+            os.gone = true;
+
+            // the Kite: flies until a shoulder breaks, then crawls
+            var ki = Spawn("kite", 20, 8); await t.Run(0.3f);
+            t.Ok("a Kite glides", ki.mode is "glide" or "dive", ki.mode);
+            ki.DamageKnot(ki.K("shoulderL"), 99, "rivet"); await t.Run(0.3f);
+            t.Ok("a broken shoulder folds it and it crawls", ki.mode == "hunt" && ki.pose == "crawl", $"{ki.mode} {ki.pose}");
+            ki.gone = true;
+
+            // the Drowned Diver: the helmet seals its crown until the latch breaks
+            var dv = Spawn("diver", 26, 16);
+            t.Ok("a Diver's crown is sealed by its helmet", dv.IsSealed(dv.K("crown")));
+            dv.DamageKnot(dv.K("latch"), 99, "rivet");
+            t.Ok("until the latch at its neck breaks", !dv.IsSealed(dv.K("crown")));
+            dv.gone = true;
+
+            // the Deepwalker: only a knot in the focused beam can be broken
+            var dw = Spawn("deepwalker", 26, 16);
+            var dk = dw.K("kneeL"); float d0 = dk.hp;
+            p.focusing = false; dw.DamageKnot(dk, 2, "rivet");
+            t.Ok("a Deepwalker's dark knot cannot be broken", dk.hp == d0, dk.hp);
+            // her focused beam laid on the knot, then the shot
+            p.x = dw.Cx() - 70; p.facing = 1; p.shut = false; p.oil = 50; await t.Run(0.05f);
+            var kpos = dw.KnotPos(dk).Value;
+            p.focusing = true; p.aim = MathF.Atan2(kpos.Y - (p.y + 8), kpos.X - p.Cx());
+            bool lit = p.BeamHits(kpos.X, kpos.Y);
+            dw.DamageKnot(dk, 2, "rivet");
+            t.Ok("in the focused beam it can", lit && dk.hp < d0, $"lit={lit} hp={dk.hp}");
+            p.focusing = false; dw.gone = true;
+
+            // the Wick: it drinks her lantern
+            var wk = Spawn("wick", 14, 16);
+            p.x = wk.Cx() - 30; p.oil = 60; p.shut = false;
+            await t.Run(1.0f);
+            t.Ok("near a Wick her oil runs out", p.oil < 56, p.oil);
+            t.Snap("beast_wick");
+            wk.gone = true;
+
+            // the acts: later kinds come up into the places she has been
+            G.act = 1; t.Place("wrecks", 20, 9); await t.Run(0.2f);
+            bool none = !G.ents.OfType<Bloater>().Any();
+            G.act = 2; t.Place("ferry", 20, 13); await t.Run(0.2f); t.Place("wrecks", 20, 9); await t.Run(0.2f);
+            t.Ok("the Wreck Field has Bloaters from Act II, not before", none && G.ents.OfType<Bloater>().Any());
+            G.act = 3; t.Place("cottage", 3, 16); await t.Run(0.2f);
+            t.Ok("and the Hult Cottage has a Wick in Act III", G.ents.OfType<Wick>().Any());
+
+            // the journal: the drowned she has seen
+            UI.Satchel("log"); await t.Run(0.3f);
+            string jt = UI.Inst.AllText().ToLowerInvariant();
+            t.Ok("the journal lists the drowned she has seen", jt.Contains("the drowned (") && jt.Contains("saltgull") && jt.Contains("netter"), "");
+            t.Snap("beast_journal");
+            UI.Close();
+        },
+
         ["difficulty"] = async t =>
         {
             // every crossing, from the table out to the drowned: rivets to put a Shucker down, Maren's pips, how hard a

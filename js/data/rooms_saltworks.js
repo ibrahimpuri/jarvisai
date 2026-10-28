@@ -106,7 +106,7 @@ room({
     "_                             H        _",
     "                              H         ",
     "                              H         ",
-    "                              H     1   ",
+    "                    gg        H  g  1   ",
     "_TTTTTTTTTTH     TTTTTTTbbbTTTTTTTTTTTTT",
     "_   |    | H      |   |      |    |    _",
     "_   |    | H      |   |      |    |    _",
@@ -116,7 +116,11 @@ room({
   ],
   ents: {
     "1": {"type": "shucker", "pose": "lying"},
+    "g": {"type": "saltgull"},
   },
+  ents2: [
+    {"type": "kite", "tx": 25, "ty": 8, "fromAct": 2},
+  ],
 });
 
 room({
@@ -194,7 +198,7 @@ room({
   ],
   ents: {
     "1": {"type": "barrel"},
-    "2": {"type": "shucker", "pose": "lying"},
+    "2": {"type": "kilnman", "pose": "lying"},
     "3": {"type": "shucker", "pose": "seated"},
     "4": {"type": "chest", "id": "ch_upperkilns", "loot": {"tallow": 2, "scrap": 2}},
   },
@@ -278,6 +282,9 @@ room({
     "2": {"type": "sign", "text": "Brass plate on the tank: BRINE CISTERN. THIRTY FATHOMS OF THE SAINT'S OWN WATER. ITS WEIGHT WILL CRUSH AN UNSEALED SUIT."},
     "3": {"type": "pickup", "item": "salt", "n": 2},
   },
+  ents2: [
+    {"type": "deepwalker", "tx": 8, "ty": 21, "fromAct": 3},
+  ],
 });
 
 room({
@@ -313,7 +320,7 @@ room({
   ],
   ents: {
     "1": {"type": "chest", "id": "ch_furnace", "loot": {"scrap": 2, "oil": 1}},
-    "2": {"type": "shucker", "pose": "lying"},
+    "2": {"type": "kilnman", "pose": "lying"},
   },
   ents2: [
     {"type": "gullet", "tx": 20, "ty": 2, "len": 4, "pair": true},
@@ -356,6 +363,9 @@ room({
     "2": {"type": "shucker", "pose": "seated"},
     "3": {"type": "pickup", "item": "oil", "n": 1},
   },
+  ents2: [
+    {"type": "wick", "tx": 26, "ty": 16, "fromAct": 3},
+  ],
 });
 
 room({
@@ -512,7 +522,7 @@ room({
   ents: {
     "1": {"type": "chest", "id": "ch_seep", "loot": {"ivory": 1, "cord": 1}, "label": "a pick-box on the bottom"},
     "2": {"type": "sign", "text": "The brine seeps out of the rock like sweat. It bears you up like a hand, and nothing you could carry would take you to the bottom."},
-    "3": {"type": "shucker", "pose": "lying"},
+    "3": {"type": "kilnman", "pose": "standing"},
   },
 });
 
@@ -655,6 +665,9 @@ room({
     "2": {"type": "shucker", "pose": "seated"},
     "3": {"type": "corpse", "pose": "seated"},
   },
+  ents2: [
+    {"type": "ossuary", "tx": 11, "ty": 16, "fromAct": 2},
+  ],
 });
 
 room({
@@ -810,6 +823,9 @@ room({
     "3": {"type": "chest", "id": "ch_saltcloister", "loot": {"scrap": 3, "oil": 1}},
     "4": {"type": "bellmouth", "pose": "seated", "hooded": true},
   },
+  ents2: [
+    {"type": "toller", "tx": 15, "ty": 16, "fromAct": 2},
+  ],
 });
 
 room({
@@ -847,6 +863,9 @@ room({
     "1": {"type": "pickup", "item": "poultice", "n": 1},
     "2": {"type": "shucker", "pose": "seated"},
   },
+  ents2: [
+    {"type": "cantor", "tx": 26, "ty": 16, "fromAct": 2},
+  ],
 });
 
 room({

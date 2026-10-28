@@ -65,6 +65,18 @@ public class Player : Mover
     public Player() { w = 10; h = 22; stepUp = true; bag.Add("rivets", 12); bag.Add("poultice", 1); }
 
     public bool Has(string a) => abilities.Contains(a);
+    // A Netter's net over her: she can hardly move and cannot jump until she tears it (mash jump), cuts it with the
+    // gaff, or it burns.
+    public float netT;
+    public void Entangle(float t)
+    {
+        if (dead || G.god) return;
+        bool fresh = netT <= 0;
+        netT = MathF.Max(netT, t);
+        Snd.Grab(); FX.Spawn(Cx(), Cy(), 6, new FXOpt { color = "#8a7a5a", smin = 10, smax = 40 });
+        if (fresh) H.ToastMsg("Netted! Mash {jump} to tear it, or {gaff} to cut it.", 2);
+        Hints.Did("net");
+    }
     public bool HasFitting(string f) => fittings.Contains(f);
     public bool Invuln() => invulnT > 0 || (dashT > 0 && dashInv > 0);
     public int WeaponTier(string wn) => weapons.TryGetValue(wn, out var ws) ? ws.tier : 0;
@@ -307,7 +319,7 @@ public class Player : Mover
                 else if (Inp.mouse.l || Inp.Held("fire")) Fire();
                 if (Hollow.owned) Hollow.Play(this, Inp.Held("sing"), Inp.Hit("sing"), dt);
             }
-            if (Inp.Hit("gaff")) GaffStrike();
+            if (Inp.Hit("gaff") && netT <= 0) GaffStrike();
             if (Inp.Hit("burn")) BurnBody();
             if (Inp.Hit("interact")) G.Interact();
         }
@@ -394,6 +406,7 @@ public class Player : Mover
         if (healT > 0 && healKind == "poultice") speed *= 0.4f;
         if (Legend.beaming) speed = MathF.Min(speed, 55);
         if (boots && InWater()) speed = 85;
+        if (netT > 0) speed *= 0.3f;
         if (Locked()) speed = 0;
         int dir = Dir();
         if (dashT > 0)
@@ -411,7 +424,16 @@ public class Player : Mover
         ApplyWind(dt);
 
         if (onGround) { coyote = COYOTE; airDashed = false; } else coyote -= dt;
-        if (Inp.Hit("jump")) jumpBuf = BUFFER; else jumpBuf -= dt;
+        if (netT > 0)
+        {
+            // tangled: jump tears at the net instead of jumping; the gaff cuts it; fire burns it off
+            netT -= dt;
+            if (Inp.Hit("jump")) { netT -= 0.45f; FX.Spawn(Cx(), Cy(), 2, new FXOpt { color = "#8a7a5a", smin = 10, smax = 30 }); }
+            if (Inp.Hit("gaff") || Hollowmere.Fire.BurnsAt(Cx(), Cy())) netT = 0;
+            if (netT <= 0) { netT = 0; Snd.Gaff(); H.ToastMsg("Free of the net.", 1); }
+            jumpBuf = 0;
+        }
+        else if (Inp.Hit("jump")) jumpBuf = BUFFER; else jumpBuf -= dt;
 
         // Ladders. Up climbs one; so does jump at a ladder with no direction held (cross on a PlayStation pad), and
         // jump held in the air catches one. Jump with a direction is still a jump, so a run past a ladder carries on.
@@ -1443,6 +1465,14 @@ public class Player : Mover
             float by = headY - hr - 6;
             c.Fill = H.Rgba(0, 0, 0, 0.6f); c.FillRect(x0 - 7, by - 0.5f, 14, 2.4f);
             c.Fill = col; c.FillRect(x0 - 6.5f, by, 13 * Math.Clamp(prog, 0, 1), 1.4f);
+        }
+        // a net over her shoulders, knotted cord in a coarse mesh
+        if (netT > 0)
+        {
+            c.Stroke = H.Rgba(150, 132, 96, 0.85f); c.LineWidth = 0.5f;
+            float nx0 = x0 - 8, ny0 = headY - 6, nw = 16, nh = gy - ny0 + 1;
+            for (int i = 0; i <= 5; i++) { float u = i / 5f; c.Line(nx0 + nw * u, ny0, nx0 + nw * (u * 0.8f + 0.1f), ny0 + nh); }
+            for (int i = 0; i <= 6; i++) { float u = i / 6f; c.Line(nx0 + u * 1.5f, ny0 + nh * u, nx0 + nw - u * 1.5f, ny0 + nh * u + MathF.Sin(G.Now * 3 + i) * 0.6f); }
         }
         // graft knots grown into her, faintly alight
         if (grafts.Count > 0)

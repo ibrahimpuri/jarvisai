@@ -476,6 +476,22 @@ public partial class UiRoot
         var tr2 = new HFlowContainer(); tr2.AddThemeConstantOverride("h_separation", 3); rc.AddChild(tr2);
         if (G.tables.Count == 0) Lbl(tr2, "No tables yet.", 5, INK_SOFT, italic: true);
         foreach (var n in G.tables.OrderBy(x => x)) Btn(tr2, "Table " + n, () => Dialogue("Prior's tide table", new List<string> { Story.TABLES[n] }, () => Satchel("log")));
+        // the bestiary: every kind of the drowned she has seen, with how to put it down
+        var beasts = Data.Lore.P("bestiary");
+        if (beasts != null)
+        {
+            var seen = beasts.Keys.Where(k => G.narr.kinds.Contains(k)).ToList();
+            InkRule(rc);
+            Lbl(rc, $"The drowned ({seen.Count}/{beasts.Keys.Count()})", 6, INK_SOFT, caps: true);
+            var br = new HFlowContainer(); br.AddThemeConstantOverride("h_separation", 3); br.AddThemeConstantOverride("v_separation", 3); rc.AddChild(br);
+            if (seen.Count == 0) Lbl(br, "Nothing yet. Keep the lamp lit.", 5, INK_SOFT, italic: true);
+            string TierName(string t) => t == "start" ? "first met on the outer island" : t == "mid" ? "met below the abbey" : "met in the deep and in the Skull";
+            foreach (var k in seen)
+            {
+                var e = beasts.P(k);
+                Btn(br, e.S("name"), () => Dialogue(e.S("name"), new List<string> { e.S("text"), "(" + char.ToUpper(TierName(e.S("tier"))[0]) + TierName(e.S("tier"))[1..] + ".)" }, () => Satchel("log")), style: MenuArt.Btn.Chip);
+            }
+        }
         InkRule(rc);
         Lbl(rc, $"Stitches {G.collected.Count(k => k.StartsWith("stitch"))}/4  ·  Brass Seals {G.collected.Count(k => k.StartsWith("seal"))}/6  ·  Knots broken {G.stats.knots.Values.Sum()}", 5, INK_SOFT);
     }
