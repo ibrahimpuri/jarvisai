@@ -676,10 +676,10 @@ public partial class UiRoot : CanvasLayer
             c.FillRect(TileArt.Hash(i, 1) * W, sy, r, r, new Color(0.85f, 0.9f, 1, a * (0.7f - 0.5f * sy / hz)));
         }
         float mx = W * 0.78f, my = hz * 0.32f;
-        c.Glow(mx, my, 34, new Color(0.7f, 0.8f, 0.85f, 0.06f));
         c.Fill = new Color(0.86f, 0.88f, 0.8f, 0.85f); c.BeginPath(); c.Arc(mx, my, 9, 0, H.PI * 2); c.FillPath();
-        // the bite out of the moon is the sky behind it, so it leaves no ring
+        // the bite out of the moon is the sky behind it, and the halo goes over both, so it leaves no ring
         c.Fill = skyTop.Lerp(skyLow, my / hz); c.BeginPath(); c.Arc(mx + 4, my - 2, 9, 0, H.PI * 2); c.FillPath();
+        c.Glow(mx, my, 34, new Color(0.7f, 0.8f, 0.85f, 0.06f));
         // the sea, flat and grey and ordinary: a haze on the horizon, and the swell in rows that widen toward her
         c.FillRectGradV(0, hz, W, Hh - hz, H.Col("#0b181c"), H.Col("#020507"));
         c.FillRectGradV(0, hz - 6, W, 10, new Color(0.3f, 0.42f, 0.45f, 0), new Color(0.3f, 0.42f, 0.45f, 0.12f));
@@ -688,7 +688,7 @@ public partial class UiRoot : CanvasLayer
             float d = TileArt.Hash(i, 5), y = hz + 2 + d * d * (Hh - hz - 30), near = (y - hz) / (Hh - hz);
             float len = 4 + near * 34 * (0.5f + TileArt.Hash(i, 6)), drift = t * (2 + near * 9);
             float x = ((TileArt.Hash(i, 7) * (W + 80) + drift) % (W + 80)) - 40;
-            float a = (0.035f + near * 0.05f) * (0.6f + 0.4f * MathF.Sin(t * 0.8f + i));
+            float a = (0.05f + near * 0.07f) * (0.6f + 0.4f * MathF.Sin(t * 0.8f + i));
             c.FillRect(x, y, len, 0.5f + near * 0.5f, new Color(0.55f, 0.7f, 0.72f, a));
         }
         // the moon's road across the water, broken by the swell
