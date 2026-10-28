@@ -2645,7 +2645,7 @@
    "ents2": [
     {
      "type": "bloater",
-     "tx": 24,
+     "tx": 27,
      "ty": 19,
      "pose": "lying",
      "fromAct": 2

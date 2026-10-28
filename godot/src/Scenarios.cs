@@ -1004,7 +1004,9 @@ public static class Scenarios
             t.Ok("a Bell Room plays the sanctuary", G.player.inBellRoom && Score.Target("score/sanctuary") == 1 && Score.Level("score/sanctuary") > 0.8f, $"{G.player.inBellRoom} {Score.Level("score/sanctuary"):0.00}");
             t.Ok("and the dread cannot follow her in", Score.Target("score/dread") == 0);
             // another region
-            t.Place("cloister", 8, 16); await t.Run(4.5f);
+            t.Place("cloister", 8, 16);
+            foreach (var b in G.ents.OfType<Body>()) b.gone = true;
+            await t.Run(4.5f);
             t.Ok("the Cloister has its own bed", Score.Bed == "cloister" && Score.Level("score/bed_cloister") > 0.9f && Score.Level("score/bed_saltworks") < 0.05f, $"{Score.Bed}");
             // the dread director: quiet, alone, it makes sounds; never in a fight
             Snd.Heard.Clear(); int before = Dread.Played;

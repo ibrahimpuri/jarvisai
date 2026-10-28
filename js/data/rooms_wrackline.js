@@ -426,7 +426,7 @@ room({
     "3": {"type": "sign", "text": "The manifest, nailed to a beam: salt for the mainland, eleven barrels. Crew, nine. Ennis, Bray and Coll have been struck out, and written in again below."},
   },
   ents2: [
-    {"type": "bloater", "tx": 24, "ty": 19, "pose": "lying", "fromAct": 2},
+    {"type": "bloater", "tx": 27, "ty": 19, "pose": "lying", "fromAct": 2},
     {"type": "diver", "tx": 33, "ty": 19, "fromAct": 3},
   ],
 });

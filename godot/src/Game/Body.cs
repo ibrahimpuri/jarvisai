@@ -393,6 +393,8 @@ public class Body : Ent
             if (burnT <= 0) { gone = true; mode = "gone"; G.OnBodyBurned(this); FX.Spawn(Cx(), Cy(), 20, new FXOpt { color = "#333", grav = -30 }); }
             return;
         }
+        // burned away, hauled into the sea: nothing left to act
+        if (gone) return;
         // Fire hurts knots.
         if (Fire.BurnsAt(Cx(), Feet() - 4) && mode != "downed")
         {
