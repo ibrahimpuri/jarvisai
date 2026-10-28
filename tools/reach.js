@@ -138,7 +138,8 @@ function analyse(abil, flags, extraSolid = [], opts = {}) {
       for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
         const nx = x + dx, ny = y + dy;
         if (!bodyFree(nx, ny)) continue;
-        if (swimOK(nx, ny)) push(nx, ny); else if (!water(nx, ny)) fall(nx, ny);
+        // swimming down into brine with the boots on, she sinks through it
+        if (swimOK(nx, ny)) push(nx, ny); else if (!water(nx, ny) || (brine(nx, ny) && can('boots'))) fall(nx, ny);
       }
     }
     if (ladder(x, y) || ladder(x, y - 1)) {
