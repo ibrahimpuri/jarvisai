@@ -92,7 +92,7 @@ H.Narr = (() => {
       if (W.solidity(below) !== 1) continue;
       if (taken.has(lx + ',' + ly) || taken.has((lx - 1) + ',' + ly) || taken.has((lx + 1) + ',' + ly)) continue;
       // keep clear of the low-tide water line
-      if (room.row === 4 && !room.fixedWater && (ty + 0.5) > H.Tide.SEA_LOW) continue;
+      if (H.Tide.tidal(room) && !room.fixedWater && (ty + 0.5) > H.Tide.SEA_LOW) continue;
       const d = Math.abs(dx) + Math.abs(dy) * 1.5;
       if (d < bd) { bd = d; best = [lx, ly]; }
     }

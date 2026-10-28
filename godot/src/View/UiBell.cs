@@ -38,6 +38,11 @@ public partial class UiRoot
         Btn(col, "Rest: " + (p.grafts.Contains("lung") ? "heal by half (Tide Lung)" : "heal") + ", save, wait for Low tide", () => { if (!PayDrowned()) return; Close(); G.Rest(bell); }, primary: true);
         Btn(col, "Reliquary chest (shared by every Bell Room)", () => Reliquary(() => BellMenu(bell)));
         Btn(col, "Bench: craft, upgrades, fittings" + (bell.room.Id == "chapel" ? ", surgery" : ""), () => Bench(bell.room.Id == "chapel", () => BellMenu(bell)));
+        foreach (var (room, _, name) in G.CableTargets(bell))
+        {
+            var to = room;
+            Btn(col, "Ride the bell-cable to " + name + (name.EndsWith("Room") ? "" : " Bell Room"), () => { Close(); G.RideCable(to); });
+        }
         Btn(col, "Leave", Close);
         Rule(c);
         Small(c, "Resting skips time. Every body left lying in water re-knots on the way.").HorizontalAlignment = HorizontalAlignment.Center;

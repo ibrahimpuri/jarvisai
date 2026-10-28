@@ -159,7 +159,7 @@ public static class Masonry
         }
 
         // ---- the sea's own record, in the rooms the tide reaches ----
-        if (r.Row == 4 && r.FixedWater == null)
+        if (r.Tidal && r.FixedWater == null)
         {
             float hi = (Tide.SEA_HIGH - Tide.spring) * TS - r.Py;
             if (hi > 0 && hi < r.Ph)

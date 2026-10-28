@@ -521,7 +521,7 @@ public partial class WorldView : Node2D
         // the room's monument, if something happened here (StoryFocus finds it by the same placement)
         Monuments.Paint(c, r);
         // tide marks on pillars (static per room; drawn with the back wall)
-        if (r.Row == 4 && r.FixedWater == null)
+        if (r.Tidal && r.FixedWater == null)
         {
             float lo = (Tide.SEA_LOW - Tide.spring) * TS, hi = (Tide.SEA_HIGH - Tide.spring) * TS;
             c.Font = "6px monospace";

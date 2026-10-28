@@ -11,8 +11,10 @@ public static class Tide
     {
         new("low", "Low", 180), new("rising", "Rising", 120), new("high", "High", 180), new("ebbing", "Ebbing", 120),
     };
-    // World-space water surfaces (in tiles, y grows downward).
-    public const float SEA_LOW = 109, SEA_HIGH = 101;
+    // The sea row: the one row of screens the tide moves through. Rooms on it are tidal; rows below are under the sea.
+    public const int SEA_ROW = 9;
+    // World-space water surfaces (in tiles, y grows downward), inside the sea row.
+    public const float SEA_LOW = SEA_ROW * H.SCREEN_H + 17, SEA_HIGH = SEA_ROW * H.SCREEN_H + 9;
 
     public static float t;          // seconds into the current cycle, already scaled
     public static int cycle;

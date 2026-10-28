@@ -10,7 +10,7 @@ const root = path.join(__dirname, '..');
 const ctx = { console, performance: { now: () => 0 } };
 ctx.window = ctx;
 vm.createContext(ctx);
-for (const f of ['js/util.js', 'js/data/items.js', 'js/data/rooms.js', 'js/data/lore.js', 'js/tide.js', 'js/world.js', 'js/narrative.js']) {
+for (const f of [...require('./data-files'), 'js/tide.js', 'js/world.js', 'js/narrative.js']) {
   vm.runInContext(fs.readFileSync(path.join(root, f), 'utf8'), ctx, { filename: f });
 }
 const H = ctx.H, W = H.World, T = H.Tide;
@@ -70,6 +70,9 @@ function analyse(abil, flags, extraSolid = [], opts = {}) {
   const spikes = (x, y) => W.charAt(x, y) === 'x';
   const stand = (x, y) => bodyFree(x, y) && solid(x, y + 1) >= 1 && !spikes(x, y);
   const swimOK = (x, y) => water(x, y) && !(brine(x, y) && can('boots')) && !(deep(x, y) && !can('seal'));
+  // Brine floats her and the Gullet's pressure stops an unsealed suit diving: in that water only the surface can be
+  // reached by a jump or a swing (weight takes her down from there, by falling).
+  const held = (x, y) => water(x, y) && (brine(x, y) || (deep(x, y) && !can('seal'))) && water(x, y - 1);
   // Clinging to timber or rib bone: the wall on side s covers the whole body.
   const wallSide = (x, y) => (W.isWallHang(x - 1, y) && W.isWallHang(x - 1, y - 1) ? -1 : W.isWallHang(x + 1, y) && W.isWallHang(x + 1, y - 1) ? 1 : 0);
   const hang = (x, y) => bodyFree(x, y) && !stand(x, y) && wallSide(x, y) !== 0;
@@ -127,6 +130,8 @@ function analyse(abil, flags, extraSolid = [], opts = {}) {
       for (const [dx, dy] of [[1, 0], [-1, 0], [0, -1]]) { const nx = x + dx, ny = y + dy; if (bodyFree(nx, ny)) { if (water(nx, ny)) push(nx, ny); else fall(nx, ny); } }
       if (!water(x, y - 1) || !water(x, y - 2)) for (let dy = 0; dy <= 2; dy++) for (let dx = -3; dx <= 3; dx++) if (stand(x + dx, y - dy) && arc(x, y, x + dx, y - dy)) push(x + dx, y - dy);
       if (!can('boots') || crushed) return;
+      // with the boots on, the brine lets her sink
+      if (brine(x, y)) fall(x, y + 1);
     }
     if (swimOK(x, y)) {
       curHow = 's';
@@ -147,7 +152,7 @@ function analyse(abil, flags, extraSolid = [], opts = {}) {
       const away = -wallSide(x, y);
       for (let dy = -6; dy <= 3; dy++) for (let k = 1; k <= 5; k++) {
         const nx = x + away * k, ny = y - dy;
-        if ((stand(nx, ny) || hang(nx, ny) || ladder(nx, ny) || swimOK(nx, ny)) && arc(x, y, nx, ny)) push(nx, ny);
+        if ((stand(nx, ny) || hang(nx, ny) || ladder(nx, ny) || swimOK(nx, ny)) && !held(nx, ny) && arc(x, y, nx, ny)) push(nx, ny);
       }
       fall(x, y + 1);
     }
@@ -165,7 +170,7 @@ function analyse(abil, flags, extraSolid = [], opts = {}) {
       for (let dx = -lim; dx <= lim; dx++) {
         const nx = x + dx, ny = y - dy;
         if (dx === 0 && dy === 0) continue;
-        if (!(stand(nx, ny) || ladder(nx, ny) || ladder(nx, ny - 1) || swimOK(nx, ny) || hang(nx, ny))) continue;
+        if (!(stand(nx, ny) || ladder(nx, ny) || ladder(nx, ny - 1) || swimOK(nx, ny) || hang(nx, ny)) || held(nx, ny)) continue;
         if (arc(x, y, nx, ny)) push(nx, ny);
       }
     }
@@ -173,7 +178,7 @@ function analyse(abil, flags, extraSolid = [], opts = {}) {
     if (can('swing') && !opts.noSwing) for (const [rx, ry] of rings) {
       if (ry >= y - 1 || Math.abs(rx - x) > 7 || Math.abs(ry - y) > 8 || Math.hypot(rx - x, ry - (y - 1)) > 6.5 || !losT(x, y - 1, rx, ry)) continue;
       for (let ty = ry + 2; ty <= ry + 8; ty++) for (let tx = rx - 7; tx <= rx + 7; tx++) {
-        if ((stand(tx, ty) || ladder(tx, ty)) && Math.hypot(tx - rx, ty - 1 - ry) <= 7.5 && losT(rx, ry, tx, ty - 1)) push(tx, ty);
+        if ((stand(tx, ty) || ladder(tx, ty)) && !held(tx, ty) && Math.hypot(tx - rx, ty - 1 - ry) <= 7.5 && losT(rx, ry, tx, ty - 1)) push(tx, ty);
       }
     }
   };
@@ -218,15 +223,22 @@ function near(seen, t, r = 2) {
 const stages = [
   { name: 'The Breakers: ashore to the reef', abil: ['swing'], flags: {}, start: 'start@breakers', breakB: true, need: ['ch_cache@breakers', 'start@reef', 'ch_constance@reef'] },
   { name: 'GATE: the salt plug holds until it burns', abil: ['swing'], flags: {}, start: 'start@breakers', mustNot: ['start@reef'] },
-  { name: 'Start (Gaff Swing only)', abil: ['swing'], flags: {}, need: ['ch_constance@reef', 'bell_chapel@chapel', 'crank@tithe', 'seawall_socket@seawall', 'first_shucker@pier', 'page_tithe@tithe', 'ch_gallery@tithe_gallery'], want: ['seal_reef@reef', 'stitch_seawall@seawall'] },
-  { name: 'Seawall gate open', abil: ['swing'], flags: { seawallOpen: true }, need: ['saint@saltgate', 'sea@saltgate', 'kiln@saltgate', 'bell_salt@saltbell', 'barge@saltgate'], want: ['seal_pans@saltgate', 'ch_pans@saltgate'] },
-  { name: 'Barge puzzle solved', abil: ['swing'], flags: { seawallOpen: true, basinFilling: true, basinCrossed: true }, pool: true, need: ['ch_kilns@kilns', 'harpoon@kilns', 'kiln@abbot', 'abbot@abbot'], want: ['stitch_kilns@kilns', 'page_kilns@kilns'] },
-  { name: 'Ballast Boots', abil: ['swing', 'boots'], flags: { seawallOpen: true, basinFilling: true, basinCrossed: true, abbotDead: true }, pool: true, need: ['bell_cloister@cloisterbell', 'sling@nave', 'teodor@nave', 'jet@priors', 'ch_brine@brineshaft', 'table_1@cloister', 'table_2@nave', 'table_3@priors'], want: ['seal_nave@nave', 'page_cloister@cloister', 'ch_cloister@cloister'] },
+  { name: 'Start (Gaff Swing only)', abil: ['swing'], flags: {}, need: ['ch_constance@reef', 'bell_chapel@chapel', 'crank@tithe', 'seawall_socket@seawall', 'first_shucker@pier', 'page_tithe@tithe', 'ch_gallery@tithe_gallery',
+    'ch_cottage@cottage', 'ch_lookout@lookout', 'bell_ferry@ferrybell', 'ch_ferrybell@ferrybell', 'ch_marguerite@wrecks', 'ch_ferry@ferry', 'ch_hithe@hithe', 'ch_arch@seaarch',
+    'ch_hold@constance_hold', 'ch_seabed@breakersfloor', 'ch_smugglers@smugglers'], want: ['seal_reef@reef', 'stitch_seawall@seawall'] },
+  { name: 'GATE: the sump keeps its box from anyone who floats', abil: ['swing'], flags: { seawallOpen: true }, breakS: true, need: ['ch_pools@tidepools'], mustNot: ['ch_sump@saltsump'] },
+  { name: 'Seawall gate open', abil: ['swing'], flags: { seawallOpen: true }, need: ['saint@saltgate', 'sea@saltgate', 'kiln@saltgate', 'bell_salt@saltbell', 'barge@saltgate'], want: ['seal_pans@saltgate', 'ch_pans@saltgate'],
+    // the barge guards the Kilns: no way round it, from the Bell Room's ladder or anywhere else
+    mustNot: ['ch_kilns@kilns', 'ch_upperkilns@upperkilns', 'bell_mine@minebell', 'abbot@abbot'] },
+  { name: 'Barge puzzle solved', abil: ['swing'], flags: { seawallOpen: true, basinFilling: true, basinCrossed: true }, pool: true, need: ['ch_kilns@kilns', 'harpoon@kilns', 'kiln@abbot', 'abbot@abbot',
+    'ch_sheds@sheds', 'ch_carts@cartyard', 'ch_salthouse@salthouse', 'ch_upperkilns@upperkilns', 'ch_terraces@terraces', 'ch_furnace@furnace', 'bell_mine@minebell', 'ch_minebell@minebell',
+    'ch_picks@picks', 'sawline@picks', 'ch_winze@winze', 'ch_seam@seam', 'ch_collapse@collapse', 'ch_saltcloister@saltcloister'], want: ['stitch_kilns@kilns', 'page_kilns@kilns'], mustNot: ['ch_seep@seep', 'ch_cistern@cisterns'] },
+  { name: 'Ballast Boots', abil: ['swing', 'boots'], flags: { seawallOpen: true, basinFilling: true, basinCrossed: true, abbotDead: true }, pool: true, need: ['bell_cloister@cloisterbell', 'sling@nave', 'teodor@nave', 'jet@priors', 'ch_brine@brineshaft', 'table_1@cloister', 'table_2@nave', 'table_3@priors', 'ch_seep@seep'], want: ['seal_nave@nave', 'page_cloister@cloister', 'ch_cloister@cloister'] },
   { name: 'Jet Valve', abil: ['swing', 'boots', 'jet'], flags: { seawallOpen: true, basinFilling: true, basinCrossed: true, priorWedged: true }, pool: true, need: ['sluice@choir', 'hesper@choir', 'bell_choir@choirbell', 'tunedbell@choir', 'valve@choir', 'table_4@choirsteps'], want: ['stitch_steps@choirsteps', 'ch_steps@choirsteps', 'page_cbell@choirbell'] },
   { name: 'Tide Key (crystal broken, water raised)', abil: ['swing', 'boots', 'jet', 'tidekey'], flags: { seawallOpen: true, basinFilling: true, basinCrossed: true, priorWedged: true }, pool: true, choir: 3, breakC: true, need: ['tidekey@choir', 'bell_rib@ribbell', 'prismA@prisms', 'prismB@prisms', 'prismC@prisms', 'ch_ribs@ribshaft'], want: ['seal_ribs@ribshaft', 'page_ribs@ribshaft', 'seal_choir@choir', 'page_choir@choir'] },
   { name: 'Drained choir route instead', abil: ['swing', 'boots', 'jet', 'tidekey'], flags: { seawallOpen: true, basinFilling: true, basinCrossed: true, priorWedged: true, choirDrained: true }, pool: true, choir: 21, breakC: true, need: ['bell_rib@ribbell', 'ch_cache@choir'] },
   { name: 'Prisms solved: Pressure Seal', abil: ['swing', 'boots', 'jet', 'tidekey'], flags: { seawallOpen: true, basinFilling: true, basinCrossed: true, priorWedged: true }, pool: true, choir: 3, breakC: true, breakS: true, need: ['seal@prisms', 'ch_prisms@prisms'], want: ['stitch_prisms@prisms'] },
-  { name: 'Seal + lift dropped', abil: ['swing', 'boots', 'jet', 'tidekey', 'seal'], flags: { seawallOpen: true, basinFilling: true, basinCrossed: true, priorWedged: true, liftDropped: true }, pool: true, choir: 3, breakC: true, breakS: true, lift: true, need: ['page_gullet@gulletmouth', 'page_lair@lair'], want: ['seal_gullet@gulletmouth'] },
+  { name: 'Seal + lift dropped', abil: ['swing', 'boots', 'jet', 'tidekey', 'seal'], flags: { seawallOpen: true, basinFilling: true, basinCrossed: true, priorWedged: true, liftDropped: true }, pool: true, choir: 3, breakC: true, breakS: true, lift: true, need: ['page_gullet@gulletmouth', 'page_lair@lair', 'ch_cistern@cisterns', 'ch_sump@saltsump'], want: ['seal_gullet@gulletmouth'] },
   { name: 'GATE: no Jet means no Choir', abil: ['swing', 'boots'], flags: { seawallOpen: true, basinFilling: true, basinCrossed: true, priorWedged: true }, pool: true, mustNot: ['hesper@choir', 'tidekey@choir'] },
   { name: 'GATE: no Tide Key means no Ribvault', abil: ['swing', 'boots', 'jet'], flags: { seawallOpen: true, basinFilling: true, basinCrossed: true, priorWedged: true }, pool: true, breakC: true, mustNot: ['bell_rib@ribbell', 'seal@prisms'] },
   { name: 'GATE: no Seal means no Gullet', abil: ['swing', 'boots', 'jet', 'tidekey'], flags: { seawallOpen: true, basinFilling: true, basinCrossed: true, priorWedged: true, liftDropped: true }, pool: true, choir: 3, breakC: true, lift: true, mustNot: ['page_lair@lair'] },
@@ -246,7 +258,8 @@ for (const [si, s] of stages.entries()) {
   if (s.pool) W.state('saltgate').pool = { basin: 7 };
   if (s.choir !== undefined) W.state('choir').choirLevel = s.choir;
   if (s.breakC) for (let y = 0; y < 23; y++) { const r = H.ROOM.choir; if (W.charAt(r.ox + 4, r.oy + y) === 'C') W.setChar(r.ox + 4, r.oy + y, ' '); if (s.choir === 3 && W.charAt(r.ox + 32, r.oy + y) === 'C') W.setChar(r.ox + 32, r.oy + y, ' '); }
-  if (s.breakS) { const r = H.ROOM.prisms; for (let y = 0; y < r.th; y++) for (let x = 0; x < r.tw; x++) if (W.charAt(r.ox + x, r.oy + y) === 'S') W.setChar(r.ox + x, r.oy + y, ' '); }
+  // salt walls crack in fire (or under a pick), anywhere on the island
+  if (s.breakS) for (const r of H.ROOMS) for (let y = 0; y < r.th; y++) for (let x = 0; x < r.tw; x++) if (W.charAt(r.ox + x, r.oy + y) === 'S') W.setChar(r.ox + x, r.oy + y, ' ');
   if (s.lift) { const r = H.ROOM.priors; for (let y = 17; y < 23; y++) W.setChar(r.ox + 21, r.oy + y, 'H'); }
   if (s.breakB) breakPlug();
   const extra = [];
@@ -296,7 +309,7 @@ if (!dump) {
   W.reset(); W.state('saltgate').pool = { basin: 7 }; W.state('choir').choirLevel = 3;
   { const r = H.ROOM.priors; for (let y = 17; y < 23; y++) W.setChar(r.ox + 21, r.oy + y, 'H'); }
   { const c = H.ROOM.choir; for (let y = 0; y < 23; y++) for (const x of [4, 32]) if (W.charAt(c.ox + x, c.oy + y) === 'C') W.setChar(c.ox + x, c.oy + y, ' '); }
-  { const r = H.ROOM.prisms; for (let y = 0; y < r.th; y++) for (let x = 0; x < r.tw; x++) if (W.charAt(r.ox + x, r.oy + y) === 'S') W.setChar(r.ox + x, r.oy + y, ' '); }
+  for (const r of H.ROOMS) for (let y = 0; y < r.th; y++) for (let x = 0; x < r.tw; x++) if (W.charAt(r.ox + x, r.oy + y) === 'S') W.setChar(r.ox + x, r.oy + y, ' ');
   breakPlug();
   const allSeen = analyse(['swing', 'boots', 'jet', 'tidekey', 'seal', 'lens'], { seawallOpen: true, basinFilling: true, basinCrossed: true, priorWedged: true, liftDropped: true, skullOpen: true });
   const unreached = [];

@@ -221,7 +221,7 @@ public static class Terrain
     static void Growth(Canvas c, RoomDef r, Func<int, int, char> at, Func<int, int, bool> mass)
     {
         string reg = r.Outdoor ? "outdoor" : r.Region;
-        bool tidal = r.Row == 4 && r.FixedWater == null;
+        bool tidal = r.Tidal && r.FixedWater == null;
         float hiLine = (Tide.SEA_HIGH - Tide.spring) * TS, loLine = (Tide.SEA_LOW - Tide.spring) * TS;
         bool Air(int x, int y) { char ch = at(x, y); return !TileArt.IsSolidCh(ch) || ch == '_'; }
         for (int ly = 0; ly < r.Th; ly++)

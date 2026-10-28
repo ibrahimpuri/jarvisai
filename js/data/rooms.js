@@ -29,7 +29,7 @@ function room(def) { H.ROOMS.push(def); H.ROOM[def.id] = def; }
 
 // ---------------------------------------------------------------- Wrackline
 room({
-  id: 'reef', name: 'The Reef', region: 'wrackline', col: 7, row: 4, outdoor: true, seaward: 1,
+  id: 'reef', name: 'The Reef', region: 'wrackline', col: 37, row: 9, outdoor: true, seaward: 1, sea: true,
   map: [
     '________________________________________',
     '_                                      _',
@@ -50,10 +50,10 @@ room({
     '          TTTTTTTTTTTTTTTTTTTTTTTTTT   #',
     '####===##############################  #',
     '#### 4 ##############################  #',
-    '########################################',
-    '########################################',
-    '########################################',
-    '########################################',
+    '#####################################  #',
+    '#####################################  #',
+    '#####################################  #',
+    '#####################################  #',
   ],
   ents: {
     '1': { type: 'start' },
@@ -66,7 +66,7 @@ room({
 });
 
 room({
-  id: 'breakers', name: 'The Breakers', region: 'wrackline', col: 8, row: 4, w: 2, outdoor: true, seaward: 1,
+  id: 'breakers', name: 'The Breakers', region: 'wrackline', col: 38, row: 9, w: 2, outdoor: true, seaward: 1,
   // The first steps: the boat lands on the outer rocks, and the climb to the reef teaches Maren's
   // body without a word of instruction. Hints show only if the player stalls (see H.Hints).
   map: [
@@ -111,7 +111,7 @@ room({
 });
 
 room({
-  id: 'pier', name: 'Long Pier', region: 'wrackline', col: 6, row: 4, outdoor: true, seaward: 1,
+  id: 'pier', name: 'Long Pier', region: 'wrackline', col: 36, row: 9, outdoor: true, seaward: 1, sea: true,
   map: [
     '####H###________________________________',
     '####H###                               _',
@@ -145,7 +145,7 @@ room({
 });
 
 room({
-  id: 'seawall', name: 'Seawall', region: 'wrackline', col: 6, row: 3, outdoor: true,
+  id: 'seawall', name: 'Seawall', region: 'wrackline', col: 36, row: 8, outdoor: true,
   map: [
     '_______________________K________________',
     '_                     #H#              _',
@@ -179,7 +179,7 @@ room({
 });
 
 room({
-  id: 'chapel', name: 'Seawall Chapel', region: 'wrackline', col: 7, row: 3, bellRoom: true,
+  id: 'chapel', name: 'Seawall Chapel', region: 'wrackline', col: 37, row: 8, bellRoom: true,
   map: [
     '########################################',
     '########################################',
@@ -195,9 +195,9 @@ room({
     '###                             ########',
     '###     w      w      w         ########',
     '###     w      w      w         ########',
-    '                                ########',
-    '                                ########',
-    '         2    3     1    4   5  ########',
+    '                                        ',
+    '                                        ',
+    '         2    3     1    4   5          ',
     '########################################',
     '########################################',
     '########################################',
@@ -215,7 +215,7 @@ room({
 });
 
 room({
-  id: 'tithe', name: 'Tithe Hall', region: 'wrackline', col: 5, row: 4,
+  id: 'tithe', name: 'Tithe Hall', region: 'wrackline', col: 35, row: 9, sea: true,
   map: [
     '###################################H####',
     '#####||#######||#######||######|###H####',
@@ -257,7 +257,7 @@ room({
 });
 
 room({
-  id: 'tithe_gallery', name: 'Tithe Gallery', region: 'wrackline', col: 5, row: 3,
+  id: 'tithe_gallery', name: 'Tithe Gallery', region: 'wrackline', col: 35, row: 8,
   map: [
     '########################################',
     '########################################',
@@ -291,7 +291,7 @@ room({
 
 // ---------------------------------------------------------------- Saltworks
 room({
-  id: 'saltgate', name: 'Evaporation Pans', region: 'saltworks', col: 6, row: 2, wrackpool: true,
+  id: 'saltgate', name: 'Evaporation Pans', region: 'saltworks', col: 36, row: 7, wrackpool: true,
   map: [
     '########################################',
     '#                                      #',
@@ -334,27 +334,27 @@ room({
 });
 
 room({
-  id: 'saltbell', name: 'Saltworks Bell Room', region: 'saltworks', col: 5, row: 2, bellRoom: true,
+  id: 'saltbell', name: 'Saltworks Bell Room', region: 'saltworks', col: 35, row: 7, bellRoom: true,
   map: [
-    '########################################',
-    '########################################',
-    '########################################',
-    '########################################',
-    '########################################',
-    '########################################',
-    '########################################',
-    '########################################',
-    '########################################',
-    '########################################',
-    '######                          ########',
-    '#####                            #######',
-    '####                              ######',
-    '###                                #####',
-    '###      w        w       w         ####',
-    '###      w        w       w         ####',
-    '                                        ',
-    '                                        ',
-    '        2   3     1    4      5         ',
+    '############################H###########',
+    '############################H###########',
+    '############################H###########',
+    '############################H###########',
+    '############################H###########',
+    '############################H###########',
+    '############################H###########',
+    '############################H###########',
+    '############################H###########',
+    '############################H###########',
+    '######                      H   ########',
+    '#####                       H    #######',
+    '####                        H     ######',
+    '###                         H      #####',
+    '###      w        w       w H       ####',
+    '###      w        w       w H       ####',
+    '                            H           ',
+    '                            H           ',
+    '        2   3     1    4    H 5         ',
     '########################################',
     '########################################',
     '########################################',
@@ -370,7 +370,7 @@ room({
 });
 
 room({
-  id: 'kilns', name: 'The Kilns', region: 'saltworks', col: 7, row: 2,
+  id: 'kilns', name: 'The Kilns', region: 'saltworks', col: 37, row: 7,
   map: [
     '##################H#####################',
     '##################H#####################',
@@ -386,9 +386,9 @@ room({
     '#          ===                         #',
     '#       ===                            #',
     '#                 ===                  #',
-    '#                                      #',
-    '#   MMMMM                              #',
-    '#########          4       5        8  #',
+    '#                                       ',
+    '#   MMMMM                               ',
+    '#########          4       5        8   ',
     '#########SSS                    MMMMMMM#',
     '#########S2S 7                         #',
     '#############MMMMMMMMMMMMMMMMMMMMM######',
@@ -412,7 +412,7 @@ room({
 });
 
 room({
-  id: 'abbot', name: 'Cathedral of Salt', region: 'saltworks', col: 7, row: 1, boss: 'abbot',
+  id: 'abbot', name: 'Cathedral of Salt', region: 'saltworks', col: 40, row: 2, boss: 'abbot',
   map: [
     '########################################',
     '########################################',
@@ -446,7 +446,7 @@ room({
 });
 
 room({
-  id: 'brineshaft', name: 'Brine Shaft', region: 'saltworks', col: 4, row: 2, w: 1, h: 2, brine: true,
+  id: 'brineshaft', name: 'Brine Shaft', region: 'saltworks', col: 34, row: 7, w: 1, h: 2, brine: true,
   map: [
     '########################################',
     '########################################',
@@ -504,7 +504,7 @@ room({
 
 // ---------------------------------------------------------------- Lower Cloister
 room({
-  id: 'cloister', name: 'Cloister Walk', region: 'cloister', col: 4, row: 4, seaward: 1,
+  id: 'cloister', name: 'Cloister Walk', region: 'cloister', col: 34, row: 9, seaward: 1, sea: true,
   map: [
     '##################H   ##################',
     '##################H   ##################',
@@ -541,7 +541,7 @@ room({
 });
 
 room({
-  id: 'cloisterbell', name: 'Cloister Bell Room', region: 'cloister', col: 3, row: 3, bellRoom: true,
+  id: 'cloisterbell', name: 'Cloister Bell Room', region: 'cloister', col: 33, row: 8, bellRoom: true,
   map: [
     '########################################',
     '########################################',
@@ -576,7 +576,7 @@ room({
 });
 
 room({
-  id: 'nave', name: 'Bell-Rope Nave', region: 'cloister', col: 3, row: 4, seaward: -1,
+  id: 'nave', name: 'Bell-Rope Nave', region: 'cloister', col: 33, row: 9, seaward: -1, sea: true,
   map: [
     '##########################H#############',
     '##########################H#############',
@@ -624,7 +624,7 @@ room({
 });
 
 room({
-  id: 'priors', name: "Prior's Walk", region: 'cloister', col: 2, row: 4, seaward: -1,
+  id: 'priors', name: "Prior's Walk", region: 'cloister', col: 32, row: 9, seaward: -1, sea: true,
   map: [
     '#################################H######',
     '#################################H######',
@@ -665,7 +665,7 @@ room({
 
 // ---------------------------------------------------------------- Sunken Choir
 room({
-  id: 'choirsteps', name: 'Choir Steps', region: 'choir', col: 2, row: 3,
+  id: 'choirsteps', name: 'Choir Steps', region: 'choir', col: 32, row: 8,
   map: [
     '########################################',
     '########################################',
@@ -701,7 +701,7 @@ room({
 });
 
 room({
-  id: 'choir', name: 'Sunken Choir', region: 'choir', col: 1, row: 3, wrackpool: true,
+  id: 'choir', name: 'Sunken Choir', region: 'choir', col: 31, row: 8, wrackpool: true,
   map: [
     '#########H##############################',
     '#########H##############################',
@@ -748,7 +748,7 @@ room({
 });
 
 room({
-  id: 'choirbell', name: 'Choir Bell Room', region: 'choir', col: 0, row: 3, bellRoom: true,
+  id: 'choirbell', name: 'Choir Bell Room', region: 'choir', col: 30, row: 8, bellRoom: true,
   map: [
     '########################################',
     '########################################',
@@ -784,7 +784,7 @@ room({
 
 // ---------------------------------------------------------------- Ribvault
 room({
-  id: 'ribshaft', name: 'The Ribs', region: 'ribvault', col: 1, row: 1, w: 1, h: 2, wind: true,
+  id: 'ribshaft', name: 'The Ribs', region: 'ribvault', col: 31, row: 6, w: 1, h: 2, wind: true,
   map: [
     '########################################',
     '########################################',
@@ -846,7 +846,7 @@ room({
 });
 
 room({
-  id: 'ribbell', name: 'Ribvault Bell Room', region: 'ribvault', col: 2, row: 1, bellRoom: true,
+  id: 'ribbell', name: 'Ribvault Bell Room', region: 'ribvault', col: 32, row: 6, bellRoom: true,
   map: [
     '###################H####################',
     '###################H####################',
@@ -885,7 +885,7 @@ room({
 });
 
 room({
-  id: 'prisms', name: 'Lamp Prisms', region: 'ribvault', col: 3, row: 1, w: 1, h: 2,
+  id: 'prisms', name: 'Lamp Prisms', region: 'ribvault', col: 33, row: 6, w: 1, h: 2,
   map: [
     '########################################',
     '########################################',
@@ -952,7 +952,7 @@ room({
 
 // ---------------------------------------------------------------- The Gullet
 room({
-  id: 'gulletmouth', name: 'Gullet Mouth', region: 'gullet', col: 2, row: 5, deep: true, wrackpool: true,
+  id: 'gulletmouth', name: 'Gullet Mouth', region: 'gullet', col: 32, row: 10, deep: true, wrackpool: true,
   map: [
     '####################    ################',
     '####################    ################',
@@ -992,7 +992,7 @@ room({
 });
 
 room({
-  id: 'lair', name: "Undertow's Lair", region: 'gullet', col: 3, row: 5, w: 2, h: 1, deep: true, boss: 'undertow',
+  id: 'lair', name: "Undertow's Lair", region: 'gullet', col: 33, row: 10, w: 2, h: 1, deep: true, boss: 'undertow',
   map: [
     '################################################################################',
     '################################################################################',
@@ -1025,7 +1025,7 @@ room({
 
 // ---------------------------------------------------------------- Lantern Skull
 room({
-  id: 'skullstair', name: 'Skull Stair', region: 'skull', col: 2, row: 0, act3spawn: true,
+  id: 'skullstair', name: 'Skull Stair', region: 'skull', col: 32, row: 5, act3spawn: true,
   map: [
     '########################################',
     '########################################',
@@ -1060,7 +1060,7 @@ room({
 });
 
 room({
-  id: 'lamp', name: 'The Lamp', region: 'skull', col: 3, row: 0,
+  id: 'lamp', name: 'The Lamp', region: 'skull', col: 33, row: 5,
   map: [
     '########################################',
     '##############            ##############',

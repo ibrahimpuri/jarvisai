@@ -222,7 +222,9 @@ public class UndertowSystem
     public HashSet<string> ripples = new();
     int from = 1;
     public Undertow live;
-    static readonly string[] SEA = { "reef", "pier", "tithe", "cloister", "nave", "priors" };
+    // The rooms it travels: the sea row's waist-deep water, marked `sea` in the room data.
+    static string[] SEA => sea ??= Data.Rooms.Where(r => r.Raw.B("sea")).Select(r => r.Id).ToArray();
+    static string[] sea;
 
     public bool Active()
     {

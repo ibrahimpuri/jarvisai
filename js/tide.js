@@ -7,8 +7,10 @@ H.Tide = (() => {
     { id: 'high', name: 'High', len: 180 },
     { id: 'ebbing', name: 'Ebbing', len: 120 },
   ];
-  // World-space water surfaces (in tiles, y grows downward).
-  const SEA_LOW = 109, SEA_HIGH = 101;
+  // The sea row: the one row of screens the tide moves through. Rooms on it are tidal; rows below are under the sea.
+  const SEA_ROW = 9;
+  // World-space water surfaces (in tiles, y grows downward), inside the sea row.
+  const SEA_LOW = SEA_ROW * 23 + 17, SEA_HIGH = SEA_ROW * 23 + 9;
 
   const T = {
     t: 0,              // seconds into the current cycle, already scaled
@@ -17,7 +19,8 @@ H.Tide = (() => {
     spring: 0,         // Act III spring tides raise every line
     paused: false,
     listeners: [],
-    PHASES, SEA_LOW, SEA_HIGH,
+    PHASES, SEA_ROW, SEA_LOW, SEA_HIGH,
+    tidal(r) { return r.row <= SEA_ROW && r.row + (r.h || 1) > SEA_ROW; },
 
     len(i) { return PHASES[i].len * this.scale; },
     total() { return PHASES.reduce((s, p, i) => s + this.len(i), 0); },

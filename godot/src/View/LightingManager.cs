@@ -185,13 +185,13 @@ public partial class LightingManager : Node
         else { Cur = to.Copy(); Palette = palTo; }
         var m = Cur;
         // the tide pulls everything colder and darker as it comes in
-        float tw = tideW * (r.Row >= 4 || r.Outdoor ? 1 : 0.4f);
+        float tw = tideW * (r.Row >= Tide.SEA_ROW || r.Outdoor ? 1 : 0.4f);
         var amb = m.ambient.Lerp(new Color(m.ambient.R * 0.8f, m.ambient.G * 0.86f, m.ambient.B * 0.95f), tw);
         // what Maren is looking at leans the ambient toward its own colour
         if (FocusW > 0) amb = amb.Lerp(new Color(amb.R * FocusTint.R, amb.G * FocusTint.G, amb.B * FocusTint.B), FocusW);
         if (r.Outdoor && lightning > 0) amb = amb.Lerp(Colors.White, lightning * 0.5f);
         Ambient = amb;
-        bool tidal = r.Row == 4 && r.FixedWater == null;
+        bool tidal = r.Tidal && r.FixedWater == null;
         float wetLine = tidal ? (Tide.SEA_HIGH - Tide.spring) * H.TILE : r.Deep || r.FixedWater != null ? r.Py - 1000 : 100000;
         float wet = MathF.Min(1, m.wet + tw * 0.15f + (r.Brine || r.Deep ? 0.5f : 0));
         var ambV = new Vector3(amb.R, amb.G, amb.B);

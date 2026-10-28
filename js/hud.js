@@ -192,7 +192,7 @@ H.HUD = (() => {
       c.strokeStyle = r === G.room ? '#ffe0a0' : '#5a5040'; c.lineWidth = r === G.room ? 2 : 1; c.strokeRect(x, y, w, h);
       // water lines only for tide phases Maren has actually seen here
       const lineFor = (sea) => y + ((sea - r.oy) / r.th) * h;
-      if (r.row === 4 && !r.fixedWater) {
+      if (H.Tide.tidal(r) && !r.fixedWater) {
         if (st.seen.low) { c.strokeStyle = '#7ab0c0'; c.beginPath(); c.moveTo(x, lineFor(H.Tide.SEA_LOW)); c.lineTo(x + w, lineFor(H.Tide.SEA_LOW)); c.stroke(); }
         if (st.seen.high) { c.strokeStyle = '#3a70b0'; c.beginPath(); c.moveTo(x, lineFor(H.Tide.SEA_HIGH)); c.lineTo(x + w, lineFor(H.Tide.SEA_HIGH)); c.stroke(); }
         if (st.seen.ebbing) { c.fillStyle = '#9ac0a0'; c.font = '8px monospace'; c.fillText('E', x + w - 9, y + 10); }

@@ -9,7 +9,7 @@ const root = path.join(__dirname, '..');
 const ctx = { window: {}, console };
 ctx.window = ctx;
 vm.createContext(ctx);
-for (const f of ['js/util.js', 'js/data/items.js', 'js/data/rooms.js']) {
+for (const f of require('./data-files')) {
   vm.runInContext(fs.readFileSync(path.join(root, f), 'utf8'), ctx, { filename: f });
 }
 const H = ctx.H;

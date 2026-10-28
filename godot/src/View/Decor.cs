@@ -148,7 +148,7 @@ public static class Decor
             for (int y = y0; y <= y1; y++) for (int x = x0; x <= x1; x++) reserved.Add((x, y));
         }
         bool Free(int lx, int ly) => !reserved.Contains((lx, ly));
-        float lowLine = r.Row == 4 && r.FixedWater == null ? (Tide.SEA_LOW - r.Oy) : float.PositiveInfinity;
+        float lowLine = r.Tidal && r.FixedWater == null ? (Tide.SEA_LOW - r.Oy) : float.PositiveInfinity;
         float World(int l, bool xAxis) => xAxis ? r.Px + l * TS : r.Py + l * TS;
 
         // floor props, walked along each run of ground
@@ -218,7 +218,7 @@ public static class Decor
                 items.Add(new DecorItem { kind = k, x = World(lx, true) + 4 + (float)rng.NextDouble() * 8, y = World(ly, false), len = len, seed = (float)rng.NextDouble(), lit = LIT.Contains(k) });
             }
         // kelp swaying up from the sea floor and along the low-water line outdoors
-        if (r.Outdoor || r.Row == 4)
+        if (r.Outdoor || r.Tidal)
             for (int lx = 1; lx < r.Tw - 1; lx++)
                 for (int ly = 2; ly < r.Th - 1; ly++)
                     if (ly >= lowLine && Empty(lx, ly) && Ground(lx, ly) && rng.NextDouble() < 0.35 && Free(lx, ly))

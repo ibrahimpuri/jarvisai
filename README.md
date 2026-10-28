@@ -281,7 +281,7 @@ Every core system in the design document is implemented and wired together:
 - **Survival.** A slot-limited satchel (8 → 12 → 16; key items take 2 slots), anywhere and bench crafting, poultices and Stitch Kits that lock you in place, breath as helmet bubbles, Bell Rooms (rekindle, save, rest to the next Low, shared Reliquary, bench), and the hidden lifeline rule. On death your satchel stays where you fell, and the Ebb carries it to the Wrack Pool if you died in tidal water.
 - **Build choices.** Seven fittings under a Pressure Rating raised by six Brass Seals. Three Brine Grafts, each with its own vulnerability; Ansel can cut one out once at the cost of a health pip. Four weapons with three behaviour-changing tiers paid in scrap and Mere-ivory.
 - **Traversal.** Gaff Swing, Ballast Boots (sink through buoyant brine, stomp), Jet Valve, Tide Key, Pressure Seal (the Gullet's pressure won't let an unsealed suit dive) and Saltsight Lens.
-- **World.** Seven regions, 26 hand-built rooms, six Bell Rooms. Puzzles: Sluice Ladder barge, Hymn of Hours, Tuned Bells (the Tide Key becomes a tuning fork), Lamp Prisms (bend the focused beam) and Dead Weight (drag knotless bodies onto the lift).
+- **World.** Seven regions; 26 hand-built rooms and six Bell Rooms in the first build, growing to the document's full island (61 rooms and 8 Bell Rooms so far; see [the full island](godot/docs/WORLD.md)). Puzzles: Sluice Ladder barge, Hymn of Hours, Tuned Bells (the Tide Key becomes a tuning fork), Lamp Prisms (bend the focused beam) and Dead Weight (drag knotless bodies onto the lift).
 - **RPG layer.** Four NPCs (Ansel, Odile, Hesper, Agathe). Four quests with physical consequences: Lines Gone Slack, The Choir's Water, The Prior's Tables and A Keeper's Log. The Brine breaches a Bell Room in Act III. Three endings: Relight the Lamp, The Saint's Hymn and Keeper's Dark, each gated as the design describes. The Godot edition adds a fourth, Host of the Mere, and a true ending, The Seventh Verse, on the Mere-Saint crossing.
 - **Fairness and tension.** A pacing valve after fights, readable dormancy (true corpses have no knots), adaptive encrustation (new bodies grow plates over the knot type you break most, always leaving two open, and Ansel remarks on it), tells before damage, and the logbook map that only records water lines for tide phases you have seen.
 - **The opening.** The Breakers teach movement without words (see above). Then the Wrackline and the Tithe Hall set piece play as written: the first Shucker stands when the water reaches it, lifting the crank tolls the bell and floods the hall, you escape by chandelier rings to the gallery, and the Undertow passes behind the glass.
@@ -289,11 +289,30 @@ Every core system in the design document is implemented and wired together:
 
 ## Scope compared with the document
 
-The document plans 8-10 people over 30 months for about 180 rooms and a 10-12 hour game. This build is a complete but compact version of it: all seven regions and the whole critical path, from the outer rocks to all three endings, across 26 rooms, so a first run is far shorter than the document's 10-12 hours. Things that are smaller than the document describes:
+The document plans 8-10 people over 30 months for about 180 rooms and a 10-12 hour game. The first build was a complete but compact version of it: all seven regions and the whole critical path, from the outer rocks to all three endings, across 26 rooms.
 
-- 26 rooms and 6 Bell Rooms instead of about 180 and 14. Bell-cable lifts, which the document lists as cuttable, are omitted.
-- Hesper and Teodor are conditional fights rather than six fixed bosses.
-- Art and audio are procedural placeholders: stick-skeleton puppets, tile shading and synthesised sound.
+The full island is now being built from it, one region at a time, with a playable build after each. [godot/docs/WORLD.md](godot/docs/WORLD.md) has the plan:
+
+- the seven regions on a larger grid
+- about 180 rooms and 14 Bell Rooms
+- six fixed bosses: the Abbot of Salt, the Almoner, the Precentor, the Hanging Mother, the Undertow and the Shoal
+- four enemy variants
+- bell-cable lifts
+
+**Phase 1 is built:** the Wrackline and the Saltworks at full size, 61 rooms in all.
+- **The Wrackline:**
+  - east along the coast from the Seawall Chapel: the Hult Cottage, the Wreckers' Lookout, the cliff path, the Ferry House (its second Bell Room), the Wreck Field, the Rope Ferry Landing, the Drowned Hithe, the Tide Pools and the Sea Arch
+  - under the sea: the sunk *Constance*, the Breakers' Floor, the Smugglers' Cut and a brine sump
+- **The Saltworks:**
+  - the Kilns climb to the Mine Head (its second Bell Room) and up through a salt mine in the Saint's flank to the Abbot, who now waits at its top
+  - the Saw-Line is in the mine's Pick Gallery
+  - a salt chute brings you back down
+- **Two variants:**
+  - the Hooded Bellmouth, which screams at noise rather than light
+  - the Gullet Pair, which hangs from two tendrils
+- **The engine:** a chart that grows and zooms, saves that move with the island, and bell-cable lifts between a region's Bell Rooms from Act II.
+
+Still smaller than the document: art and audio are procedural (stick-skeleton puppets, tile shading and synthesised sound).
 
 ## Development tools
 
@@ -313,7 +332,8 @@ node tools/desktop-test.js <exe> [out/]   # launches the packaged desktop app, p
 
 | File | Contents |
 | --- | --- |
-| `js/data/rooms.js` | The island: 26 ASCII rooms on a world grid, with their entities |
+| `js/data/rooms.js` | The island's first 26 ASCII rooms on a world grid, with their entities |
+| `js/data/rooms_<region>.js` | Each region's rooms for the full island, with their carvings (see `tools/data-files.js` for the load order) |
 | `js/data/items.js` | Items, recipes, weapons, fittings, grafts and abilities |
 | `js/settings.js` / `js/input.js` | Saved settings; keyboard, mouse and controller input, rumble |
 | `js/glyphs.js` | Button prompts for keyboard, mouse, Xbox, PlayStation and Switch, on the canvas and in menus |

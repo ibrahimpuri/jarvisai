@@ -141,7 +141,7 @@ public static class Narr
                 if (World.Solidity(World.CharAt(tx, ty + 1)) != 1) continue;
                 if (taken.Contains((lx, ly)) || taken.Contains((lx - 1, ly)) || taken.Contains((lx + 1, ly))) continue;
                 // keep clear of the low-tide water line
-                if (room.Row == 4 && room.FixedWater == null && (ty + 0.5f) > Tide.SEA_LOW) continue;
+                if (room.Tidal && room.FixedWater == null && (ty + 0.5f) > Tide.SEA_LOW) continue;
                 float d = Math.Abs(dx) + Math.Abs(dy) * 1.5f;
                 if (d < bd) { bd = d; best = (lx, ly); }
             }

@@ -39,20 +39,21 @@ public static class Chart
     static Vector2 M(float wx, float wy) => new(ox + wx / H.TILE * k, oy + wy / H.TILE * k);
     static float Hash(int a, int b) => TileArt.Hash(a, b);
 
+    // How close the chart is drawn: 0 frames everything she knows of; each step in halves the view around her.
+    public static int Zoom;
+    public static Vector2 Pan;   // tiles the closer views are moved from Maren
+    public const int MAX_ZOOM = 3;
+
     public static void Draw(Canvas c, float W, float Hh)
     {
         if (marks == null) BuildMarks();
-        int cols = Data.Rooms.Max(r => r.Col + r.W), rows = Data.Rooms.Max(r => r.Row + r.H);
-        int tw = cols * 40, th = rows * 23;
-        float top = 30, bottom = 30;
-        k = MathF.Min((W - 24) / tw, (Hh - top - bottom) / th);
-        ox = MathF.Floor((W - tw * k) / 2); oy = MathF.Floor(top + (Hh - top - bottom - th * k) / 2);
-        Paper(c, W, Hh);
         var visited = new HashSet<string>(Data.Rooms.Where(r => World.StateOrNull(r.Id)?.visited == true).Select(r => r.Id));
-        Sea(c, W, Hh, visited);
         // rooms she knows of but has not entered: their doors are open onto them
         var known = new HashSet<string>();
         foreach (var id in visited) foreach (var n in Guide.Links(id).Keys) if (!visited.Contains(n)) known.Add(n);
+        View(W, Hh, visited, known);
+        Paper(c, W, Hh);
+        Sea(c, W, Hh, visited);
         foreach (var id in known) Unknown(c, Data.Room[id]);
         // the rooms: ink first, all of them, then the washes, so walls are inked where stone meets open
         var ordered = Data.Rooms.Where(r => visited.Contains(r.Id)).ToList();
@@ -75,6 +76,26 @@ public static class Chart
         Objective(c, W);
         Compass(c, W - 26, Hh - 24);
         Legend(c, Hh);
+    }
+
+    // The part of the island on the paper, in tiles. The island is far bigger than one sheet, so the chart frames what
+    // she has found (and grows as she finds more), or, zoomed in, a closer view around her that can be panned.
+    static void View(float W, float Hh, HashSet<string> visited, HashSet<string> known)
+    {
+        const float top = 30, bottom = 30, MIN_W = 9 * 40, MIN_H = 5 * 23, PAD = 20;
+        var rooms = Data.Rooms.Where(r => visited.Contains(r.Id) || known.Contains(r.Id) || r == G.room).ToList();
+        if (rooms.Count == 0) rooms = Data.Rooms;
+        float x0 = rooms.Min(r => r.Ox) - PAD, y0 = rooms.Min(r => r.Oy) - PAD;
+        float x1 = rooms.Max(r => r.Ox + r.Tw) + PAD, y1 = rooms.Max(r => r.Oy + r.Th) + PAD;
+        float cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, vw = MathF.Max(MIN_W, x1 - x0), vh = MathF.Max(MIN_H, y1 - y0);
+        if (Zoom > 0 && G.player != null)
+        {
+            float f = MathF.Pow(2, Zoom);
+            vw = MathF.Max(MIN_W * 0.75f, vw / f); vh = MathF.Max(MIN_H * 0.75f, vh / f);
+            cx = G.player.Cx() / H.TILE + Pan.X; cy = G.player.Cy() / H.TILE + Pan.Y;
+        }
+        k = MathF.Min((W - 24) / vw, (Hh - top - bottom) / vh);
+        ox = MathF.Floor(W / 2 - cx * k); oy = MathF.Floor(top + (Hh - top - bottom) / 2 - cy * k);
     }
 
     // ---- paper ------------------------------------------------------------------------------------------
@@ -155,7 +176,7 @@ public static class Chart
     // the tide lines she has seen in the rooms the sea reaches
     static void Tides(Canvas c, RoomDef r)
     {
-        if (r.Row != 4 || r.FixedWater != null) return;
+        if (!r.Tidal || r.FixedWater != null) return;
         var st = World.StateOrNull(r.Id); if (st == null) return;
         var a = M(r.Px, r.Py); var b = M(r.Px + r.Pw, r.Py + r.Ph);
         void Line(float sea, Color col)
@@ -351,5 +372,7 @@ public static class Chart
         Item(ix => { c.Stroke = SEA; c.LineWidth = 0.6f; c.BeginPath(); c.Arc(ix, y, 2.2f, 0, H.PI * 1.6f); c.StrokePath(); }, "wrack pool");
         Item(ix => { c.Stroke = SEA; c.LineWidth = 0.6f; c.Line(ix - 3, y, ix + 3, y); }, "tide seen");
         Item(ix => { c.Fill = new Color(INK_FADED.R, INK_FADED.G, INK_FADED.B, 0.8f); c.FillRect(ix - 3, y - 2, 2, 0.6f); c.FillRect(ix + 1, y - 2, 2, 0.6f); c.FillRect(ix - 3, y + 1.6f, 2, 0.6f); c.FillRect(ix + 1, y + 1.6f, 2, 0.6f); }, "not yet entered");
+        c.Fill = new Color(INK_FADED.R, INK_FADED.G, INK_FADED.B, 0.9f);
+        c.FillText(Zoom > 0 ? "closer: wheel, triggers or + - to zoom; right stick or arrows to look about" : "wheel, triggers or + - to look closer", x + 4, y + 2);
     }
 }

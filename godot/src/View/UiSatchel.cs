@@ -507,14 +507,44 @@ public partial class UiRoot
         c.BeginPath(); c.MoveTo(4, sz.Y / 2); c.QuadraticCurveTo(sz.X / 2, sz.Y / 2 + 1.2f, sz.X - 4, sz.Y / 2 - 0.5f); c.StrokePath();
     }, new Vector2(0, 6)) { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill });
 
+    // The chart. The island is larger than the sheet: the mouse wheel, the triggers or + and - zoom in around Maren, and
+    // the right stick or the arrow keys move a closer view.
     partial class MapView : Control
     {
         readonly Canvas cv = new();
+        public MapView() { ClipContents = true; MouseFilter = MouseFilterEnum.Pass; }
         public override void _Draw()
         {
             var c = cv.Begin(this);
             Chart.Draw(c, Size.X, Size.Y);
         }
-        public override void _Process(double delta) => QueueRedraw();
+        float zoomCool;
+        public override void _Process(double delta)
+        {
+            float dt = (float)delta;
+            zoomCool -= dt;
+            int dz = 0;
+            if (Input.IsKeyPressed(Key.Equal) || Input.IsKeyPressed(Key.Pageup) || Input.GetJoyAxis(0, JoyAxis.TriggerRight) > 0.6f) dz = 1;
+            else if (Input.IsKeyPressed(Key.Minus) || Input.IsKeyPressed(Key.Pagedown) || Input.GetJoyAxis(0, JoyAxis.TriggerLeft) > 0.6f) dz = -1;
+            if (dz != 0 && zoomCool <= 0) { ZoomBy(dz); zoomCool = 0.25f; }
+            var pan = new Vector2(Input.GetJoyAxis(0, JoyAxis.RightX), Input.GetJoyAxis(0, JoyAxis.RightY));
+            if (pan.Length() < 0.25f) pan = Vector2.Zero;
+            if (Input.IsKeyPressed(Key.Left)) pan.X -= 1; if (Input.IsKeyPressed(Key.Right)) pan.X += 1;
+            if (Input.IsKeyPressed(Key.Up)) pan.Y -= 1; if (Input.IsKeyPressed(Key.Down)) pan.Y += 1;
+            if (Chart.Zoom > 0 && pan != Vector2.Zero) Chart.Pan += pan * dt * 90 / Chart.Zoom;
+            QueueRedraw();
+        }
+        static void ZoomBy(int dz)
+        {
+            int z = Math.Clamp(Chart.Zoom + dz, 0, Chart.MAX_ZOOM);
+            if (z == Chart.Zoom) return;
+            if (z == 0) Chart.Pan = Vector2.Zero;
+            Chart.Zoom = z; Snd.Ui();
+        }
+        public override void _GuiInput(InputEvent e)
+        {
+            if (e is InputEventMouseButton mb && mb.Pressed && mb.ButtonIndex is MouseButton.WheelUp or MouseButton.WheelDown)
+            { ZoomBy(mb.ButtonIndex == MouseButton.WheelUp ? 1 : -1); AcceptEvent(); }
+        }
     }
 }

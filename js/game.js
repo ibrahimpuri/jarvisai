@@ -281,11 +281,11 @@ H.Game = (() => {
           if (inTideWater(r, s)) s.reknot = true;
         }
       }
-      if (G.room.row === 4) H.Narr.think('rising');
+      if (H.Tide.tidal(G.room)) H.Narr.think('rising');
       H.Hints.tideTurned();
     }
     if (ph === 'high') {
-      if (G.room.row === 4 && !G.room.fixedWater) H.Narr.think('firstHigh');
+      if (H.Tide.tidal(G.room) && !G.room.fixedWater) H.Narr.think('firstHigh');
       for (const r of H.ROOMS) {
         const st = W().states[r.id];
         if (!st || r === G.room) continue;
@@ -302,7 +302,7 @@ H.Game = (() => {
         if (!st || !st.loose) continue;
         const keep = [];
         for (const l of st.loose) {
-          const inWater = W().roomSurface(r, l.x) < l.y - 2 && r.row === 4;
+          const inWater = W().roomSurface(r, l.x) < l.y - 2 && H.Tide.tidal(r);
           if (!inWater) { keep.push(l); continue; }
           if (l.item === 'bolts') continue;
           const wp = G.wrackPools[r.region];
@@ -328,7 +328,7 @@ H.Game = (() => {
   function inTideWater(r, s) {
     const bx = s.x + 6, by = s.y + 4;
     if (r.fixedWater !== undefined || r.id === 'choir' || r.pools) return W().roomSurface(r, bx) < by;
-    if (r.row !== 4) return false;
+    if (!H.Tide.tidal(r)) return false;
     return by > (H.Tide.SEA_HIGH - H.Tide.spring) * TS;
   }
   function refreshLoose() {
@@ -541,7 +541,7 @@ H.Game = (() => {
     for (const [i, n] of p.bag.list()) bag.items[i] = n;
     if (G.satchelDrop) for (const [i, n] of G.satchelDrop.bag.list()) bag.items[i] = (bag.items[i] || 0) + n;
     p.bag.clear();
-    const tidal = G.room.row === 4 && p.inWater();
+    const tidal = H.Tide.tidal(G.room) && p.inWater();
     let x = p.cx(), y = p.y + p.h;
     G.satchelDrop = { room: G.room.id, x, y, bag, tidal };
     H.Audio.toll();
@@ -797,7 +797,7 @@ H.Game = (() => {
     updateCamera(dt);
     // Ambience follows the tide and the tension.
     const tension = H.clamp(G.swell / 9 + (G.undertow.live ? 0.6 : 0) + (G.bossBar ? 0.4 : 0), 0, 1);
-    H.Audio.ambience(G.room.row === 4 || G.room.outdoor ? H.Tide.level01() : 0.2, tension, p.headUnder());
+    H.Audio.ambience(H.Tide.tidal(G.room) || G.room.outdoor ? H.Tide.level01() : 0.2, tension, p.headUnder());
     H.Render.draw();
     if (G.glimpseT > 0) drawGlimpse();
   }

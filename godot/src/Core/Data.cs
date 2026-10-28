@@ -84,6 +84,8 @@ public class RoomDef
     public bool Outdoor, Deep, Brine, BellRoom;
     public int Seaward;
     public float? FixedWater;
+    // On the sea row, so the tide moves through it.
+    public bool Tidal => Row <= Tide.SEA_ROW && Row + H > Tide.SEA_ROW;
     public List<Pool> Pools;
     public string[] Map;
     public Dictionary<char, Props> Ents = new();

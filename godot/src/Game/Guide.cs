@@ -54,7 +54,7 @@ public static class Guide
             now = () => F.B("basinJam") && !F.B("basinCrossed") ? "Wrong order: the sluices are jammed. Wait for the Ebb (or rest at a bell), then throw them again: wave, skull, flame." : null,
             done = () => Visited("kilns") },
         new() { id = "abbot", act = "I", room = "abbot", title = "Face the Abbot of Salt",
-            how = "Climb from the Kilns into the Cathedral of Salt. His salt plates only fall when he strikes his own furnaces: stand by a kiln and let him swing at you, then break what the plates were covering.",
+            how = "The Cathedral of Salt is at the top of the salt mine. From the Kilns climb to the Upper Kilns, up the Furnace Stair to the Mine Head (its Bell Room is just east), and into the mine. The drift above the Pick Gallery has fallen in, so go the long way: east through the Brine Seep and the Crystal Drift, up the Winze, and back west past the Ivory Seam and the Pillar Hall to the Abbot's Stair. His salt plates only fall when he strikes his own furnaces: stand by a kiln and let him swing at you, then break what the plates were covering.",
             done = () => F.B("abbotDead") },
         // ---- Act II: the Cloister and the Choir ----
         new() { id = "boots", act = "II", room = "abbot", what = "ability:boots", title = "Take the Abbot's Ballast Boots",

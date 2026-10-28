@@ -151,7 +151,7 @@
   // ---------------------------------------------------------------- Undertow (roaming system)
   H.UndertowSystem = class {
     constructor() { this.room = null; this.moveT = 10; this.driven = false; this.dead = false; this.ripples = {}; this.bellT = 0; this.from = null; this.live = null; }
-    static sea() { return ['reef', 'pier', 'tithe', 'cloister', 'nave', 'priors']; }
+    static sea() { return H.ROOMS.filter((r) => r.sea).map((r) => r.id); }
     active() {
       if (this.dead || this.driven || G().act < 2) return false;
       const ph = H.Tide.phase();

@@ -178,7 +178,7 @@ H.Render = (() => {
       c.fillStyle = 'rgba(236,240,245,0.55)';
       for (let i = 0; i < 4; i++) { const px = x + ((h * 97 + i * 5) % 15); c.fillRect(px, y - 1, 1.5, 2 + ((i + tx) % 2)); }
     }
-    if (accent === 'barnacle' && room.row === 4) {
+    if (accent === 'barnacle' && H.Tide.tidal(room)) {
       c.fillStyle = 'rgba(30,40,40,0.6)'; c.fillRect(x + h * 12, y + 2, 2, 2); c.fillRect(x + ((h * 31) % 13), y + 3, 1, 1);
       c.fillStyle = 'rgba(60,110,70,0.5)'; c.fillRect(x + ((h * 53) % 12), y + 1, 3, 1);
     }
@@ -355,7 +355,7 @@ H.Render = (() => {
   }
 
   function drawTideMarks(c, room) {
-    if (!(room.row === 4 && !room.fixedWater)) return;
+    if (!(H.Tide.tidal(room) && !room.fixedWater)) return;
     const T = H.Tide;
     const lo = (T.SEA_LOW - T.spring) * TS, hi = (T.SEA_HIGH - T.spring) * TS;
     c.font = '6px monospace';

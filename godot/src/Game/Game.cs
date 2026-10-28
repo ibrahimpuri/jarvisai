@@ -383,11 +383,11 @@ public static class G
                     if (InTideWater(r, s)) s.Set("reknot", true);
                 }
             }
-            if (room.Row == 4) Narr.Think("rising");
+            if (room.Tidal) Narr.Think("rising");
         }
         if (ph == "high")
         {
-            if (room.Row == 4 && room.FixedWater == null) Narr.Think("firstHigh");
+            if (room.Tidal && room.FixedWater == null) Narr.Think("firstHigh");
             foreach (var r in Data.Rooms)
             {
                 var st = World.StateOrNull(r.Id);
@@ -409,7 +409,7 @@ public static class G
                 var keep = new List<Loose>();
                 foreach (var l in st.loose)
                 {
-                    bool inWater = World.RoomSurface(r, l.x) < l.y - 2 && r.Row == 4;
+                    bool inWater = World.RoomSurface(r, l.x) < l.y - 2 && r.Tidal;
                     if (!inWater) { keep.Add(l); continue; }
                     if (l.item == "bolts") continue;
                     wrackPools.TryGetValue(r.Region, out var wp);
@@ -437,7 +437,7 @@ public static class G
     {
         float bx = s.F("x") + 6, by = s.F("y") + 4;
         if (r.FixedWater != null || r.Id == "choir" || r.Pools != null) return World.RoomSurface(r, bx) < by;
-        if (r.Row != 4) return false;
+        if (!r.Tidal) return false;
         return by > (Tide.SEA_HIGH - Tide.spring) * TS;
     }
     static void RefreshLoose()
@@ -595,6 +595,29 @@ public static class G
         var d = Props.Empty(); d.Set("done", true);
         World.State(room.Id).ents[spec.S("key")] = d;
     }
+    // The bell-cable lifts, from Act II: a lit Bell Room rides its cable to any other lit Bell Room in its region.
+    public static List<(RoomDef room, string bell, string name)> CableTargets(Ent from)
+    {
+        var list = new List<(RoomDef, string, string)>();
+        if (act < 2 || from?.room == null) return list;
+        foreach (var r in Data.Rooms)
+        {
+            if (!r.BellRoom || r == from.room || r.Region != from.room.Region) continue;
+            foreach (var sp in RoomSpecs(r))
+                if (sp.S("type") == "bell" && bellsLit.Contains(sp.S("id"))) list.Add((r, sp.S("id"), sp.S("name") ?? r.Name));
+        }
+        return list;
+    }
+    public static void RideCable(RoomDef r)
+    {
+        Snd.Toll(); Shake(1);
+        EnterRoom(r);
+        var bell = ents.OfType<Bell>().FirstOrDefault();
+        if (bell != null) { player.x = bell.Cx() - 20; player.y = bell.y + bell.h - player.h; }
+        player.vx = player.vy = 0; player.state = "normal";
+        SnapCamera();
+        H.ToastMsg("The cable sings as the cage runs down it, bell to bell. " + r.Name + ".", 3);
+    }
     public static void SetRespawn(Ent bell) => respawn = new Spot { room = bell.room.Id, x = bell.Cx() - 20, y = bell.y + bell.h - player.h };
 
     public static void SetChoirLevel(string name)
@@ -696,7 +719,7 @@ public static class G
         foreach (var kv in p.bag.List()) bag.items[kv.Key] = kv.Value;
         if (satchelDrop != null) foreach (var kv in satchelDrop.bag.List()) bag.items[kv.Key] = bag.items.GetValueOrDefault(kv.Key) + kv.Value;
         p.bag.Clear();
-        bool tidal = room.Row == 4 && p.InWater();
+        bool tidal = room.Tidal && p.InWater();
         satchelDrop = new SatchelInfo { room = room.Id, x = p.Cx(), y = p.y + p.h, bag = bag, tidal = tidal };
         Snd.Toll();
         var (title, line) = Narr.DeathText();
@@ -787,6 +810,8 @@ public static class G
             ["satchelDrop"] = satchelDrop == null ? null : new JsonObject { ["room"] = satchelDrop.room, ["x"] = satchelDrop.x, ["y"] = satchelDrop.y, ["tidal"] = satchelDrop.tidal, ["bag"] = satchelDrop.bag.ToJson() },
             ["difficulty"] = difficulty, ["encrustedType"] = encrustedType, ["freeGraft"] = freeGraft, ["tips"] = SA(tips),
             ["undertowDead"] = undertow.dead, ["narr"] = narr.ToJson(), ["hollow"] = Hollow.ToJson(), ["legend"] = Legend.ToJson(),
+            // where every room sat when this was saved, so a later, larger island can move what the save remembers
+            ["origins"] = new JsonObject(Data.Rooms.Select(r => new KeyValuePair<string, JsonNode>(r.Id, new JsonArray(r.Px, r.Py)))),
         };
         using var fa = Godot.FileAccess.Open(SAVE_PATH, Godot.FileAccess.ModeFlags.Write);
         if (fa == null) { H.ToastMsg("Could not save (storage unavailable)."); return; }
@@ -802,6 +827,8 @@ public static class G
         World.flags = d.P("flags") ?? Props.Empty();
         var states = new Dictionary<string, RoomState>();
         if (d.P("states") is Props sp) foreach (var k in sp.Keys) states[k] = RoomState.FromJson(sp.P(k).O);
+        var moved = RoomMoves(d.P("origins"));
+        foreach (var (id, st) in states) MoveState(st, moved(id));
         World.States = states;
         var td = d.P("tide"); Tide.t = td.F("t"); Tide.cycle = td.I("cycle"); Tide.scale = td.F("scale", 1); Tide.spring = td.F("spring");
         player = new Player(); player.Load(d.P("player"));
@@ -812,9 +839,10 @@ public static class G
         tables = new HashSet<int>(d.A("tables").Select(n => (int)n.GetValue<double>()));
         collected = new HashSet<string>(d.Strings("collected")); bellsLit = new HashSet<string>(d.Strings("bellsLit"));
         reliquary = Bag.From(d.P("reliquary"));
-        var rs = d.P("respawn"); respawn = new Spot { room = rs.S("room"), x = rs.F("x"), y = rs.F("y") };
-        var sdp = d.P("satchelDrop");
-        satchelDrop = sdp == null ? null : new SatchelInfo { room = sdp.S("room"), x = sdp.F("x"), y = sdp.F("y"), tidal = sdp.B("tidal"), bag = Bag.From(sdp.P("bag")) };
+        var rs = d.P("respawn"); var rm = moved(rs.S("room"));
+        respawn = new Spot { room = rs.S("room"), x = rs.F("x") + rm.X, y = rs.F("y") + rm.Y };
+        var sdp = d.P("satchelDrop"); var sm = sdp == null ? default : moved(sdp.S("room"));
+        satchelDrop = sdp == null ? null : new SatchelInfo { room = sdp.S("room"), x = sdp.F("x") + sm.X, y = sdp.F("y") + sm.Y, tidal = sdp.B("tidal"), bag = Bag.From(sdp.P("bag")) };
         difficulty = d.S("difficulty") ?? "keeper"; encrustedType = d.S("encrustedType"); freeGraft = d.B("freeGraft");
         tips = new HashSet<string>(d.Strings("tips")); narr = NarrState.From(d.P("narr")); dialT = 1;
         undertow = new UndertowSystem { dead = d.B("undertowDead") }; mode = "play"; ended = null; swell = 0; valveT = 0;
@@ -827,6 +855,26 @@ public static class G
         player.x = respawn.x; player.y = respawn.y;
         SnapCamera();
         titleT = 3;
+    }
+
+    // How far each room has moved since a save was made, in world pixels. A save made before rooms recorded their
+    // origins comes from the 26-room island, which sat 30 screens west and 5 screens north of where those rooms are now.
+    static Func<string, Godot.Vector2> RoomMoves(Props origins)
+    {
+        return id =>
+        {
+            if (id == null || !Data.Room.TryGetValue(id, out var r)) return default;
+            if (origins == null) return new Godot.Vector2(30 * H.SCREEN_W * TS, 5 * H.SCREEN_H * TS);
+            if (origins.A(id) is not JsonArray o || o.Count < 2) return default;
+            return new Godot.Vector2(r.Px - (float)o[0].GetValue<double>(), r.Py - (float)o[1].GetValue<double>());
+        };
+    }
+    static void MoveState(RoomState st, Godot.Vector2 by)
+    {
+        if (by == default) return;
+        if (st.loose != null) foreach (var l in st.loose) { l.x += by.X; l.y += by.Y; }
+        foreach (var e in st.ents.Values)
+            if (e != null && e.Has("x") && e.Has("y")) { e.Set("x", e.F("x") + by.X); e.Set("y", e.F("y") + by.Y); }
     }
 
     public static string StatsSummary()
@@ -1045,7 +1093,7 @@ public static class G
         shakeX = (H.Rand() - 0.5f) * shakeAmt; shakeY = (H.Rand() - 0.5f) * shakeAmt;
         // Ambience follows the tide and the tension.
         tension = H.Clamp(swell / 9 + (undertow.live != null ? 0.6f : 0) + (bossBar != null ? 0.4f : 0), 0, 1);
-        Snd.Ambience(room.Row == 4 || room.Outdoor ? Tide.Level01() : 0.2f, tension, p.HeadUnder(), p.inBellRoom);
+        Snd.Ambience(room.Tidal || room.Outdoor ? Tide.Level01() : 0.2f, tension, p.HeadUnder(), p.inBellRoom);
     }
 
     // The island is never quite silent: the Saint's ribs settle under the abbey, and somewhere far off a bell is rung.

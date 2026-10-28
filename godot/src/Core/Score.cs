@@ -114,7 +114,7 @@ public partial class Score : Node
         hadBoss = G.bossBar != null;
         if (near > 0 || boss) chaseHold = 4.5f; else chaseHold -= dt;
         tense = Math.Clamp(G.tension * 0.8f + aware * 0.75f, 0, 1);
-        float tide = r.Row == 4 || r.Outdoor ? MathF.Pow(Tide.Level01(), 1.5f) : Tide.Level01() * 0.3f;
+        float tide = r.Tidal || r.Outdoor ? MathF.Pow(Tide.Level01(), 1.5f) : Tide.Level01() * 0.3f;
         // with the Tine in her hand the drowned choir follows her everywhere, louder as the sea takes hold
         if (Legend.merged) tide = MathF.Max(tide, 0.2f + 0.5f * Legend.Hold01);
         if (dead)

@@ -14,11 +14,18 @@ public class Gullet : Body
 {
     public float ax, ay, len;
     bool stunOnLand;
+    // The Gullet Pair hangs from two tendrils, a little apart. Cut one and it swings from the other; only cutting
+    // both brings it down.
+    public bool pair;
+    float swingT, swingCool;
+    const float SPREAD = 9;
     public Gullet(Props spec, RoomDef room) : base(spec, room)
     {
         type = "gullet";
         ax = spec.F("x"); ay = spec.F("anchorY"); len = spec.F("len", 4) * H.TILE;
+        pair = spec.B("pair");
         AddKnot("tendril", "tendril", "tendril", 2, 4);
+        if (pair) AddKnot("tendril2", "tendril", "tendril2", 2, 4);
         AddKnot("spine1", "spine", "s1", 3);
         AddKnot("spine2", "spine", "s2", 3);
         AddKnot("spine3", "spine", "s3", 3);
@@ -31,10 +38,13 @@ public class Gullet : Body
     {
         var j = new Dictionary<string, Vector2>();
         float sway = mode == "hang" ? MathF.Sin(anim * 1.3f) * 2 : 0;
+        if (Swinging) sway = MathF.Sin(swingT * 2.4f) * 22;
         if (mode == "hang")
         {
-            j["tendril"] = V(ax + sway * 0.4f, ay + len * 0.45f);
-            float bx = ax + sway, by = ay + len;
+            float hx = HangX();
+            j["tendril"] = V((pair ? ax - SPREAD : ax) + sway * 0.4f, ay + len * 0.45f);
+            if (pair) j["tendril2"] = V(ax + SPREAD + sway * 0.4f, ay + len * 0.45f);
+            float bx = hx + sway, by = ay + len;
             j["s1"] = V(bx, by - 10); j["s2"] = V(bx + 1, by - 5); j["s3"] = V(bx, by);
             j["head"] = V(bx, by + 3);
         }
@@ -45,15 +55,19 @@ public class Gullet : Body
             j["s1"] = V(x - f * 8, y + wv); j["s2"] = V(x, y - wv); j["s3"] = V(x + f * 7, y + wv);
             j["head"] = V(x + f * 12, y - 1);
             j["tendril"] = V(x - f * 14, y + 2);
+            if (pair) j["tendril2"] = V(x - f * 12, y + 3);
         }
         return j;
     }
     public override (float x, float y, float w, float h) HitBox()
     {
-        if (mode == "hang") return (ax - 5, ay + len - 14, 10, 18);
+        if (mode == "hang") return (Cx() - 5, ay + len - 14, 10, 18);
         return (x, y, w, h);
     }
-    public override float Cx() => mode == "hang" ? ax : x + w / 2;
+    public override float Cx() => mode == "hang" ? HangX() + (Swinging ? MathF.Sin(swingT * 2.4f) * 22 : 0) : x + w / 2;
+    // swinging from one tendril of a pair: it hangs under the one still holding
+    bool Swinging => pair && mode == "hang" && (K("tendril").broken != K("tendril2").broken);
+    float HangX() => !Swinging ? ax : K("tendril").broken ? ax + SPREAD : ax - SPREAD;
     public override float Cy() => mode == "hang" ? ay + len - 5 : y + h / 2;
     public override void Hear(float hx, float hy, float d, float r, string src)
     {
@@ -71,24 +85,51 @@ public class Gullet : Body
         mode = "fall";
         x = ax - w / 2; y = ay + len - h;
         vy = 50; stunOnLand = stunned;
+        x = Cx() - w / 2;
         K("tendril").broken = true;
+        if (pair) K("tendril2").broken = true;
         Voices.Alert(this);
     }
     public override void OnKnotBroken(Knot k, string src)
     {
-        if (k.id == "tendril" && mode == "hang") { k.broken = false; Drop(true); return; }
+        if (k.type == "tendril" && mode == "hang")
+        {
+            // one tendril of a pair cut: it swings from the other, and swings hard
+            if (pair && knots.Count(q => q.type == "tendril" && !q.broken) == 1) { swingT = 0; Snd.Thud(Pan()); Voices.Alert(this); return; }
+            k.broken = false; Drop(true); return;
+        }
         if (k.type == "spine" && knots.Count(q => q.type == "spine" && q.broken) >= 3) Down(src);
     }
+    bool tendrilHit;
     public override bool DamageKnot(Knot k, float dmg, string src)
     {
         if (k.type == "spine" && mode == "hang" && src != "fire") dmg *= 0.5f;
-        return base.DamageKnot(k, dmg, src);
+        // a shot to a tendril does not shake it loose; cutting it does (OnKnotBroken), and it lands stunned
+        tendrilHit = k.type == "tendril";
+        try { return base.DamageKnot(k, dmg, src); } finally { tendrilHit = false; }
     }
-    public override void Wake(bool force = false) { if (mode == "hang") Drop(); }
+    public override void Wake(bool force = false)
+    {
+        if (mode != "hang" || tendrilHit) return;
+        // a pair swinging from one tendril holds on; only cutting that one brings it down
+        if (pair && knots.Count(q => q.type == "tendril" && !q.broken) == 1) return;
+        Drop();
+    }
     public override void Think(float dt)
     {
         var p = G.player;
-        if (mode == "hang") { vx = 0; vy = 0; return; }
+        if (mode == "hang")
+        {
+            vx = 0; vy = 0;
+            if (Swinging)
+            {
+                // it swings through anyone under it
+                swingT += dt; swingCool -= dt;
+                var hb = HitBox();
+                if (p != null && swingCool <= 0 && H.RectsOverlap(hb.x - 3, hb.y, hb.w + 6, hb.h + 4, p.x, p.y, p.w, p.h)) { p.Hurt(1, this); swingCool = 1.2f; }
+            }
+            return;
+        }
         if (mode == "fall")
         {
             if (onGround)
@@ -157,8 +198,12 @@ public class Gullet : Body
         c.StrokeStyle = "#9fb7c0"; c.LineWidth = 1.5f;
         if (mode == "hang")
         {
-            c.BeginPath(); c.MoveTo(ax, ay); c.QuadraticCurveTo(ax + MathF.Sin(anim) * 3, ay + len / 2, j["s1"].X, j["s1"].Y); c.StrokePath();
-            c.Fill = H.Rgba(220, 240, 250, 0.7f); c.FillRect(ax - 3, ay, 6, 2);
+            foreach (var (kid, tx) in pair ? new[] { ("tendril", ax - SPREAD), ("tendril2", ax + SPREAD) } : new[] { ("tendril", ax) })
+            {
+                if (K(kid).broken) { c.BeginPath(); c.MoveTo(tx, ay); c.LineTo(tx + MathF.Sin(anim * 2) * 2, ay + 10); c.StrokePath(); continue; }
+                c.BeginPath(); c.MoveTo(tx, ay); c.QuadraticCurveTo(tx + MathF.Sin(anim) * 3, ay + len / 2, j["s1"].X, j["s1"].Y); c.StrokePath();
+                c.Fill = H.Rgba(220, 240, 250, 0.7f); c.FillRect(tx - 3, ay, 6, 2);
+            }
         }
         // a smooth spine through the segments, a body tapering from tail to a heavy head
         var sp = new[] { j["s1"], j["s2"], j["s3"], j["head"] };
@@ -221,7 +266,7 @@ public class Gullet : Body
         base.Restore(s);
         string sm = s.S("mode");
         if (sm == "hang") { mode = "hang"; x = ax - w / 2; y = ay + len - h; }
-        else if (sm != "downed" && sm != "gone") { mode = "ground"; K("tendril").broken = true; }
+        else if (sm != "downed" && sm != "gone") { mode = "ground"; K("tendril").broken = true; if (pair) K("tendril2").broken = true; }
         w = 22; h = 9;
     }
     public override void SetPose(string p) { if (p == "lying") pose = "lying"; }
@@ -229,6 +274,7 @@ public class Gullet : Body
     {
         base.StandUp();
         w = 22; h = 9; mode = "ground"; K("tendril").broken = true;
+        if (pair) K("tendril2").broken = true;
     }
 }
 
@@ -236,9 +282,13 @@ public class Gullet : Body
 public class Bellmouth : Body
 {
     float screamCool, home, belly;
+    // The Hooded Bellmouth has a hymnal page tied over its eyes. The lantern means nothing to it; noise does, so
+    // shuttering will not save her, and only quiet will.
+    public bool hooded;
     public Bellmouth(Props spec, RoomDef room) : base(spec, room)
     {
         type = "bellmouth";
+        hooded = spec.B("hooded");
         AddKnot("jaw", "jaw", "jaw", 3);
         AddKnot("shoulderL", "shoulder", "shoulderL", 3);
         AddKnot("shoulderR", "shoulder", "shoulderR", 3);
@@ -252,6 +302,7 @@ public class Bellmouth : Body
     public override Palette Pal() => new() { robe = "#d8d4c8", skin = "#8e9e98", cowl = null, dark = "#6a6a62" };
     bool SeesLight()
     {
+        if (hooded) return false;
         var p = G.player;
         var lights = new List<(float x, float y, bool lantern)>();
         if (p != null && p.LanternLit() && !p.inBellRoom) lights.Add((p.Cx(), p.y + 8, true));
@@ -265,6 +316,14 @@ public class Bellmouth : Body
             if (facingOK && Phys.Los(Cx(), y + 6, l.x, l.y)) return true;
         }
         return false;
+    }
+    public override void Hear(float hx, float hy, float d, float r, string src)
+    {
+        if (!hooded) { base.Hear(hx, hy, d, r, src); return; }
+        if (src == "scream" || d > r || mode != "idle" || screamCool > 0 || K("jaw").broken) return;
+        mode = "inhale"; atkT = 1.5f;
+        int s = (int)H.Sign(hx - Cx()); if (s != 0) facing = s;
+        Snd.Inhale(Pan());
     }
     public override void Think(float dt)
     {
@@ -346,6 +405,15 @@ public class Bellmouth : Body
             c.BeginPath(); c.Ellipse(st.X + facing * 2 - 1.5f, st.Y + 1, b * 0.5f, b * 0.45f, 0, 0, H.PI * 2); c.FillPath();
             c.FillStyle = "#d8d4c8"; c.FillRect(st.X - 6, st.Y + 4, 12, 3);
             if (mode == "inhale") { c.FillStyle = "#101010"; c.BeginPath(); c.Arc(j["jaw"].X, j["jaw"].Y, 2, 0, H.PI * 2); c.FillPath(); }
+        }
+        if (hooded && j.TryGetValue("head", out var hd))
+        {
+            // a page of the hymnal, wet through, tied over its eyes with bell-rope
+            c.Save(); c.Translate(hd.X, hd.Y - 1); c.Rotate(MathF.Sin(anim * 0.7f) * 0.08f);
+            c.Fill = H.Col("#cfc6a8"); c.FillRect(-4.5f, -2.2f, 9, 4.4f);
+            c.Fill = H.Rgba(60, 50, 40, 0.55f); for (int q = 0; q < 3; q++) c.FillRect(-3.5f, -1.4f + q * 1.3f, 7 - q, 0.4f);
+            c.Fill = H.Col("#6a5236"); c.FillRect(-5, -0.4f, 10, 0.8f);
+            c.Restore();
         }
     }
 }

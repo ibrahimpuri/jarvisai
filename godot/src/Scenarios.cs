@@ -1244,6 +1244,101 @@ public static class Scenarios
             t.Ok("a jump clipping a ceiling corner slips past it", p.y < G.room.Py + 2 * 16 - 4, $"y {p.y - G.room.Py:0}");
         },
 
+        // The full island, phase 1: every new room can be entered, the bell-cable rides between a region's Bell Rooms,
+        // an old save from the 26-room island loads onto the new grid, and the two new variants follow their rules.
+        ["bigworld"] = async t =>
+        {
+            G.god = true;
+            var p = G.player;
+            // every room of the grown Wrackline and Saltworks: enter it, look at it, and nothing breaks
+            string[] fresh = { "cottage", "lookout", "cliffpath", "ferrybell", "wrecks", "ferry", "hithe", "tidepools", "seaarch", "constance_hold", "breakersfloor", "smugglers", "saltsump",
+                "sheds", "cartyard", "trestle", "salthouse", "upperkilns", "terraces", "cisterns", "furnace", "minehead", "minebell", "adit", "picks", "seep", "drift", "winze", "seam", "pillars", "collapse", "abbotstair", "saltcloister", "saltchapel", "chute", "abbot" };
+            int entered = 0;
+            foreach (var id in fresh)
+            {
+                var r = Data.Room[id];
+                // somewhere to stand: the first open cell with floor under it, low in the room
+                (int x, int y) spot = (-1, -1);
+                for (int ty = Math.Min(r.Th - 2, 20); ty > 1 && spot.x < 0; ty--)
+                    for (int tx = 2; tx < r.Tw - 2 && spot.x < 0; tx++)
+                        if (World.Solid(r.Ox + tx, r.Oy + ty) == 0 && World.Solid(r.Ox + tx, r.Oy + ty - 1) == 0 && World.Solid(r.Ox + tx, r.Oy + ty + 1) == 1) spot = (tx, ty);
+                if (spot.x < 0) { t.Ok("somewhere to stand in " + id, false); continue; }
+                t.Place(id, spot.x, spot.y); await t.Run(0.35f);
+                if (G.room?.Id == id) entered++;
+                t.Snap("bw_" + id);
+            }
+            t.Ok("every new room can be entered", entered == fresh.Length, $"{entered} of {fresh.Length}");
+
+            // the bell-cable: nothing in Act I, then a ride to the other lit Bell Room of the region
+            G.act = 1; G.bellsLit.Add("bell_mine");
+            t.Place("saltbell", 18, 18); p.bag.Add("oil", 2);
+            await t.Tap("interact"); await t.Run(0.2f);
+            t.Ok("in Act I the Bell Room has no cable", UI.Kind == "bell" && !UI.Inst.AllText().Contains("bell-cable"), UI.Kind);
+            UI.Close(); await t.Run(0.2f);
+            G.act = 2;
+            await t.Tap("interact"); await t.Run(0.2f);
+            t.Ok("in Act II it offers the cable to the Mine Head", UI.Inst.AllText().Contains("Ride the bell-cable to Mine Head"), UI.Kind);
+            t.Snap("bw_cable_menu");
+            await t.ClickButton("Ride the bell-cable"); await t.Run(0.5f);
+            t.Ok("and the cable carries her there", G.room?.Id == "minebell" && !UI.IsOpen(), G.room?.Id);
+
+            // a save from the 26-room island: what it remembers is moved onto the new grid
+            const string SAVE = "user://hollowmere_save.json";
+            G.SetRespawn(G.ents.OfType<Bell>().First()); G.Save();
+            var raw = System.Text.Json.Nodes.JsonNode.Parse(Godot.FileAccess.GetFileAsString(SAVE)).AsObject();
+            float rx = (float)raw["respawn"]["x"].GetValue<double>(), ry = (float)raw["respawn"]["y"].GetValue<double>();
+            raw.Remove("origins");
+            // an old save has every position on the old grid: the respawn, and every body and item in every room
+            const float OX = 30 * 40 * 16, OY = 5 * 23 * 16;
+            raw["respawn"]["x"] = rx - OX; raw["respawn"]["y"] = ry - OY;
+            string probe = null; float probeX = 0, probeY = 0;
+            foreach (var (rid, stn) in raw["states"].AsObject())
+            {
+                if (stn?["ents"] is not System.Text.Json.Nodes.JsonObject ents) continue;
+                foreach (var (key, en) in ents)
+                    if (en is System.Text.Json.Nodes.JsonObject eo && eo["x"] != null && eo["y"] != null)
+                    {
+                        float ex = (float)eo["x"].GetValue<double>(), ey = (float)eo["y"].GetValue<double>();
+                        if (probe == null && rid == "pillars") { probe = key; probeX = ex; probeY = ey; }
+                        eo["x"] = ex - OX; eo["y"] = ey - OY;
+                    }
+            }
+            using (var fa = Godot.FileAccess.Open(SAVE, Godot.FileAccess.ModeFlags.Write)) fa.StoreString(raw.ToJsonString());
+            G.LoadGame(); await t.Run(0.3f);
+            t.Ok("an old save's respawn lands where it was, on the new grid", G.room?.Id == "minebell" && MathF.Abs(G.respawn.x - rx) < 1 && MathF.Abs(G.respawn.y - ry) < 1, $"{G.respawn.room} {G.respawn.x - rx:0} {G.respawn.y - ry:0}");
+            var back = probe == null ? null : World.State("pillars").ents.GetValueOrDefault(probe);
+            t.Ok("and so do the bodies it remembers", back != null && MathF.Abs(back.F("x") - probeX) < 1 && MathF.Abs(back.F("y") - probeY) < 1, probe);
+            if (UI.IsOpen()) UI.Close();
+            G.god = true; p = G.player;
+
+            // the Gullet Pair: one tendril cut and it swings; both, and it falls
+            t.Place("winze", 4, 16); await t.Run(0.3f);
+            var g = First<Gullet>(x => x.pair);
+            t.Ok("the Winze has a Gullet Pair", g != null);
+            if (g != null)
+            {
+                g.DamageKnot(g.K("tendril"), 99, "rivet"); await t.Run(0.3f);
+                t.Ok("one tendril cut: it swings from the other", g.mode == "hang" && g.K("tendril").broken && !g.K("tendril2").broken, g.mode);
+                g.DamageKnot(g.K("tendril2"), 99, "rivet"); await t.Run(0.3f);
+                t.Ok("both cut: it falls", g.mode is "fall" or "ground", g.mode);
+            }
+
+            // the Hooded Bellmouth: the lantern means nothing to it; noise does
+            // she stands in the open bay beside it, her lamp on it
+            t.Place("pillars", 18, 16); await t.Run(0.2f);
+            var bm = First<Bellmouth>(b => b.hooded);
+            t.Ok("the Pillar Hall has a Hooded Bellmouth", bm != null);
+            if (bm != null)
+            {
+                p.facing = 1; bm.facing = -1; p.focusing = true;
+                await t.Run(1.0f);
+                t.Ok("the lantern does not set it off", bm.mode == "idle" && G.ents.Contains(bm), bm.mode);
+                Noise.Emit(p.Cx(), p.Cy(), 8, "rivet"); await t.Run(0.05f);
+                t.Ok("a noise does", bm.mode == "inhale", bm.mode);
+                t.Snap("bw_hooded");
+            }
+        },
+
         ["difficulty"] = async t =>
         {
             // every crossing, from the table out to the drowned: rivets to put a Shucker down, Maren's pips, how hard a
