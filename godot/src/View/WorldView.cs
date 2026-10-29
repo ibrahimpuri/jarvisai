@@ -590,7 +590,12 @@ public partial class WorldView : Node2D
         Hollow.DrawWorld(c);
         Legend.DrawWorld(c);
         foreach (var pr in G.projectiles) pr.Draw(c);
-        foreach (var s in G.enemyShots) { c.StrokeStyle = "#a0b0b8"; c.LineWidth = 1.5f; c.Line(s.x, s.y, s.x - s.vx * 0.02f, s.y - s.vy * 0.02f); }
+        foreach (var s in G.enemyShots)
+        {
+            // the Almoner's alms-bowls tumble; everything else streaks
+            if (s.kind == "bowl") { c.FillStyle = "#6a6a66"; c.BeginPath(); c.Ellipse(s.x, s.y, 4, 2.2f, s.life * 9, 0, H.PI * 2); c.FillPath(); c.Fill = H.Rgba(220, 220, 210, 0.4f); c.FillCircle(s.x - 1, s.y - 1, 1); continue; }
+            c.StrokeStyle = "#a0b0b8"; c.LineWidth = 1.5f; c.Line(s.x, s.y, s.x - s.vx * 0.02f, s.y - s.vy * 0.02f);
+        }
         foreach (var m in motes)
         {
             switch (m.kind)

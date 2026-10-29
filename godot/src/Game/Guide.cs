@@ -63,11 +63,17 @@ public static class Guide
         new() { id = "cloister", act = "II", room = "cloister", title = "Go down into the Lower Cloister",
             how = "From Odile's Bell Room in the Saltworks, put the Ballast Boots on and sink down the Brine Shaft. (At Low tide the Tithe Hall's west door opens onto the Cloister too.)",
             done = () => Visited("cloister") || Visited("nave") || Visited("priors") },
+        new() { id = "west", act = "II", room = "refectory", title = "Cross the Lower Cloister",
+            how = "The Prior's Walk is at the far west end of the Lower Cloister. Go west from the Bell-Rope Nave into the Lavatorium, then along the lower floor (the Chapter House, the Slype, the Undercroft) or up the Night Stair and along the upper floor (the Dorter, the Library, the Counting House). The two floors meet at the Refectory. The lower floor floods at High tide.",
+            done = () => Visited("refectory") || F.B("almonerDead") },
+        new() { id = "almoner", act = "II", room = "refectory", title = "Break the Almoner",
+            how = "He is chained by the neck to the Refectory's long table, and the doors west are chained to him. Break two of his limbs and the crown in his chest opens. Knees first and he can only crawl, but when the tide is in he swims after you. Elbows first and he cannot grab or throw, but he heaves the table: be off the floor and the table when his knots flare. His chain does not reach the sideboards by the walls.",
+            done = () => F.B("almonerDead") },
         new() { id = "prior", act = "II", room = "priors", what = "ability:jet", title = "Open the Prior's door",
-            how = "In the Prior's Walk, west of the Bell-Rope Nave. The hymnal says the door opens \"when the sea turns its back\": come at the Ebb. The Prior kept a Jet Valve behind it.",
+            how = "Go on west from the Refectory, past the Almonry (ring its bell), to the Prior's Walk at the far end of the Cloister. The hymnal says the door opens \"when the sea turns its back\": come at the Ebb. The Prior kept a Jet Valve behind it.",
             done = () => P.Has("jet") },
         new() { id = "choir", act = "II", room = "choir", what = "ability:tidekey", title = "Climb to the Sunken Choir",
-            how = "Up from the Prior's Walk to the Choir Steps, then west into the Sunken Choir. The Choir will not harm you while you keep its water. Take the Tide Key.",
+            how = "Up from the Prior's Walk to the Choir Steps (or west along the upper floor, through the Prior's Lodging), then west into the Sunken Choir. The Choir will not harm you while you keep its water. Take the Tide Key.",
             done = () => P.Has("tidekey") },
         new() { id = "ribvault", act = "II", room = "ribbell", title = "Rise into the Ribvault",
             how = "Turn the Tide Key in the Choir's sluice and raise the water to the vault, then swim up into the Saint's ribs and on to the Ribvault Bell Room.",
@@ -104,7 +110,7 @@ public static class Guide
 
     // ---- the island's seams ------------------------------------------------------------------------------
     static Dictionary<string, Dictionary<string, List<(int tx, int ty)>>> seams;
-    static bool OpenTile(char ch) => World.Solidity(ch) != 1 || ch is 'L' or 'E' or 'K' or 'Z' or 'V' or 'Y' or 'h';
+    static bool OpenTile(char ch) => World.Solidity(ch) != 1 || ch is 'L' or 'E' or 'K' or 'Z' or 'V' or 'Y' or 'h' or 'Q';
     static void BuildSeams()
     {
         seams = new();

@@ -631,7 +631,7 @@ room({
 });
 
 room({
-  id: 'priors', name: "Prior's Walk", region: 'cloister', col: 32, row: 9, seaward: -1, sea: true,
+  id: 'priors', name: "Prior's Walk", region: 'cloister', col: 14, row: 9, seaward: -1, sea: true,
   map: [
     '#################################H######',
     '#################################H######',
@@ -673,7 +673,7 @@ room({
 
 // ---------------------------------------------------------------- Sunken Choir
 room({
-  id: 'choirsteps', name: 'Choir Steps', region: 'choir', col: 32, row: 8,
+  id: 'choirsteps', name: 'Choir Steps', region: 'choir', col: 14, row: 8,
   map: [
     '########################################',
     '########################################',
@@ -712,7 +712,7 @@ room({
 });
 
 room({
-  id: 'choir', name: 'Sunken Choir', region: 'choir', col: 31, row: 8, wrackpool: true,
+  id: 'choir', name: 'Sunken Choir', region: 'choir', col: 13, row: 8, wrackpool: true,
   map: [
     '#########H##############################',
     '#########H##############################',
@@ -760,7 +760,7 @@ room({
 });
 
 room({
-  id: 'choirbell', name: 'Choir Bell Room', region: 'choir', col: 30, row: 8, bellRoom: true,
+  id: 'choirbell', name: 'Choir Bell Room', region: 'choir', col: 12, row: 8, bellRoom: true,
   map: [
     '########################################',
     '########################################',
@@ -796,7 +796,7 @@ room({
 
 // ---------------------------------------------------------------- Ribvault
 room({
-  id: 'ribshaft', name: 'The Ribs', region: 'ribvault', col: 31, row: 6, w: 1, h: 2, wind: true,
+  id: 'ribshaft', name: 'The Ribs', region: 'ribvault', col: 13, row: 6, w: 1, h: 2, wind: true,
   map: [
     '########################################',
     '########################################',
@@ -861,7 +861,7 @@ room({
 });
 
 room({
-  id: 'ribbell', name: 'Ribvault Bell Room', region: 'ribvault', col: 32, row: 6, bellRoom: true,
+  id: 'ribbell', name: 'Ribvault Bell Room', region: 'ribvault', col: 14, row: 6, bellRoom: true,
   map: [
     '###################H####################',
     '###################H####################',
@@ -900,7 +900,7 @@ room({
 });
 
 room({
-  id: 'prisms', name: 'Lamp Prisms', region: 'ribvault', col: 33, row: 6, w: 1, h: 2,
+  id: 'prisms', name: 'Lamp Prisms', region: 'ribvault', col: 15, row: 6, w: 1, h: 2,
   map: [
     '########################################',
     '########################################',
@@ -968,7 +968,7 @@ room({
 
 // ---------------------------------------------------------------- The Gullet
 room({
-  id: 'gulletmouth', name: 'Gullet Mouth', region: 'gullet', col: 32, row: 10, deep: true, wrackpool: true,
+  id: 'gulletmouth', name: 'Gullet Mouth', region: 'gullet', col: 14, row: 10, deep: true, wrackpool: true,
   map: [
     '####################    ################',
     '####################    ################',
@@ -1011,7 +1011,7 @@ room({
 });
 
 room({
-  id: 'lair', name: "Undertow's Lair", region: 'gullet', col: 33, row: 10, w: 2, h: 1, deep: true, boss: 'undertow',
+  id: 'lair', name: "Undertow's Lair", region: 'gullet', col: 15, row: 10, w: 2, h: 1, deep: true, boss: 'undertow',
   map: [
     '################################################################################',
     '################################################################################',
@@ -1048,7 +1048,7 @@ room({
 
 // ---------------------------------------------------------------- Lantern Skull
 room({
-  id: 'skullstair', name: 'Skull Stair', region: 'skull', col: 32, row: 5, act3spawn: true,
+  id: 'skullstair', name: 'Skull Stair', region: 'skull', col: 14, row: 5, act3spawn: true,
   map: [
     '########################################',
     '########################################',
@@ -1087,7 +1087,7 @@ room({
 });
 
 room({
-  id: 'lamp', name: 'The Lamp', region: 'skull', col: 33, row: 5,
+  id: 'lamp', name: 'The Lamp', region: 'skull', col: 15, row: 5,
   map: [
     '########################################',
     '##############            ##############',

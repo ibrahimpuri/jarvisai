@@ -254,6 +254,11 @@ H.Game = (() => {
       H.Audio.buoy(0.9, 0.6);
       H.toast('The buoy bell tolls in the dark water. The Undertow is home.', 4);
     }
+    // The Almoner is fought only in the Godot build; here the Refectory's chains fall away when she comes in.
+    if (room.id === 'refectory' && !f.almonerDead) {
+      f.almonerDead = true;
+      H.toast('The chains on the Refectory doors hang loose. Whatever they held is gone.', 4);
+    }
     if (room.id === 'abbot' && f.abbotDead && !G.player.has('boots')) {
       G.ents.push(new H.ObjTypes.ability({ type: 'ability', id: 'boots', x: room.px + 20 * TS, y: room.py + 18 * TS, key: 'boots_drop' }, room));
     }

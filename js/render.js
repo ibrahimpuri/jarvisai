@@ -46,7 +46,7 @@ H.Render = (() => {
   const DECOR = new Set('=|wHoxa'.split(''));
   const DYNAMIC = new Set('ELVKZYhyCSb'.split(''));
   const COVERS = new Set('#GTPM'.split('')); // tiles that hide the back wall completely
-  const isSolidCh = (ch) => SOLIDS.has(ch) || ch === 'S' || ch === 'C' || ch === 'E' || ch === 'L' || ch === 'V' || ch === 'K' || ch === 'Z' || ch === 'Y' || ch === 'h';
+  const isSolidCh = (ch) => SOLIDS.has(ch) || ch === 'S' || ch === 'C' || ch === 'E' || ch === 'L' || ch === 'V' || ch === 'K' || ch === 'Z' || ch === 'Y' || ch === 'h' || ch === 'Q';
 
   function buildCaches(room) {
     const W = H.World, pal = PAL[room.region];
@@ -249,8 +249,8 @@ H.Render = (() => {
       const ch = W.charAt(tx, ty);
       const s = W.solidity(ch);
       switch (ch) {
-        case 'E': case 'L': case 'V': case 'K': case 'Z': case 'Y': case 'h': {
-          const col = { E: '#3a5a6a', L: '#4a3a2a', V: '#5a4a6a', K: '#5a5048', Z: '#6a5a3a', Y: '#3a4a5a', h: '#4a4a4a' }[ch];
+        case 'E': case 'L': case 'V': case 'K': case 'Z': case 'Y': case 'h': case 'Q': {
+          const col = { E: '#3a5a6a', L: '#4a3a2a', V: '#5a4a6a', K: '#5a5048', Z: '#6a5a3a', Y: '#3a4a5a', h: '#4a4a4a', Q: '#3e3834' }[ch];
           if (s === 1) {
             c.fillStyle = col; c.fillRect(x, y, TS, TS);
             c.fillStyle = 'rgba(0,0,0,0.35)'; c.fillRect(x + 2, y + 2, TS - 4, TS - 4);

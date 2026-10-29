@@ -232,10 +232,11 @@ public class UndertowSystem
         string ph = Tide.PhaseId();
         return (ph == "rising" && Tide.PhaseProgress() > 0.55f) || ph == "high";
     }
-    List<string> Neighbours(string id)
+    // The sea rooms either side along the sea row, however wide each room is.
+    public List<string> Neighbours(string id)
     {
         var r = Data.Room[id];
-        return SEA.Where(o => o != id && Data.Room[o].Row == r.Row && Math.Abs(Data.Room[o].Col - r.Col) == 1).ToList();
+        return SEA.Where(o => o != id && Data.Room[o].Tidal && (Data.Room[o].Col + Data.Room[o].W == r.Col || r.Col + r.W == Data.Room[o].Col)).ToList();
     }
     public void DriveOff() { driven = true; room = null; live = null; }
     public void OnPhase(string ph) { if (ph == "low") { driven = false; ripples.Clear(); } if (ph == "ebbing" || ph == "low") room = null; }
@@ -272,8 +273,8 @@ public class UndertowSystem
                 from = s != 0 ? s : 1;
                 room = next; moveT = H.Rand(14, 22);
             }
-            // Enter the player's room: never in a Bell Room, never within 10 s of a load.
-            if (room == here.Id && !here.BellRoom && G.sinceLoad > 10 && !p.dead) SpawnLive(here);
+            // Enter the player's room: never in a Bell Room, never where a boss still stands, never within 10 s of a load.
+            if (room == here.Id && !here.BellRoom && G.sinceLoad > 10 && !p.dead && !G.ents.Any(e => e is Body b && b.boss && !b.gone)) SpawnLive(here);
         }
         // The bell is always audible before it arrives.
         bellT -= dt;
@@ -483,6 +484,200 @@ public class Abbot : Body
         c.StrokeStyle = "#3a322a"; c.LineWidth = 5.4f;
         c.BeginPath(); c.MoveTo(ar.X, ar.Y); c.LineTo(ar.X - f * 6, ar.Y + 18); c.StrokePath();
         c.FillStyle = "#9a9a90"; c.FillCircle(ar.X - f * 6, ar.Y + 18, 2.6f);
+    }
+    public override Props Serialize() => null;
+}
+
+// ---------------------------------------------------------------- The Almoner
+// The brother who chose which one in ten went down to the Saint, and made sure it was never him. A bloated Shucker the
+// size of three men, chained by the neck to the Refectory's long table; the doors west are chained to him too. Which
+// knots break first decides the fight. Knees first, and he drags himself about, but when the tide is in he swims at
+// her through the flooded hall. Elbows first, and he cannot grab or throw, but he heaves the table. The crown in his
+// chest is sealed until two limbs are broken.
+public class Almoner : Drowned
+{
+    const float SCALE = 2.4f;
+    public bool started;
+    readonly float anchorX, anchorY, chain, tableX0, tableX1;
+    float noteT, slamT;
+    public Almoner(Props spec, RoomDef room) : base(spec, room)
+    {
+        type = "almoner"; boss = true; voice = "shucker";
+        AddKnot("kneeL", "knee", "kneeL", 7, 7);
+        AddKnot("kneeR", "knee", "kneeR", 7, 7);
+        AddKnot("elbowL", "elbow", "elbowL", 6, 7);
+        AddKnot("elbowR", "elbow", "elbowR", 6, 7);
+        AddKnot("crown", "crown", "sternum", 10, 9, 2);
+        // his chain is made fast to the middle of the table
+        anchorX = spec.F("x"); anchorY = room.Py + 37 * H.TILE;
+        tableX0 = room.Px + 22 * H.TILE; tableX1 = room.Px + 58 * H.TILE;
+        chain = 28 * H.TILE;
+        pose = "";
+        SetPose("seated");
+        x = spec.F("x") - w / 2; y = spec.F("y") - h;
+        facing = 1;
+        mode = "dormant"; awakeMode = "hunt";
+        stepUp = false;
+    }
+    public override void SetPose(string p)
+    {
+        if (p == pose) return;
+        float bottom = y + h, mid = Cx();
+        base.SetPose(p);
+        w *= SCALE; h *= SCALE; x = mid - w / 2; y = bottom - h;
+    }
+    public override Dictionary<string, Vector2> Skeleton()
+    {
+        var j = base.Skeleton();
+        float cx = Cx(), fy = Feet();
+        foreach (var k in j.Keys.ToArray()) j[k] = new Vector2(cx + (j[k].X - cx) * SCALE, fy + (j[k].Y - fy) * SCALE);
+        return j;
+    }
+    public void Start()
+    {
+        if (started) return;
+        started = true; mode = "rise"; atkT = 1.4f;
+        G.bossBar = this;
+        Snd.Toll(); Snd.Groan(0, 0.5f); G.Shake(4);
+        H.ToastMsg("The Almoner heaves himself up from the table. The chain at his neck pulls taut.", 4);
+        Narr.Think("almoner");
+    }
+    public override void Wake(bool force = false) { if (mode == "dormant") Start(); }
+    public override void Hear(float hx, float hy, float d, float r, string src) { if (mode == "dormant" && d < r) Start(); }
+    public override bool Perceives() { var p = G.player; return started && p != null && !p.dead && G.room == room; }
+    public override bool DamageKnot(Knot k, float dmg, string src) { Start(); return base.DamageKnot(k, dmg, src); }
+    public override void DamageFlesh(float d, float hx, float hy, string src) { Start(); base.DamageFlesh(d, hx, hy, src); }
+    public override void OnKnotBroken(Knot k, string src)
+    {
+        if (k.type == "crown")
+        {
+            ReleaseGrab();
+            gone = true; dead = true; mode = "gone";
+            FX.Salt(Cx(), Cy(), 90); G.Shake(10); Snd.Toll(); Snd.Rumble();
+            G.OnAlmonerKilled(this);
+            return;
+        }
+        base.OnKnotBroken(k, src);
+        if (k.type == "knee" && !LegsOK()) H.ToastMsg(World.IsWater(Cx(), Feet() - 6) || Tide.PhaseId() == "high" ? "His legs give. He slides into the water, and swims." : "His legs give. He drags himself toward the water under the table.", 3);
+        if (k.type == "elbow" && !ArmsOK()) H.ToastMsg("His arms hang. He gets his shoulder under the table instead.", 3);
+    }
+    // she is somewhere his hands can reach: on the floor or the table, within the chain
+    bool Reachable(Player p) => MathF.Abs(p.Cx() - anchorX) < chain + 2 * H.TILE && p.Feet() > room.Py + 33 * H.TILE;
+    bool OnTable(Player p) => p.onGround && p.Cx() > tableX0 && p.Cx() < tableX1 && MathF.Abs(p.Feet() - anchorY) < 6;
+    public override void Think(float dt)
+    {
+        var p = G.player;
+        if (p == null) return;
+        // the doors west are chained to him
+        noteT -= dt;
+        if (noteT <= 0 && p.Cx() < room.Px + 3 * H.TILE)
+        {
+            noteT = 12;
+            H.ToastMsg("The doors west are chained shut. The chains run back across the floor to the Almoner's collar.", 4);
+        }
+        if (mode == "dormant")
+        {
+            if (H.Dist(p.Cx(), p.Cy(), Cx(), Cy()) < 18 * H.TILE && p.Feet() > room.Py + 30 * H.TILE) Start();
+            return;
+        }
+        if (mode == "rise") { vx = 0; atkT -= dt; if (atkT <= 0) { SetPose(LegsOK() ? "stand" : "crawl"); mode = "hunt"; } return; }
+        if (mode == "heave" || mode == "slam" || mode == "throw") { Special(dt, p); return; }
+        if (Blow(dt, 150, 14, 2, true)) return;
+        cool -= dt;
+        int s = (int)H.Sign(p.Cx() - Cx()); if (s != 0) facing = s;
+        bool wet = World.IsWater(Cx(), Cy());
+        if (!LegsOK() && wet && World.IsWater(p.Cx(), p.Cy()))
+        {
+            // he swims: heavy, fast, straight at her
+            float dx = p.Cx() - Cx(), dy = p.Cy() - Cy(), dd = MathF.Max(1, MathF.Sqrt(dx * dx + dy * dy));
+            float sp = 78 * Menace;
+            vx = H.Approach(vx, dx / dd * sp, 300 * dt); vy = H.Approach(vy, dy / dd * sp - 20, 300 * dt);
+        }
+        else if (Reachable(p)) Pursue(dt, p.Cx(), (LegsOK() ? 30 : 16) * Menace);
+        else vx = H.Approach(vx, 0, 400 * dt);
+        if (cool > 0) return;
+        float d = DistToHer();
+        if (!ArmsOK())
+        {
+            // no hands: he gets his shoulder under the table and throws it up
+            if (d < 30 * H.TILE) { mode = "heave"; atkT = Wind(1.3f); cool = Cool(3.4f); foreach (var k in knots) if (!k.broken) k.flare = 1.3f; Voices.Windup(this); Snd.Groan(Pan(), 0.4f); }
+            return;
+        }
+        if (OnTable(p) && d < 9 * H.TILE) { mode = "slam"; atkT = Wind(0.9f); cool = Cool(2.4f); foreach (var k in knots) if (!k.broken) k.flare = 0.9f; Voices.Windup(this); return; }
+        if (!Reachable(p)) { mode = "throw"; atkT = Wind(0.8f); cool = Cool(2.6f); foreach (var k in knots) if (!k.broken) k.flare = 0.8f; Voices.Windup(this); return; }
+        if (d < 4.5f * H.TILE * (LegsOK() ? 1 : 0.7f)) StartBlow(0.9f, 2.2f);
+    }
+    // the heave, the slam on the table, the thrown bowl
+    void Special(float dt, Player p)
+    {
+        vx *= 0.8f; atkT -= dt;
+        if (atkT > 0) return;
+        string was = mode; mode = "recover"; atkT = 0.9f;
+        if (was == "throw")
+        {
+            // an alms-bowl of pewter, thrown hard
+            var hand = Skel()["handL"];
+            float dx = p.Cx() - hand.X, t = H.Clamp(MathF.Abs(dx) / 260, 0.45f, 1.3f), g = 460;
+            G.enemyShots.Add(new Shot { x = hand.X, y = hand.Y, vx = dx / t, vy = (p.Cy() - hand.Y) / t - 0.5f * g * t, grav = g, life = 2.4f, dmg = 1, src = this, kind = "bowl" });
+            Snd.Gaff(Pan());
+            return;
+        }
+        // the table jumps under his fists or his shoulder
+        slamT = 0.5f;
+        Snd.Thud(Pan()); Snd.Rumble(); G.Shake(was == "heave" ? 7 : 5);
+        for (float tx = tableX0; tx < tableX1; tx += 24) FX.Salt(tx, anchorY, 3);
+        bool onTable = OnTable(p);
+        bool onFloor = p.onGround && p.Cx() > tableX0 - 3 * H.TILE && p.Cx() < tableX1 + 3 * H.TILE && p.Feet() > anchorY + 1;
+        if (was == "slam" && onTable) { p.Hurt(2, this); p.vy = -280; }
+        if (was == "heave")
+        {
+            if (onTable) { p.Hurt(1, this); p.vy = -380; }
+            else if (onFloor) { p.Hurt(2, this); p.vy = -240; }
+            // at High water the heave sends a wave down the hall
+            if (World.IsWater(p.Cx(), p.Cy()) && MathF.Abs(p.Cx() - Cx()) < 26 * H.TILE) p.vx += H.Sign(p.Cx() - Cx()) * 320;
+        }
+    }
+    public override void Physics(float dt, bool pinned = false)
+    {
+        base.Physics(dt, pinned);
+        // the chain: he cannot go further from the table than it lets him
+        float dx = Cx() - anchorX, dy = Cy() - anchorY, d = MathF.Sqrt(dx * dx + dy * dy);
+        if (d > chain) { x -= dx * (1 - chain / d); y -= dy * (1 - chain / d); vx *= 0.3f; }
+    }
+    public override void Update(float dt) { base.Update(dt); if (slamT > 0) slamT -= dt; }
+    public override Palette Pal() => new() { robe = "#211d22", skin = "#93a092", cowl = "#171419", dark = "#0e0c10" };
+    public override void Draw(Canvas c)
+    {
+        if (gone) return;
+        float cx = Cx(), fy = Feet();
+        // the chain, from the ring in the table to his collar, slack or taut
+        var neck = Skel()["neck"];
+        float sag = MathF.Max(0, 40 - H.Dist(neck.X, neck.Y, anchorX, anchorY) * 0.12f);
+        c.StrokeStyle = "#4a4038"; c.LineWidth = 2.2f;
+        c.BeginPath(); c.MoveTo(anchorX, anchorY);
+        for (int i = 1; i <= 12; i++) { float t = i / 12f; c.LineTo(H.Lerp(anchorX, neck.X, t), H.Lerp(anchorY, neck.Y, t) + MathF.Sin(t * H.PI) * sag); }
+        c.StrokePath();
+        c.Stroke = H.Rgba(160, 130, 100, 0.35f); c.LineWidth = 0.8f;
+        for (int i = 1; i < 12; i += 2) { float t = i / 12f; float lx = H.Lerp(anchorX, neck.X, t), ly = H.Lerp(anchorY, neck.Y, t) + MathF.Sin(t * H.PI) * sag; c.Line(lx - 1.5f, ly - 1, lx + 1.5f, ly + 1); }
+        c.FillStyle = "#5a4c40"; c.FillCircle(anchorX, anchorY - 1, 3);
+        if (slamT > 0) { c.Fill = H.Rgba(220, 215, 200, slamT * 0.6f); c.FillRect(tableX0, anchorY - 6 - slamT * 8, tableX1 - tableX0, 3); }
+        // the body: drawn at a man's size and scaled up to his
+        var scaled = _skel;
+        _skel = base.Skeleton();
+        c.Save(); c.Translate(cx, fy); c.Scale(SCALE, SCALE); c.Translate(-cx, -fy);
+        DrawHuman(c, Pal());
+        var j = _skel;
+        // the belly that the brothers' bread made
+        var st = j["sternum"]; var hp = j["hip"];
+        c.FillStyle = Shade(Pal().robe, 0.55f); c.BeginPath(); c.Ellipse((st.X + hp.X) / 2 + facing * 2.2f, (st.Y + hp.Y) / 2 + 1, 6.5f, 5.2f, 0, 0, H.PI * 2); c.FillPath();
+        c.Fill = H.Rgba(255, 255, 255, 0.05f); c.BeginPath(); c.Ellipse((st.X + hp.X) / 2 + facing * 3.4f, (st.Y + hp.Y) / 2 - 1, 3, 2.4f, 0, 0, H.PI * 2); c.FillPath();
+        // the iron collar, and the alms-purse at his belt
+        var nk = j["neck"];
+        c.StrokeStyle = "#3a3430"; c.LineWidth = 1.6f; c.BeginPath(); c.Arc(nk.X, nk.Y + 0.5f, 2.4f, 0, H.PI * 2); c.StrokePath();
+        c.FillStyle = "#4a3a28"; c.FillCircle(hp.X - facing * 3, hp.Y + 1.5f, 1.8f);
+        c.Fill = H.Rgba(200, 170, 90, 0.5f); c.FillRect(hp.X - facing * 3 - 0.6f, hp.Y + 0.5f, 1.2f, 0.8f);
+        c.Restore();
+        _skel = scaled;
     }
     public override Props Serialize() => null;
 }

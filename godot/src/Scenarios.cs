@@ -1246,6 +1246,137 @@ public static class Scenarios
             t.Ok("a jump clipping a ceiling corner slips past it", p.y < G.room.Py + 2 * 16 - 4, $"y {p.y - G.room.Py:0}");
         },
 
+        // The full island, phase 2: the Lower Cloister. Every new room can be entered; the Almoner keeps the way west
+        // chained, fights by which knots she breaks first, and his death opens it; the Almonry is the region's second Bell
+        // Room; and what saves remember of the moved west lands where it is now.
+        ["cloister"] = async t =>
+        {
+            G.god = true;
+            var p = G.player; var f = World.flags;
+            f.Set("seawallOpen", true); f.Set("abbotDead", true); p.abilities.Add("boots"); G.act = 2;
+            G.quests.Set("anselMet", true);
+            foreach (var id in new[] { "pier", "saltgate", "kilns", "cloister" }) World.State(id).visited = true;
+            t.Ok("the guide sends her west across the Cloister", Guide.Current?.id == "west", Guide.Current?.id);
+
+            string[] fresh = { "lavatorium", "chapter", "slype", "warming", "undercroft", "refectory", "kitchens", "infirmary", "charnel", "cells", "garth",
+                "nightstair", "dorter", "scriptorium", "library", "counting", "almonry", "dole", "chantry", "bellcote", "sacristy", "treasury", "pulpitum", "lodging", "lightwell" };
+            int entered = 0;
+            foreach (var id in fresh)
+            {
+                var r = Data.Room[id];
+                (int x, int y) spot = (-1, -1);
+                for (int ty = Math.Min(r.Th - 2, 20); ty > 1 && spot.x < 0; ty--)
+                    for (int tx = 2; tx < r.Tw - 2 && spot.x < 0; tx++)
+                        if (World.Solid(r.Ox + tx, r.Oy + ty) == 0 && World.Solid(r.Ox + tx, r.Oy + ty - 1) == 0 && World.Solid(r.Ox + tx, r.Oy + ty + 1) == 1) spot = (tx, ty);
+                if (spot.x < 0) { t.Ok("somewhere to stand in " + id, false); continue; }
+                t.Place(id, spot.x, spot.y); await t.Run(0.35f);
+                if (G.room?.Id == id) entered++;
+                t.Snap("cl_" + id);
+            }
+            t.Ok("every Cloister room can be entered", entered == fresh.Length, $"{entered} of {fresh.Length}");
+            t.Ok("and once she has seen the Refectory, the guide names the Almoner", Guide.Current?.id == "almoner", Guide.Current?.id);
+
+            // the Almoner, and the doors chained to him
+            var rr = Data.Room["refectory"];
+            t.Place("refectory", 74, 39); await t.Run(0.3f);
+            foreach (var b in G.ents.OfType<Body>()) if (b is not Almoner) b.gone = true;
+            var al = First<Almoner>();
+            t.Ok("the Almoner sits at his table", al != null && al.mode == "dormant", al?.mode);
+            if (al == null) return;
+            t.Ok("and the doors west are chained to him", World.Solid(rr.Ox, rr.Oy + 38) == 1 && World.Solid(rr.Ox, rr.Oy + 15) == 1);
+            t.Snap("cl_almoner_waits");
+            t.Place("refectory", 58, 39); await t.Run(0.4f);
+            t.Ok("he wakes as she comes down the hall", al.started && G.bossBar == al, al.mode);
+            await t.Run(1.8f);
+            t.Snap("cl_almoner_up");
+            // up on a sideboard, out of the chain's reach: he throws his alms-bowls instead
+            float ax = rr.Px + 40 * 16 + 8;
+            t.Place("refectory", 4, 36);
+            bool threw = false; float far = 0;
+            for (int i = 0; i < 60 && !threw; i++) { await t.Run(0.1f); threw |= G.enemyShots.Any(s => s.kind == "bowl"); far = MathF.Max(far, MathF.Abs(al.Cx() - ax)); }
+            t.Ok("out of his reach, he throws", threw);
+            t.Snap("cl_almoner_throws");
+            t.Ok("and the chain holds him to the table", far <= 28 * 16 + 2, $"{far / 16:0.0} tiles");
+            // knees first: he goes down on his hands, and at High water he swims at her
+            al.DamageKnot(al.K("kneeL"), 99, "rivet"); al.DamageKnot(al.K("kneeR"), 99, "rivet");
+            await t.Run(0.3f);
+            t.Ok("knees broken, he goes down on his hands", al.pose == "crawl", al.pose);
+            t.Ok("and two broken limbs open the crown in his chest", !al.IsSealed(al.K("crown")));
+            Tide.AdvanceTo("high"); await t.Run(1f);
+            t.Place("refectory", 24, 34);
+            float d0 = H.Dist(al.Cx(), al.Cy(), p.Cx(), p.Cy());
+            bool swam = false;
+            for (int i = 0; i < 25; i++) { await t.Run(0.1f); swam |= World.IsWater(al.Cx(), al.Cy()) && MathF.Abs(al.vy) > 5; }
+            float d1 = H.Dist(al.Cx(), al.Cy(), p.Cx(), p.Cy());
+            t.Ok("in the High water he swims at her", swam && d1 < d0 - 16, $"{d0 / 16:0.0} -> {d1 / 16:0.0} tiles");
+            t.Snap("cl_almoner_swims");
+            // elbows: no grab and no throw, but he heaves the table, and the floor throws her
+            Tide.AdvanceTo("low"); await t.Run(0.5f);
+            al.DamageKnot(al.K("elbowL"), 99, "rivet"); al.DamageKnot(al.K("elbowR"), 99, "rivet");
+            t.Place("refectory", 30, 39); await t.Run(0.1f);
+            G.god = false; p.hp = p.maxHp; p.invulnT = 0;
+            bool heaved = false; int hp0 = p.hp;
+            for (int i = 0; i < 80 && p.hp == hp0; i++) { await t.Run(0.1f); heaved |= al.mode == "heave"; }
+            t.Ok("with no arms he heaves the table, and the floor throws her", heaved && p.hp < hp0, $"heaved {heaved} hp {hp0}->{p.hp}");
+            t.Snap("cl_almoner_heave");
+            G.god = true; p.hp = p.maxHp;
+            // the crown
+            int ivory0 = p.bag.Count("ivory");
+            al.DamageKnot(al.K("crown"), 99, "rivet"); await t.Run(0.5f);
+            t.Ok("the crown breaks, and the Almoner is done", al.gone && f.B("almonerDead") && G.bossBar == null);
+            t.Ok("he leaves 2 Mere-ivory", p.bag.Count("ivory") == ivory0 + 2, p.bag.Count("ivory"));
+            t.Ok("and the chains on the doors west fall away", World.Solid(rr.Ox, rr.Oy + 38) == 0 && World.Solid(rr.Ox, rr.Oy + 15) == 0);
+            t.Ok("the guide sends her on to the Prior's door", Guide.Current?.id == "prior", Guide.Current?.id);
+            t.Place("refectory", 2, 39); await t.Hold("left", 1.0f);
+            t.Ok("she walks out west into the Kitchens", G.room?.Id == "kitchens", G.room?.Id);
+            t.Place("refectory", 70, 39); await t.Run(0.3f);
+            t.Ok("and he stays dead", First<Almoner>() == null);
+
+            // the Almonry: the Cloister's second Bell Room, and the cable between them
+            G.bellsLit.Add("bell_cloister");
+            t.Place("almonry", 9, 16); p.bag.Add("oil", 2);
+            await t.Tap("interact"); await t.Run(0.2f);
+            t.Ok("the Almonry is a Bell Room", G.room.BellRoom && UI.Kind == "bell", UI.Kind);
+            t.Ok("and its bell-cable runs to the Cloister Bell Room", UI.Inst.AllText().Contains("Ride the bell-cable to Lower Cloister"), UI.Kind);
+            t.Snap("cl_almonry");
+            await t.ClickButton("Ride the bell-cable"); await t.Run(0.5f);
+            t.Ok("which carries her there", G.room?.Id == "cloisterbell", G.room?.Id);
+            if (UI.IsOpen()) UI.Close();
+
+            // the Undertow walks the whole lower floor, however wide its rooms
+            var ut = new UndertowSystem();
+            t.Ok("the Undertow's way runs room to room along the lower floor", ut.Neighbours("chapter").Contains("lavatorium") && ut.Neighbours("chapter").Contains("slype")
+                && ut.Neighbours("refectory").Contains("kitchens") && ut.Neighbours("refectory").Contains("undercroft") && ut.Neighbours("priors").Contains("garth"), string.Join(",", ut.Neighbours("refectory")));
+
+            // saves made before the west moved: what they remember of the Prior's Walk lands where it is now
+            const string SAVE = "user://hollowmere_save.json";
+            t.Place("priors", 30, 16); await t.Run(0.3f);
+            var pr = Data.Room["priors"];
+            float rx = p.x, ry = p.y;
+            G.respawn = new G.Spot { room = "priors", x = rx, y = ry };
+            G.Save();
+            var raw0 = System.Text.Json.Nodes.JsonNode.Parse(Godot.FileAccess.GetFileAsString(SAVE)).AsObject();
+            string probe = null; float probeX = 0, probeY = 0;
+            if (raw0["states"]?["priors"]?["ents"] is System.Text.Json.Nodes.JsonObject pe)
+                foreach (var (key, en) in pe)
+                    if (probe == null && en is System.Text.Json.Nodes.JsonObject eo && eo["x"] != null && eo["y"] != null) { probe = key; probeX = (float)eo["x"].GetValue<double>(); probeY = (float)eo["y"].GetValue<double>(); }
+            t.Ok("the Prior's Walk remembers something to move", probe != null);
+            foreach (var (label, sx, sy, phase1) in new[] { ("a save from before the Cloister grew", 18f * 40 * 16, 0f, true), ("a save from the 26-room island", 2f * 40 * 16 - pr.Px, 4f * 23 * 16 - pr.Py, false) })
+            {
+                var raw = System.Text.Json.Nodes.JsonNode.Parse(raw0.ToJsonString()).AsObject();
+                if (phase1) raw["origins"]["priors"] = new System.Text.Json.Nodes.JsonArray(pr.Px + sx, pr.Py + sy);
+                else raw.Remove("origins");
+                raw["respawn"]["x"] = rx + sx; raw["respawn"]["y"] = ry + sy;
+                if (probe != null) { raw["states"]["priors"]["ents"][probe]["x"] = probeX + sx; raw["states"]["priors"]["ents"][probe]["y"] = probeY + sy; }
+                using (var fa = Godot.FileAccess.Open(SAVE, Godot.FileAccess.ModeFlags.Write)) fa.StoreString(raw.ToJsonString());
+                G.LoadGame(); await t.Run(0.3f);
+                var back = probe == null ? null : World.State("priors").ents.GetValueOrDefault(probe);
+                t.Ok(label + " lands on the Prior's Walk as it is now", G.room?.Id == "priors" && MathF.Abs(G.respawn.x - rx) < 1 && MathF.Abs(G.respawn.y - ry) < 1
+                    && back != null && MathF.Abs(back.F("x") - probeX) < 1 && MathF.Abs(back.F("y") - probeY) < 1, $"{G.respawn.x - rx:0},{G.respawn.y - ry:0}");
+                if (UI.IsOpen()) UI.Close();
+            }
+        },
+
         // The full island, phase 1: every new room can be entered, the bell-cable rides between a region's Bell Rooms,
         // an old save from the 26-room island loads onto the new grid, and the two new variants follow their rules.
         ["bigworld"] = async t =>
@@ -1966,7 +2097,7 @@ public static class Scenarios
         {
             await t.Run(0.05f);
             var gaps = new List<string>(); var ladders = new List<string>(); var buried = new List<string>();
-            static bool Open(char ch) => World.Solidity(ch) != 1 || ch is 'L' or 'E' or 'K' or 'Z' or 'V' or 'Y' or 'h';
+            static bool Open(char ch) => World.Solidity(ch) != 1 || ch is 'L' or 'E' or 'K' or 'Z' or 'V' or 'Y' or 'h' or 'Q';
             foreach (var r in Data.Rooms)
             {
                 for (int ty = 0; ty < r.Th; ty++)

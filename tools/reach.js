@@ -234,17 +234,25 @@ const stages = [
   { name: 'Barge puzzle solved', abil: ['swing'], flags: { seawallOpen: true, basinFilling: true, basinCrossed: true }, pool: true, need: ['ch_kilns@kilns', 'harpoon@kilns', 'kiln@abbot', 'abbot@abbot',
     'ch_sheds@sheds', 'ch_carts@cartyard', 'ch_salthouse@salthouse', 'ch_upperkilns@upperkilns', 'ch_terraces@terraces', 'ch_furnace@furnace', 'bell_mine@minebell', 'ch_minebell@minebell',
     'ch_picks@picks', 'sawline@picks', 'ch_winze@winze', 'ch_seam@seam', 'ch_collapse@collapse', 'ch_saltcloister@saltcloister'], want: ['stitch_kilns@kilns', 'page_kilns@kilns'], mustNot: ['ch_seep@seep', 'ch_cistern@cisterns'] },
-  { name: 'Ballast Boots', abil: ['swing', 'boots'], flags: { seawallOpen: true, basinFilling: true, basinCrossed: true, abbotDead: true }, pool: true, need: ['bell_cloister@cloisterbell', 'sling@nave', 'teodor@nave', 'jet@priors', 'ch_brine@brineshaft', 'table_1@cloister', 'table_2@nave', 'table_3@priors', 'ch_seep@seep'], want: ['seal_nave@nave', 'page_cloister@cloister', 'ch_cloister@cloister'] },
-  { name: 'Jet Valve', abil: ['swing', 'boots', 'jet'], flags: { seawallOpen: true, basinFilling: true, basinCrossed: true, priorWedged: true }, pool: true, need: ['sluice@choir', 'hesper@choir', 'bell_choir@choirbell', 'tunedbell@choir', 'valve@choir', 'table_4@choirsteps'], want: ['stitch_steps@choirsteps', 'ch_steps@choirsteps', 'page_cbell@choirbell'] },
-  { name: 'Tide Key (crystal broken, water raised)', abil: ['swing', 'boots', 'jet', 'tidekey'], flags: { seawallOpen: true, basinFilling: true, basinCrossed: true, priorWedged: true }, pool: true, choir: 3, breakC: true, need: ['tidekey@choir', 'bell_rib@ribbell', 'prismA@prisms', 'prismB@prisms', 'prismC@prisms', 'ch_ribs@ribshaft'], want: ['seal_ribs@ribshaft', 'page_ribs@ribshaft', 'seal_choir@choir', 'page_choir@choir'] },
-  { name: 'Drained choir route instead', abil: ['swing', 'boots', 'jet', 'tidekey'], flags: { seawallOpen: true, basinFilling: true, basinCrossed: true, priorWedged: true, choirDrained: true }, pool: true, choir: 21, breakC: true, need: ['bell_rib@ribbell', 'ch_cache@choir'] },
-  { name: 'Prisms solved: Pressure Seal', abil: ['swing', 'boots', 'jet', 'tidekey'], flags: { seawallOpen: true, basinFilling: true, basinCrossed: true, priorWedged: true }, pool: true, choir: 3, breakC: true, breakS: true, need: ['seal@prisms', 'ch_prisms@prisms'], want: ['stitch_prisms@prisms'] },
-  { name: 'Seal + lift dropped', abil: ['swing', 'boots', 'jet', 'tidekey', 'seal'], flags: { seawallOpen: true, basinFilling: true, basinCrossed: true, priorWedged: true, liftDropped: true }, pool: true, choir: 3, breakC: true, breakS: true, lift: true, need: ['page_gullet@gulletmouth', 'page_lair@lair', 'ch_cistern@cisterns', 'ch_sump@saltsump'], want: ['seal_gullet@gulletmouth'] },
-  { name: 'GATE: no Jet means no Choir', abil: ['swing', 'boots'], flags: { seawallOpen: true, basinFilling: true, basinCrossed: true, priorWedged: true }, pool: true, mustNot: ['hesper@choir', 'tidekey@choir'] },
-  { name: 'GATE: no Tide Key means no Ribvault', abil: ['swing', 'boots', 'jet'], flags: { seawallOpen: true, basinFilling: true, basinCrossed: true, priorWedged: true }, pool: true, breakC: true, mustNot: ['bell_rib@ribbell', 'seal@prisms'] },
-  { name: 'GATE: no Seal means no Gullet', abil: ['swing', 'boots', 'jet', 'tidekey'], flags: { seawallOpen: true, basinFilling: true, basinCrossed: true, priorWedged: true, liftDropped: true }, pool: true, choir: 3, breakC: true, lift: true, mustNot: ['page_lair@lair'] },
-  { name: 'GATE: Skull closed', abil: ['swing', 'boots', 'jet', 'tidekey', 'seal'], flags: { seawallOpen: true, basinFilling: true, basinCrossed: true, priorWedged: true, liftDropped: true }, pool: true, choir: 3, breakC: true, breakS: true, lift: true, mustNot: ['agathe@lamp'] },
-  { name: 'Skull open', abil: ['swing', 'boots', 'jet', 'tidekey', 'seal'], flags: { seawallOpen: true, basinFilling: true, basinCrossed: true, priorWedged: true, liftDropped: true, skullOpen: true }, pool: true, choir: 3, breakC: true, breakS: true, lift: true, need: ['shoal@skullstair', 'agathe@lamp', 'lampwork@lamp', 'beacon@lamp', 'hymnbell@lamp'] },
+  { name: 'Ballast Boots', abil: ['swing', 'boots'], flags: { seawallOpen: true, basinFilling: true, basinCrossed: true, abbotDead: true }, pool: true, need: ['bell_cloister@cloisterbell', 'sling@nave', 'teodor@nave', 'ch_brine@brineshaft', 'table_1@cloister', 'table_2@nave', 'ch_seep@seep',
+    'ch_lavatorium@lavatorium', 'ch_chapter@chapter', 'ch_warming@warming', 'ch_undercroft@undercroft', 'ch_nightstair@nightstair', 'ch_dorter@dorter', 'ch_scriptorium@scriptorium', 'ch_library@library', 'ch_counting@counting', 'almoner@refectory'],
+    want: ['seal_nave@nave', 'page_cloister@cloister', 'ch_cloister@cloister'],
+    // the Almoner's chained doors are the only way west
+    mustNot: ['bell_almonry@almonry', 'ch_kitchens@kitchens', 'jet@priors', 'table_3@priors', 'ch_lodging@lodging', 'ch_lightwell@lightwell'] },
+  { name: 'The Almoner dead', abil: ['swing', 'boots'], flags: { seawallOpen: true, basinFilling: true, basinCrossed: true, abbotDead: true, almonerDead: true }, pool: true, need: ['bell_almonry@almonry', 'ch_almonry@almonry', 'jet@priors', 'table_3@priors',
+    'ch_kitchens@kitchens', 'ch_infirmary@infirmary', 'ch_charnel@charnel', 'ch_cells@cells', 'ch_garth@garth', 'ch_dole@dole', 'ch_sacristy@sacristy', 'ch_pulpitum@pulpitum', 'ch_lodging@lodging'],
+    // what the Jet Valve opens, back in the Cloister
+    mustNot: ['ch_lightwell@lightwell', 'ch_bellcote@bellcote', 'ch_treasury@treasury'] },
+  { name: 'Jet Valve', abil: ['swing', 'boots', 'jet'], flags: { seawallOpen: true, basinFilling: true, basinCrossed: true, priorWedged: true, almonerDead: true }, pool: true, need: ['sluice@choir', 'hesper@choir', 'bell_choir@choirbell', 'tunedbell@choir', 'valve@choir', 'table_4@choirsteps', 'ch_lightwell@lightwell', 'ch_bellcote@bellcote', 'ch_treasury@treasury'], want: ['stitch_steps@choirsteps', 'ch_steps@choirsteps', 'page_cbell@choirbell'] },
+  { name: 'Tide Key (crystal broken, water raised)', abil: ['swing', 'boots', 'jet', 'tidekey'], flags: { seawallOpen: true, basinFilling: true, basinCrossed: true, priorWedged: true, almonerDead: true }, pool: true, choir: 3, breakC: true, need: ['tidekey@choir', 'bell_rib@ribbell', 'prismA@prisms', 'prismB@prisms', 'prismC@prisms', 'ch_ribs@ribshaft'], want: ['seal_ribs@ribshaft', 'page_ribs@ribshaft', 'seal_choir@choir', 'page_choir@choir'] },
+  { name: 'Drained choir route instead', abil: ['swing', 'boots', 'jet', 'tidekey'], flags: { seawallOpen: true, basinFilling: true, basinCrossed: true, priorWedged: true, almonerDead: true, choirDrained: true }, pool: true, choir: 21, breakC: true, need: ['bell_rib@ribbell', 'ch_cache@choir'] },
+  { name: 'Prisms solved: Pressure Seal', abil: ['swing', 'boots', 'jet', 'tidekey'], flags: { seawallOpen: true, basinFilling: true, basinCrossed: true, priorWedged: true, almonerDead: true }, pool: true, choir: 3, breakC: true, breakS: true, need: ['seal@prisms', 'ch_prisms@prisms'], want: ['stitch_prisms@prisms'] },
+  { name: 'Seal + lift dropped', abil: ['swing', 'boots', 'jet', 'tidekey', 'seal'], flags: { seawallOpen: true, basinFilling: true, basinCrossed: true, priorWedged: true, almonerDead: true, liftDropped: true }, pool: true, choir: 3, breakC: true, breakS: true, lift: true, need: ['page_gullet@gulletmouth', 'page_lair@lair', 'ch_cistern@cisterns', 'ch_sump@saltsump'], want: ['seal_gullet@gulletmouth'] },
+  { name: 'GATE: no Jet means no Choir', abil: ['swing', 'boots'], flags: { seawallOpen: true, basinFilling: true, basinCrossed: true, priorWedged: true, almonerDead: true }, pool: true, mustNot: ['hesper@choir', 'tidekey@choir'] },
+  { name: 'GATE: no Tide Key means no Ribvault', abil: ['swing', 'boots', 'jet'], flags: { seawallOpen: true, basinFilling: true, basinCrossed: true, priorWedged: true, almonerDead: true }, pool: true, breakC: true, mustNot: ['bell_rib@ribbell', 'seal@prisms'] },
+  { name: 'GATE: no Seal means no Gullet', abil: ['swing', 'boots', 'jet', 'tidekey'], flags: { seawallOpen: true, basinFilling: true, basinCrossed: true, priorWedged: true, almonerDead: true, liftDropped: true }, pool: true, choir: 3, breakC: true, lift: true, mustNot: ['page_lair@lair'] },
+  { name: 'GATE: Skull closed', abil: ['swing', 'boots', 'jet', 'tidekey', 'seal'], flags: { seawallOpen: true, basinFilling: true, basinCrossed: true, priorWedged: true, almonerDead: true, liftDropped: true }, pool: true, choir: 3, breakC: true, breakS: true, lift: true, mustNot: ['agathe@lamp'] },
+  { name: 'Skull open', abil: ['swing', 'boots', 'jet', 'tidekey', 'seal'], flags: { seawallOpen: true, basinFilling: true, basinCrossed: true, priorWedged: true, almonerDead: true, liftDropped: true, skullOpen: true }, pool: true, choir: 3, breakC: true, breakS: true, lift: true, need: ['shoal@skullstair', 'agathe@lamp', 'lampwork@lamp', 'beacon@lamp', 'hymnbell@lamp'] },
 ];
 
 // The barrel's fire cracks the salt plug in the Breakers.
@@ -312,7 +320,7 @@ if (!dump) {
   { const c = H.ROOM.choir; for (let y = 0; y < 23; y++) for (const x of [4, 32]) if (W.charAt(c.ox + x, c.oy + y) === 'C') W.setChar(c.ox + x, c.oy + y, ' '); }
   for (const r of H.ROOMS) for (let y = 0; y < r.th; y++) for (let x = 0; x < r.tw; x++) if (W.charAt(r.ox + x, r.oy + y) === 'S') W.setChar(r.ox + x, r.oy + y, ' ');
   breakPlug();
-  const allSeen = analyse(['swing', 'boots', 'jet', 'tidekey', 'seal', 'lens'], { seawallOpen: true, basinFilling: true, basinCrossed: true, priorWedged: true, liftDropped: true, skullOpen: true });
+  const allSeen = analyse(['swing', 'boots', 'jet', 'tidekey', 'seal', 'lens'], { seawallOpen: true, basinFilling: true, basinCrossed: true, priorWedged: true, liftDropped: true, skullOpen: true, almonerDead: true });
   const unreached = [];
   for (const r of H.ROOMS) for (const c of H.Narr.carvingSpecs(r, new Set())) if (!near(allSeen, { x: r.ox + c.tx, y: r.oy + c.ty }, 1)) unreached.push(r.id + ' ' + c.tx + ',' + c.ty);
   console.log((unreached.length ? 'FAIL' : 'ok  ') + ' carvings reachable: ' + (unreached.length ? unreached.join('; ') : 'all ' + Object.keys(H.LORE.carvings).length));
@@ -320,16 +328,17 @@ if (!dump) {
   fails += trapCheck('traps, early game', ['swing'], { seawallOpen: true }) ? 1 : 0;
   fails += trapCheck('traps, barge solved (Act I)', ['swing'], { seawallOpen: true, basinFilling: true, basinCrossed: true }, () => { W.state('saltgate').pool = { basin: 7 }; }) ? 1 : 0;
   fails += trapCheck('traps, boots (Act II start)', ['swing', 'boots'], { seawallOpen: true, basinFilling: true, basinCrossed: true, abbotDead: true }, () => { W.state('saltgate').pool = { basin: 7 }; }) ? 1 : 0;
-  fails += trapCheck('traps, mid game', ['swing', 'boots', 'jet'], { seawallOpen: true, basinFilling: true, basinCrossed: true, priorWedged: true }, () => { W.state('saltgate').pool = { basin: 7 }; }) ? 1 : 0;
-  fails += trapCheck('traps, Tide Key, shrine water normal', ['swing', 'boots', 'jet', 'tidekey'], { seawallOpen: true, basinFilling: true, basinCrossed: true, priorWedged: true }, () => {
+  fails += trapCheck('traps, boots, the Almoner dead', ['swing', 'boots'], { seawallOpen: true, basinFilling: true, basinCrossed: true, abbotDead: true, almonerDead: true }, () => { W.state('saltgate').pool = { basin: 7 }; }) ? 1 : 0;
+  fails += trapCheck('traps, mid game', ['swing', 'boots', 'jet'], { seawallOpen: true, basinFilling: true, basinCrossed: true, priorWedged: true, almonerDead: true }, () => { W.state('saltgate').pool = { basin: 7 }; }) ? 1 : 0;
+  fails += trapCheck('traps, Tide Key, shrine water normal', ['swing', 'boots', 'jet', 'tidekey'], { seawallOpen: true, basinFilling: true, basinCrossed: true, priorWedged: true, almonerDead: true }, () => {
     W.state('saltgate').pool = { basin: 7 };
     const c = H.ROOM.choir; for (let y = 0; y < 23; y++) if (W.charAt(c.ox + 4, c.oy + y) === 'C') W.setChar(c.ox + 4, c.oy + y, ' ');
   }) ? 1 : 0;
-  fails += trapCheck('traps, Choir drained', ['swing', 'boots', 'jet', 'tidekey'], { seawallOpen: true, basinFilling: true, basinCrossed: true, priorWedged: true, choirDrained: true }, () => {
+  fails += trapCheck('traps, Choir drained', ['swing', 'boots', 'jet', 'tidekey'], { seawallOpen: true, basinFilling: true, basinCrossed: true, priorWedged: true, choirDrained: true, almonerDead: true }, () => {
     W.state('saltgate').pool = { basin: 7 }; W.state('choir').choirLevel = 21;
     const c = H.ROOM.choir; for (let y = 0; y < 23; y++) if (W.charAt(c.ox + 4, c.oy + y) === 'C') W.setChar(c.ox + 4, c.oy + y, ' ');
   }) ? 1 : 0;
-  fails += trapCheck('traps, all tools', ['swing', 'boots', 'jet', 'tidekey', 'seal', 'lens'], { seawallOpen: true, basinFilling: true, basinCrossed: true, priorWedged: true, liftDropped: true, skullOpen: true }, () => {
+  fails += trapCheck('traps, all tools', ['swing', 'boots', 'jet', 'tidekey', 'seal', 'lens'], { seawallOpen: true, basinFilling: true, basinCrossed: true, priorWedged: true, liftDropped: true, skullOpen: true, almonerDead: true }, () => {
     W.state('saltgate').pool = { basin: 7 }; W.state('choir').choirLevel = 3;
     const r = H.ROOM.priors; for (let y = 17; y < 23; y++) W.setChar(r.ox + 21, r.oy + y, 'H');
     const c = H.ROOM.choir; for (let y = 0; y < 23; y++) for (const x of [4, 32]) if (W.charAt(c.ox + x, c.oy + y) === 'C') W.setChar(c.ox + x, c.oy + y, ' ');

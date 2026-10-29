@@ -209,6 +209,7 @@ public static class G
             return new Gullet(spec, r);
         }
         if (t == "abbot") return f.B("abbotDead") ? null : new Abbot(spec, r);
+        if (t == "almoner") return f.B("almonerDead") ? null : new Almoner(spec, r);
         if (t == "shoal") return act >= 3 && !f.B("shoalDead") ? new Shoal(spec, r) : null;
         if (t == "grafted") return act >= 3 ? new Grafted(spec, r) : null;
         // the last night's weapons: Agathe's Glass is left for Maren at the spring tide; the Ear is always there
@@ -307,7 +308,8 @@ public static class G
             if (Tide.PhaseId() == "low" && Tide.PhaseRemaining() > 14) Tide.SetPhase("low", Tide.Len(0) - 12);
         }
         if (r.Id == "kilns" && f.B("basinFilling")) f.Set("basinCrossed", true);
-        string enterThought = r.Id switch { "pier" => "pier", "chapel" => "chapel", "choir" => "choir", "skullstair" => "skull", "lamp" => "agathe", _ => null };
+        // a room can have a thought of its own, named for it, for the first time she comes in
+        string enterThought = r.Id switch { "skullstair" => "skull", "lamp" => "agathe", _ => Data.L("thoughts", r.Id) != null ? r.Id : null };
         if (enterThought != null) Narr.Think(enterThought);
         // Reaching the reef: the tide starts to move, and the dial shows it.
         if (r.Id != "breakers" && !f.B("landed"))
@@ -584,6 +586,16 @@ public static class G
         player.bag.Add("ivory", 2);
         H.ToastMsg("The Abbot of Salt crumbles. 2 Mere-ivory. Something heavy clatters to the floor: his Ballast Boots.", 5);
         StartAct(2);
+    }
+    public static void OnAlmonerKilled(Body a)
+    {
+        World.flags.Set("almonerDead", true);
+        World.MarkDirty();
+        bossBar = null;
+        player.bag.Add("ivory", 2);
+        Snd.Rumble();
+        H.ToastMsg("The Almoner goes down across his table. 2 Mere-ivory. The chain at his collar goes slack, and the chains on the doors west fall away.", 6);
+        Narr.Think("almonerDead");
     }
     public static void OnUndertowKilled()
     {
@@ -862,17 +874,29 @@ public static class G
     }
 
     // How far each room has moved since a save was made, in world pixels. A save made before rooms recorded their
-    // origins comes from the 26-room island, which sat 30 screens west and 5 screens north of where those rooms are now.
+    // origins comes from the 26-room island, whose rooms sat where PROTO puts them (anything else it names is taken to
+    // have moved as most of that island did, 30 screens east and 5 south).
     static Func<string, Godot.Vector2> RoomMoves(Props origins)
     {
         return id =>
         {
             if (id == null || !Data.Room.TryGetValue(id, out var r)) return default;
-            if (origins == null) return new Godot.Vector2(30 * H.SCREEN_W * TS, 5 * H.SCREEN_H * TS);
+            if (origins == null)
+                return PROTO.TryGetValue(id, out var c) ? new Godot.Vector2(r.Px - c.col * H.SCREEN_W * TS, r.Py - c.row * H.SCREEN_H * TS)
+                    : new Godot.Vector2(30 * H.SCREEN_W * TS, 5 * H.SCREEN_H * TS);
             if (origins.A(id) is not JsonArray o || o.Count < 2) return default;
             return new Godot.Vector2(r.Px - (float)o[0].GetValue<double>(), r.Py - (float)o[1].GetValue<double>());
         };
     }
+    // The 26-room island's grid, in screens.
+    static readonly Dictionary<string, (int col, int row)> PROTO = new()
+    {
+        ["reef"] = (7, 4), ["breakers"] = (8, 4), ["pier"] = (6, 4), ["seawall"] = (6, 3), ["chapel"] = (7, 3), ["tithe"] = (5, 4), ["tithe_gallery"] = (5, 3),
+        ["saltgate"] = (6, 2), ["saltbell"] = (5, 2), ["kilns"] = (7, 2), ["abbot"] = (7, 1), ["brineshaft"] = (4, 2),
+        ["cloister"] = (4, 4), ["cloisterbell"] = (3, 3), ["nave"] = (3, 4), ["priors"] = (2, 4), ["choirsteps"] = (2, 3),
+        ["choir"] = (1, 3), ["choirbell"] = (0, 3), ["ribshaft"] = (1, 1), ["ribbell"] = (2, 1), ["prisms"] = (3, 1),
+        ["gulletmouth"] = (2, 5), ["lair"] = (3, 5), ["skullstair"] = (2, 0), ["lamp"] = (3, 0),
+    };
     static void MoveState(RoomState st, Godot.Vector2 by)
     {
         if (by == default) return;
@@ -1012,7 +1036,7 @@ public static class G
             s.vy += s.grav * dt;
             s.x += s.vx * dt; s.y += s.vy * dt; s.life -= dt;
             if (World.SolidPx(s.x, s.y)) s.life = 0;
-            float sz = s.kind == "net" ? 6 : 2;
+            float sz = s.kind == "net" ? 6 : s.kind == "bowl" ? 4 : 2;
             if (H.RectsOverlap(s.x - sz, s.y - sz, sz * 2, sz * 2, p.x, p.y, p.w, p.h))
             {
                 // a thrown net does not wound: it holds
