@@ -249,7 +249,7 @@ H.Game = (() => {
       G.ents.push(new H.ObjTypes.npc({ type: 'npc', id: 'hesper', x: room.px + 11 * TS, y: room.py + 17 * TS, key: 'hesper_lamp' }, room));
     }
     if (room.id === 'lair' && !f.undertowDead) {
-      const b = new H.BodyTypes.undertow({ x: room.px + 60 * TS, y: room.py + 11 * TS, key: 'undertow_boss', boss: true, dir: -1 }, room);
+      const b = new H.BodyTypes.undertow({ x: room.px + 20 * TS, y: room.py + 11 * TS, key: 'undertow_boss', boss: true, dir: 1 }, room);
       G.ents.push(b); G.bossBar = b;
       H.Audio.buoy(0.9, 0.6);
       H.toast('The buoy bell tolls in the dark water. The Undertow is home.', 4);

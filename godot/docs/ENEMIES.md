@@ -54,7 +54,9 @@ only from that act, so revisiting a region brings new kinds into it:
   - in the Ribvault: a Wick in the Lung, two at the Skull Gate, and a Drowned Diver in the Heart-Root
 
 And the end mixes every tier: the Skull Stair has Wicks, a Toller and a Kilnman, and the Gullet Mouth has a Bloater
-beside its Deepwalker and Diver.
+beside its Deepwalker and Diver. In the Gullet at full size, Bloaters lie in the Long Throat and the Up-Current,
+Deepwalkers walk the Stomach, the Deep and the Whale Fall, Divers hunt the Throat Gate, the Pylorus and the wreck, Gullet
+Pairs hang in the Pylorus and the Brine Galleries, and a Toller keeps the Buoy Chapel.
 
 ## The journal's bestiary
 

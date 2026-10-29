@@ -29,7 +29,7 @@ the Skull reach their full-island cells in later phases:
 | Cloister (west) | priors (with the lift), choirsteps, gulletmouth | rows 3–5, col 2 | rows 8–10, col 14 |
 | Sunken Choir | choir, choirbell | row 3, cols 0–1 | row 6, cols 3–4 |
 | Ribvault | ribshaft, ribbell, prisms | rows 1–2, cols 1–3 | rows 3–5, cols 6–8 |
-| Gullet | lair | row 5, cols 3–4 | row 13, cols 20–21 |
+| Gullet | lair | row 5, cols 3–4 | stayed at row 10, cols 15–16, east of the Gullet Mouth |
 | Lantern Skull | skullstair, lamp | row 0, cols 2–3 | row 0, cols 22–23 |
 
 ```
@@ -100,7 +100,9 @@ Six fixed bosses, all built from the same knot rules at a bigger scale, plus the
    down onto the deck of ribs, where the knots along her spine can be broken; after a while she hauls herself back up
    on three new tendrils. Two broken spine knots open the crown in her back. Her death opens the Ribvault's doors
    (a new tile, `U`): the way on to the Sternum Bell and down to the Lamp Prisms and the Pressure Seal.
-5. **The Undertow** (the Gullet, its lair). The island's stalker, killable only here.
+5. **The Undertow** (the Gullet, its lair). The island's stalker, killable only here. The lair's front, onto the
+   Gullet Mouth, is the Saint's epiglottis (a new tile, `N`), shut until it dies: Maren comes round the long way and
+   into the lair from behind, out of the Buoy Chapel, and the Undertow waits at the far end, facing her.
 6. **The Shoal** (Lantern Skull, Act III). Five bodies fused into one rolling mass with eight knots.
 
 Conditional fights stay as they are: **Teodor** (Act III, if he was captured) and **Hesper** (if the Choir was drained).
@@ -157,8 +159,8 @@ The counts stay as the document gives them, spread so that thorough exploration 
 | 2 | Lower Cloister | 86 in all (25 new) | **built** |
 | 3 | Sunken Choir | 104 in all (18 new) | **built** |
 | 4 | Ribvault | 120 in all (16 new) | **built** |
-| 5 | The Gullet | | next |
-| 6 | Lantern Skull | | |
+| 5 | The Gullet | 134 in all (14 new) | **built** |
+| 6 | Lantern Skull | | next |
 
 ### What the engine does for a large island
 
@@ -229,6 +231,16 @@ The counts stay as the document gives them, spread so that thorough exploration 
   - she drips brine; her spine is out of reach while she hangs; every cut tendril drops one of her young
   - four tendrils cut, she falls onto the deck; there her spine breaks; she climbs back on new tendrils
   - her death opens the doors; the Sternum Bell's cable; the way into the prisms; the Skull's hatch
+
+### Phase 5 tests
+
+- `node tools/reach.js`: the Gullet's chests, bells and the Buoy Chapel's Toller with the Seal, and its gate:
+  - from the Gullet Mouth the lair is shut until the Undertow dies, and open after
+- `--test gullet5`: every new room can be entered, and every one but the domes is deep water:
+  - a vent in the rock gives her breath back; away from it the Gullet takes it
+  - the Drowned Bell and the Last Air are domes of air over the water, each with a bell
+  - the guide sends her round to the lair; the Undertow waits at the far end; its death opens the Skull and the
+    lair's front, and it stays dead
 
 ## Phase 1: the Wrackline and the Saltworks
 
@@ -391,6 +403,38 @@ Pressure Seal. The Breastplate's bone door opens back to the Breastbone. With th
 | **The Breastplate** | 15,5 | the bone door back to the Breastbone |
 | **The Lantern Lung** | 16–17,6 | the lamp oil, and Bellmouths; west to the prisms |
 | **The Heart-Root** | 16–17,7 | deep brine (Pressure Seal) |
+
+## Phase 5: the Gullet (14 rooms)
+
+The Saint's throat, under everything: always flooded, and deep (the Pressure Seal). Breath is the clock. Air comes
+from vents in the rock (`a`, every room or two) and from two domes of trapped air, the Gullet's Bell Rooms, entered
+from below. The Undertow's lair, east of the Gullet Mouth, is shut from that side by the Saint's epiglottis (`N`),
+so the way runs the long way round and into the lair from behind.
+
+The way through: west from the Gullet Mouth through the Throat Gate and down the Long Throat to the Stomach (the
+Drowned Bell's dome is over its east end); east through the Pylorus and down to the Deep, the floor under everything
+(the Last Air's dome is over it, and two Deepwalkers walk it); east along the Undertow's Road and up the Up-Current;
+west through the Brine Galleries and the Buoy Chapel into the lair. The Swallowed Wreck (up from the Pylorus), the
+Teeth and the Whale Fall are a loop back down onto the Up-Current. The Undertow's death opens the lair onto the
+Gullet Mouth, and the Skull's hatch.
+
+| Room | Cell | Role |
+| --- | --- | --- |
+| The Gullet Mouth, Undertow's Lair | 14–16,10 | as before; the Mouth opens west, the lair east and onto the Mouth only when the Undertow dies |
+| **The Throat Gate** | 12–13,10 | the way in, west of the Mouth |
+| **The Long Throat** | 11–12,11 | down, Bloaters lying in it |
+| **The Stomach** | 11–13,12 | everything the sea gave the Saint |
+| **The Drowned Bell** | 13,11 | a dome of air over the Stomach: the first Bell Room |
+| **The Pylorus** | 14–15,12 | the valve: crystal teeth on its floor, a Gullet Pair |
+| **The Deep** | 14–17,13 | the floor under everything; two Deepwalkers |
+| **The Last Air** | 16,12 | a dome over the Deep: the second Bell Room |
+| **The Undertow's Road** | 18,13 | a groove worn by something heavy |
+| **The Up-Current** | 19, 11–13 | the long way up |
+| **The Brine Galleries** | 18–19,10 | the brothers' diggings |
+| **The Buoy Chapel** | 17,10 | behind the lair; a Toller |
+| **The Swallowed Wreck** | 14–15,11 | an older *Constance* (up from the Pylorus) |
+| **The Teeth** | 16,11 | crystal teeth, always open |
+| **The Whale Fall** | 17–18,11 | a whale's bones, inside a dead god; back onto the Up-Current |
 
 Later phases are planned in the same way when they are built: their region's rooms, the gap their clusters move
 across, their second Bell Room and their boss.

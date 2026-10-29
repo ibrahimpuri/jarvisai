@@ -337,6 +337,11 @@ The full island is now being built from it, one region at a time, with a playabl
 - **the Sternum Bell**, the Ribvault's second Bell Room
 - the Lantern Skull now sits on top of the Ribvault, over the Skull Gate
 
+**Phase 5 is built:** the Gullet at full size, 134 rooms in all.
+- 14 new rooms in the Saint's throat, all deep water: down the Long Throat to the Stomach, through the Pylorus to the Deep, east along the Road and up the Up-Current, and back into the Undertow's lair from behind
+- breath is the clock: air vents in the rock, and two domes of trapped air, **the Drowned Bell** and **the Last Air**, the Gullet's Bell Rooms
+- the lair's front onto the Gullet Mouth stays shut until **the Undertow** dies
+
 Still smaller than the document: art and audio are procedural (stick-skeleton puppets, tile shading and synthesised sound).
 
 ## Development tools

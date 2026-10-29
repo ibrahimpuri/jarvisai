@@ -50,7 +50,7 @@ public static class Monuments
     // Each stands on the nearest open stretch of floor to its hint, from the room's original map (so it never moves
     // when salt grows or a door opens). Ladders and platforms may cross in front of it: it is behind the play.
     static readonly Dictionary<string, Monument> placed = new();
-    static bool Air(char ch) => World.Solidity(ch) == 0 || ch is 'E' or 'L' or 'V' or 'K' or 'Z' or 'Y' or 'h' or 'Q' or 'J' or 'U';
+    static bool Air(char ch) => World.Solidity(ch) == 0 || ch is 'E' or 'L' or 'V' or 'K' or 'Z' or 'Y' or 'h' or 'Q' or 'J' or 'U' or 'N' or 'O';
     static bool Floor(char ch) => ch is '#' or '_' or 'T' or 'R' or 'M' or 'P' or 'S' or 'C' or 'G' or '=' or 'b';
     public static Monument For(RoomDef r)
     {

@@ -98,10 +98,10 @@ public static class Guide
             done = () => P.Has("seal") },
         // ---- Act III: the spring tide ----
         new() { id = "gullet", act = "III", room = "gulletmouth", title = "Dive the Gullet",
-            how = "With the Pressure Seal you can dive deep water. Weight the lift in the Prior's Walk and go down into the Gullet below it.",
+            how = "With the Pressure Seal you can dive deep water. Weight the lift in the Prior's Walk and go down into the Gullet Mouth below it. Its east wall is shut: go west through the Throat Gate and down the Long Throat. Breathe at the air vents and in the domes (the Drowned Bell, the Last Air).",
             done = () => Visited("gulletmouth") || F.B("undertowDead") },
         new() { id = "undertow", act = "III", room = "lair", title = "Kill the Undertow",
-            how = "Its lair is east of the Gullet Mouth, in the deep. Break the knots that hold it together.",
+            how = "Its lair is east of the Gullet Mouth, shut from that side. Go round: down the Long Throat to the Stomach, east through the Pylorus and down to the Deep, east along the Road, up the Up-Current, west through the Brine Galleries and the Buoy Chapel, and into the lair from behind. Break the knots that hold it together.",
             done = () => F.B("undertowDead") },
         new() { id = "skull", act = "III", room = "skullstair", title = "Climb into the Lantern Skull",
             how = "The hatch into the Skull has opened, at the Skull Gate on top of the Ribvault: ride the bell-cable to the Sternum Bell, go back into the Spine and out by its upper door, through the Atlas, and climb the ladder under the hatch.",
@@ -125,7 +125,7 @@ public static class Guide
 
     // ---- the island's seams ------------------------------------------------------------------------------
     static Dictionary<string, Dictionary<string, List<(int tx, int ty)>>> seams;
-    static bool OpenTile(char ch) => World.Solidity(ch) != 1 || ch is 'L' or 'E' or 'K' or 'Z' or 'V' or 'Y' or 'h' or 'Q' or 'J' or 'U';
+    static bool OpenTile(char ch) => World.Solidity(ch) != 1 || ch is 'L' or 'E' or 'K' or 'Z' or 'V' or 'Y' or 'h' or 'Q' or 'J' or 'U' or 'N' or 'O';
     static void BuildSeams()
     {
         seams = new();

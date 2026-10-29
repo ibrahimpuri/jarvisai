@@ -1250,6 +1250,86 @@ public static class Scenarios
 
         // The full island, phase 4: the Ribvault. Every new room can be entered; the Hanging Mother keeps the Ribvault's
         // doors, comes down when four tendrils are cut, and dies by her spine; the Sternum Bell; the Skull on top.
+        // Phase 5: the Gullet at full size. Down the throat, through the Deep and up the Up-Current, round into the
+        // Undertow's lair from behind; breath at the vents and in the two domes; the lair's front shut until it dies.
+        ["gullet5"] = async t =>
+        {
+            G.god = true;
+            var p = G.player; var f = World.flags;
+            foreach (var fl in new[] { "seawallOpen", "abbotDead", "almonerDead", "priorWedged", "precentorDead", "motherDead", "liftDropped" }) f.Set(fl, true);
+            foreach (var a in new[] { "boots", "jet", "tidekey", "seal" }) p.abilities.Add(a);
+            G.act = 3; G.quests.Set("anselMet", true); G.quests.Set("hesperMet", true);
+            foreach (var id in new[] { "pier", "saltgate", "kilns", "cloister", "refectory", "choir", "organloft", "ribbell", "spine" }) World.State(id).visited = true;
+            var gm = Data.Room["gulletmouth"]; var lr = Data.Room["lair"];
+            t.Ok("the lair's front, onto the Gullet Mouth, is shut", World.Solid(lr.Ox, lr.Oy + 12) == 1 && World.Solid(gm.Ox + 39, gm.Oy + 12) == 0);
+
+            string[] fresh = { "throatgate", "longthroat", "stomach", "drownedbell", "pylorus", "deep", "lastair", "road", "upcurrent", "galleries", "buoychapel", "wreck", "teeth", "whalefall" };
+            int entered = 0;
+            foreach (var id in fresh)
+            {
+                var r = Data.Room[id];
+                (int x, int y) spot = (-1, -1);
+                for (int ty = Math.Min(r.Th - 2, 66); ty > 1 && spot.x < 0; ty--)
+                    for (int tx = 2; tx < r.Tw - 2 && spot.x < 0; tx++)
+                        if (World.Solid(r.Ox + tx, r.Oy + ty) == 0 && World.Solid(r.Ox + tx, r.Oy + ty - 1) == 0 && World.Solid(r.Ox + tx, r.Oy + ty + 1) == 1) spot = (tx, ty);
+                if (spot.x < 0) { t.Ok("somewhere to be in " + id, false); continue; }
+                t.Place(id, spot.x, spot.y); await t.Run(0.35f);
+                if (G.room?.Id == id) entered++;
+                t.Snap("g5_" + id);
+            }
+            t.Ok("every Gullet room can be entered", entered == fresh.Length, $"{entered} of {fresh.Length}");
+            foreach (var id in new[] { "throatgate", "longthroat", "stomach", "pylorus", "deep", "road", "upcurrent", "galleries", "buoychapel", "wreck", "teeth", "whalefall" })
+                if (!Data.Room[id].Deep) t.Ok(id + " is deep water", false);
+
+            // breath: the vents in the rock
+            var tg = Data.Room["throatgate"];
+            t.Place("throatgate", 40, 7);
+            foreach (var b in G.ents.OfType<Body>()) b.gone = true;
+            p.x = tg.Px + 40 * 16 + 8 - p.w / 2; p.y = tg.Py + 5 * 16 + 2; p.vx = p.vy = 0; p.breath = 5;
+            await t.Run(0.3f);
+            t.Ok("a vent in the rock gives her breath back", p.breath > 7, $"{p.breath:0.0}");
+            p.x = tg.Px + 50 * 16; p.y = tg.Py + 10 * 16; p.vx = p.vy = 0; p.breath = 20;
+            await t.Run(0.5f);
+            t.Ok("away from it the Gullet takes it", p.breath < 20, $"{p.breath:0.0}");
+
+            // the domes: trapped air, and the Gullet's Bell Rooms
+            foreach (var (id, bell) in new[] { ("drownedbell", "bell_drowned"), ("lastair", "bell_lastair") })
+            {
+                var d = Data.Room[id];
+                t.Place(id, 14, 16); await t.Run(0.3f);
+                t.Ok(id + " is a dome of air over the water", d.BellRoom && !World.IsWater(d.Px + 14 * 16, d.Py + 12 * 16) && World.IsWater(d.Px + 20 * 16, d.Py + 20 * 16));
+                t.Ok("with a bell in it", G.ents.OfType<Bell>().Any(b => b.spec.S("id") == bell));
+                t.Ok("where she breathes", !p.HeadUnder());
+                t.Snap("g5_dome_" + id);
+            }
+
+            // the guide sends her round
+            World.State("gulletmouth").visited = true;
+            t.Ok("the guide sends her round to the Undertow", Guide.Current?.id == "undertow", Guide.Current?.id);
+            t.Ok("and tells her the way", Guide.Current?.how.Contains("Buoy Chapel") == true);
+
+            // the lair, from behind
+            t.Place("buoychapel", 6, 16); await t.Run(0.3f);
+            foreach (var b in G.ents.OfType<Body>()) b.gone = true;
+            t.Place("lair", 74, 15); await t.Run(0.4f);
+            var u = First<Undertow>(e => e.boss);
+            t.Ok("the Undertow waits in its lair", u != null && G.bossBar == u);
+            if (u == null) return;
+            t.Ok("far from the door she came in by", u.Cx() < lr.Px + 40 * 16, $"{(u.Cx() - lr.Px) / 16:0}");
+            t.Snap("g5_lair");
+            u.DamageKnot(u.K("buoy"), 99, "rivet");
+            u.DamageKnot(u.K("ropeL"), 99, "rivet"); u.DamageKnot(u.K("ropeR"), 99, "rivet");
+            u.DamageKnot(u.K("crown"), 99, "rivet");
+            await t.Run(0.3f);
+            t.Ok("it dies, and the Skull opens", f.B("undertowDead") && f.B("skullOpen") && G.bossBar == null);
+            t.Ok("and the lair opens onto the Gullet Mouth", World.Solid(lr.Ox, lr.Oy + 12) == 0);
+            t.Ok("the guide sends her up into the Skull", Guide.Current?.id == "skull", Guide.Current?.id);
+            t.Place("gulletmouth", 30, 15); await t.Run(0.3f);
+            t.Place("lair", 6, 15); await t.Run(0.3f);
+            t.Ok("the short way back is open, and it stays dead", G.room?.Id == "lair" && First<Undertow>(e => e.boss) == null);
+            t.Snap("g5_lair_open");
+        },
+
         ["ribvault4"] = async t =>
         {
             G.god = true;
@@ -2331,7 +2411,7 @@ public static class Scenarios
         {
             await t.Run(0.05f);
             var gaps = new List<string>(); var ladders = new List<string>(); var buried = new List<string>();
-            static bool Open(char ch) => World.Solidity(ch) != 1 || ch is 'L' or 'E' or 'K' or 'Z' or 'V' or 'Y' or 'h' or 'Q' or 'J' or 'U';
+            static bool Open(char ch) => World.Solidity(ch) != 1 || ch is 'L' or 'E' or 'K' or 'Z' or 'V' or 'Y' or 'h' or 'Q' or 'J' or 'U' or 'N' or 'O';
             foreach (var r in Data.Rooms)
             {
                 for (int ty = 0; ty < r.Th; ty++)

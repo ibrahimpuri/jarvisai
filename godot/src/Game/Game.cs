@@ -355,7 +355,7 @@ public static class G
             ents.Add(new NPC(Spec(("type", "npc"), ("id", "hesper"), ("x", r.Px + 11 * TS), ("y", r.Py + 17 * TS), ("key", "hesper_lamp")), r));
         if (r.Id == "lair" && !f.B("undertowDead"))
         {
-            var b = new Undertow(Spec(("x", r.Px + 60 * TS), ("y", r.Py + 11 * TS), ("key", "undertow_boss"), ("boss", true), ("dir", -1)), r);
+            var b = new Undertow(Spec(("x", r.Px + 20 * TS), ("y", r.Py + 11 * TS), ("key", "undertow_boss"), ("boss", true), ("dir", 1)), r);   // you come in from behind, out of the Buoy Chapel
             ents.Add(b); bossBar = b;
             Snd.Buoy(0.9f, 0.6f);
             H.ToastMsg("The buoy bell tolls in the dark water. The Undertow is home.", 4);
@@ -623,10 +623,19 @@ public static class G
     {
         World.flags.Set("undertowDead", true); World.flags.Set("skullOpen", true);
         undertow.dead = true; bossBar = null;
+        World.MarkDirty();
         player.bag.Add("ivory", 2);
         H.ToastMsg("The Undertow dies in its lair. Far above, at the top of the Ribvault, the hatch into the Skull grinds open.", 6);
     }
-    public static void OnShoalKilled() { World.flags.Set("shoalDead", true); bossBar = null; H.ToastMsg("The Shoal comes apart. The lamp room is ahead.", 4); }
+    public static void OnShoalKilled()
+    {
+        World.flags.Set("shoalDead", true);
+        World.MarkDirty();
+        bossBar = null;
+        player.bag.Add("ivory", 2);
+        Snd.Rumble();
+        H.ToastMsg("The Shoal comes apart. 2 Mere-ivory. The way on to the lamp is open.", 6);
+    }
     public static void Collect(Props spec)
     {
         Story.Collect(spec);

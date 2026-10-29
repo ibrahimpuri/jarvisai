@@ -147,6 +147,9 @@ public static class World
             case 'J': return flags.B("precentorDead") ? 0 : 1;
             // the Ribvault's doors, grown shut with bone until the Hanging Mother falls
             case 'U': return flags.B("motherDead") ? 0 : 1;
+            // the Saint's epiglottis, shut across the front of the Undertow's lair until it dies
+            case 'N': return flags.B("undertowDead") ? 0 : 1;
+            case 'O': return flags.B("shoalDead") ? 0 : 1;
             case 'Y': return flags.B("choirDrained") ? 0 : 1;
             case 'y': return flags.B("choirDrained") ? 2 : 0;
             // the pan's hatch grinds shut behind whoever ran for the barge (G.HATCH_CLOSE seconds after the last lever)

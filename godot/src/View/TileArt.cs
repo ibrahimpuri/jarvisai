@@ -34,7 +34,7 @@ public static class TileArt
     public static readonly HashSet<char> SOLIDS = new("#_TRMPG");
     public static readonly HashSet<char> DECOR = new("=|wHoxa");
     public static readonly HashSet<char> DYNAMIC = new("ELVKZYhyCSb");
-    public static bool IsSolidCh(char ch) => SOLIDS.Contains(ch) || ch is 'S' or 'C' or 'E' or 'L' or 'V' or 'K' or 'Z' or 'Y' or 'h' or 'Q' or 'J' or 'U';
+    public static bool IsSolidCh(char ch) => SOLIDS.Contains(ch) || ch is 'S' or 'C' or 'E' or 'L' or 'V' or 'K' or 'Z' or 'Y' or 'h' or 'Q' or 'J' or 'U' or 'N' or 'O';
 
     // ---- timber and bone ----------------------------------------------------------------------------
     public static void SolidTile(Canvas c, char ch, float x, float y, int tx, int ty, RoomDef room, Pal pal, Func<int, int, bool> solidAt, int lx, int ly)
@@ -123,9 +123,9 @@ public static class TileArt
         int s = World.Solidity(ch);
         switch (ch)
         {
-            case 'E': case 'L': case 'V': case 'K': case 'Z': case 'Y': case 'h': case 'Q': case 'J': case 'U':
+            case 'E': case 'L': case 'V': case 'K': case 'Z': case 'Y': case 'h': case 'Q': case 'J': case 'U': case 'N': case 'O':
                 {
-                    string col = ch switch { 'E' => "#3a5a6a", 'L' => "#4a3a2a", 'V' => "#5a4a6a", 'K' => "#5a5048", 'Z' => "#6a5a3a", 'Y' => "#3a4a5a", 'Q' => "#3e3834", 'J' => "#4a4852", 'U' => "#cfc6ae", _ => "#4a4a4a" };
+                    string col = ch switch { 'E' => "#3a5a6a", 'L' => "#4a3a2a", 'V' => "#5a4a6a", 'K' => "#5a5048", 'Z' => "#6a5a3a", 'Y' => "#3a4a5a", 'Q' => "#3e3834", 'J' => "#4a4852", 'U' => "#cfc6ae", 'N' => "#6a4a4e", 'O' => "#5a3e3a", _ => "#4a4a4a" };
                     if (s == 1)
                     {
                         c.FillStyle = col; c.FillRect(x, y, TS, TS);
