@@ -555,6 +555,12 @@ public class Player : Mover
     public bool OnOneWay() => World.Solid(H.FloorI(Cx() / TS), H.FloorI((y + h + 2) / TS)) == 2 || (platform != null && platform.oneWay);
     public bool OnLadderTile() => World.IsLadder(H.FloorI(Cx() / TS), H.FloorI((y + h - 4) / TS)) || World.IsLadder(H.FloorI(Cx() / TS), H.FloorI((y + 4) / TS));
     public bool LadderBelow() => World.IsLadder(H.FloorI(Cx() / TS), H.FloorI((y + h + 4) / TS));
+    // a lip one tile high just ahead of her feet, with room above it
+    bool LedgeAhead(int dir)
+    {
+        int tx = H.FloorI((dir > 0 ? x + w + 2 : x - 2) / TS), fy = H.FloorI((y + h - 1) / TS);
+        return World.Solid(tx, fy) == 1 && World.Solid(tx, fy - 1) != 1 && World.Solid(tx, fy - 2) != 1;
+    }
     bool WallAt(int dir)
     {
         int tx = H.FloorI((dir > 0 ? x + w + 2 : x - 2) / TS);
@@ -716,9 +722,14 @@ public class Player : Mover
     {
         bool brine = World.IsBrine(Cx(), Cy());
         int dx = Dir();
-        int dy = (Inp.Held("down") ? 1 : 0) - (Inp.Held("up") ? 1 : 0);
+        // under the surface, jump held swims up as Up does (at the surface it leaps out, below)
+        int dy = (Inp.Held("down") ? 1 : 0) - (Inp.Held("up") || (Inp.Held("jump") && HeadUnder()) ? 1 : 0);
         // a ladder out of the water: up, or jump with no direction, takes it
         if (OnLadderTile() && dragging == null && !Locked() && (UpIntent() || DownIntent() || (Inp.Hit("jump") && dx == 0 && LadderUp()))) { MountLadder(); return; }
+        // standing on a ladder's top under water, down climbs on, as it does on land
+        if (onGround && DownIntent() && LadderBelow() && dragging == null && !Locked()) { MountLadder(); y += 4; return; }
+        // pushing into a ledge a tile high along the bottom, she rises over it rather than swimming into the rock
+        if (dx != 0 && dy == 0 && hitWall == dx && LedgeAhead(dx)) dy = -1;
         float sp = Locked() ? 0 : 105;
         if (dragging != null) sp = 40;
         // on a pad she swims where the stick points, at the speed it is pushed

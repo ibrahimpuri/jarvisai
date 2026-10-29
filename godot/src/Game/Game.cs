@@ -47,6 +47,8 @@ public static class G
     public static HashSet<string> collected = new(), bellsLit = new(), tips = new();
     public static Bag reliquary;
     public static Spot respawn;
+    public static Spot doorSpot;   // where she came into the room she is in, for trying a boss again
+    public static string cameFrom; // the room she walked in from (none when she rode a cable or woke at a bell)
     public static SatchelInfo satchelDrop;
     public static string difficulty = "keeper";
     public static float swell, valveT, sinceLoad;
@@ -145,7 +147,7 @@ public static class G
         if (C.startScrap > 0) player.bag.Add("scrap", C.startScrap);
         act = 1; quests = Props.Empty(); stats = new Stats();
         pages = new(); tables = new(); collected = new(); bellsLit = new(); reliquary = new Bag(40);
-        respawn = null; satchelDrop = null; swell = 0; valveT = 0; undertow = new UndertowSystem(); bossBar = null;
+        respawn = null; doorSpot = null; satchelDrop = null; swell = 0; valveT = 0; undertow = new UndertowSystem(); bossBar = null;
         encrustedType = null; freeGraft = false; ended = null; tips = new(); mode = "play"; narr = new NarrState();
         titheFlood = null; breachT = 0; glimpseT = 0;
         Narr.Reset();
@@ -242,6 +244,7 @@ public static class G
     static readonly HashSet<string> COLLECTS = new() { "stitch", "seal", "page", "table", "ability", "weapon" };
     public static void EnterRoom(RoomDef r, bool initial = false)
     {
+        cameFrom = null;
         if (!initial) SaveRoomState();
         string prevRegion = room?.Region;
         room = r;
@@ -312,7 +315,8 @@ public static class G
         if (r.Id == "kilns" && f.B("basinFilling")) f.Set("basinCrossed", true);
         // a room can have a thought of its own, named for it, for the first time she comes in
         string enterThought = r.Id switch { "skullstair" => "skull", "lamp" => "agathe", _ => Data.L("thoughts", r.Id) != null ? r.Id : null };
-        if (enterThought != null) Narr.Think(enterThought);
+        Narr.LeftRoom(r.Id);
+        if (enterThought != null) Narr.Think(enterThought, r.Id);
         // Reaching the reef: the tide starts to move, and the dial shows it.
         if (r.Id != "breakers" && !f.B("landed"))
         {
@@ -336,15 +340,17 @@ public static class G
             }
             else if (r.Id == "cloisterbell")
             {
-                for (int i = 0; i < 2; i++)
-                {
-                    var s = new Shucker(Spec(("x", r.Px + (14 + i * 10) * TS), ("y", r.Py + 17 * TS), ("key", "breach" + i), ("pose", "standing")), r);
-                    ApplyEncrustation(s); ents.Add(s);
-                }
-                f.Set("breachDone", true);
-                H.ToastMsg("The spring tide has breached this Bell Room. The bell is drowned out. It is not safe here.", 4);
+                f.Set("breachDone", true); f.Set("cloisterBreached", true);
+                H.ToastMsg("The spring tide has breached this Bell Room. The bell is drowned out until the room is cleared.", 4);
             }
         }
+        // the breach's two drowned are waiting in the Cloister's Bell Room until she puts them down
+        if (act >= 3 && r.Id == "cloisterbell" && f.B("cloisterBreached") && !f.B("cloisterCleared"))
+            for (int i = 0; i < 2; i++)
+            {
+                var s = new Shucker(Spec(("x", r.Px + (14 + i * 10) * TS), ("y", r.Py + 17 * TS), ("key", "breach" + i), ("pose", "standing")), r);
+                ApplyEncrustation(s); ents.Add(s);
+            }
         if (r.Id == "choir" && act >= 3 && f.B("choirDrained") && !q.B("hesperDead"))
         {
             var hh = new Grafted(Spec(("x", r.Px + 31 * TS), ("y", r.Py + 17 * TS), ("key", "hesper_boss"), ("boss", true)), r);
@@ -365,7 +371,17 @@ public static class G
     }
 
     static string BreachRoom() => quests.S("teodor") == "captured" && !World.flags.B("breachDone") ? "saltbell" : "cloisterbell";
-    public static bool BellRoomBreached(string id) => act >= 3 && id == "cloisterbell" && World.flags.B("breachDone") && BreachRoom() == "cloisterbell" || (id == "saltbell" && breachT > 0);
+    // The Cloister's bell is drowned out from the breach until its two drowned are down; the Saltworks' only while Teodor hunts.
+    public static bool BellRoomBreached(string id) => id == "cloisterbell" ? act >= 3 && World.flags.B("cloisterBreached") && !World.flags.B("cloisterCleared") : id == "saltbell" && breachT > 0;
+    static void CheckBreachCleared()
+    {
+        var f = World.flags;
+        if (room?.Id != "cloisterbell" || !f.B("cloisterBreached") || f.B("cloisterCleared")) return;
+        if (ents.OfType<Body>().Any(b => b.key != null && b.key.StartsWith("breach") && !b.gone && b.Alive())) return;
+        f.Set("cloisterCleared", true);
+        Snd.RoomBell();
+        H.ToastMsg("The room is quiet again. The bell rings clear: you can rest here.", 4);
+    }
 
     // ------------------------------------------------------------------ tide consequences
     static void OnPhase(string ph, string prev)
@@ -655,6 +671,20 @@ public static class G
         }
         return list;
     }
+    // From a lit Bell Room the cables run on under the whole island: every other lit Bell Room, region by region.
+    public static List<(RoomDef room, string bell, string name)> AllCableTargets(Ent from)
+    {
+        var list = new List<(RoomDef room, string bell, string name)>();
+        if (act < 2 || from?.room == null) return list;
+        var order = Data.Regions.Keys.ToList();
+        foreach (var r in Data.Rooms.OrderBy(r => order.IndexOf(r.Region)).ThenBy(r => r.Col))
+        {
+            if (!r.BellRoom || r == from.room) continue;
+            foreach (var sp in RoomSpecs(r))
+                if (sp.S("type") == "bell" && bellsLit.Contains(sp.S("id"))) list.Add((r, sp.S("id"), sp.S("name") ?? r.Name));
+        }
+        return list;
+    }
     public static void RideCable(RoomDef r)
     {
         Snd.Toll(); Shake(1);
@@ -759,7 +789,7 @@ public static class G
         {
             Snd.Toll();
             var (t0, l0) = Narr.DeathText();
-            After(0.9f, () => UI.Death(t0, l0, "The pilgrim's grace: your satchel is still on your shoulder.", Respawn));
+            After(0.9f, () => UI.Death(t0, l0, "The pilgrim's grace: your satchel is still on your shoulder.", Respawn, BossRetry()));
             return;
         }
         var bag = new Bag(99);
@@ -771,7 +801,45 @@ public static class G
         Snd.Toll();
         var (title, line) = Narr.DeathText();
         string detail = tidal ? "You died in tidal water. Your satchel lies where you fell; the next Ebb will carry it to this region's Wrack Pool, marked on your map." : "Your satchel lies where you fell. Nothing is ever lost for good, but getting it back is its own small expedition.";
-        After(0.9f, () => UI.Death(title, line, detail, Respawn));
+        After(0.9f, () => UI.Death(title, line, detail, Respawn, BossRetry()));
+    }
+    // Killed by a boss in its own room: she can try again from the door she came in by, rather than walk back from the bell.
+    static Action BossRetry()
+    {
+        var b = bossBar;
+        if (b == null || b.gone || b.dead || b.room != room || doorSpot?.room != room.Id) return null;
+        var spot = SafeNear(room, doorSpot.x, doorSpot.y);
+        return () =>
+        {
+            var p = player;
+            p.dead = false; p.hp = p.maxHp; p.breath = float.IsFinite(p.BreathMax()) ? p.BreathMax() : 30; p.state = "normal"; p.vx = p.vy = 0; p.invulnT = 2;
+            p.grabbedBy = null; p.healT = 0; p.reloadT = 0; p.craftT = 0;
+            if (p.oil < 30) p.oil = 30;
+            var r = room;
+            EnterRoom(r);
+            p.x = spot.X; p.y = spot.Y;
+            doorSpot = new Spot { room = r.Id, x = p.x, y = p.y };
+            SnapCamera();
+            breachT = 0;
+        };
+    }
+    // the nearest place to stand to a point in a room, so a retry never wakes her in the air or on a ladder
+    static Godot.Vector2 SafeNear(RoomDef r, float px, float py)
+    {
+        var p = player;
+        int cx = H.FloorI((px + p.w / 2) / TS), cy = H.FloorI((py + p.h - 1) / TS);
+        Godot.Vector2 best = new(px, py); float bd = 1e9f;
+        for (int ty = r.Oy + 1; ty < r.Oy + r.Th - 1; ty++)
+            for (int tx = r.Ox + 1; tx < r.Ox + r.Tw - 1; tx++)
+            {
+                float d = (tx - cx) * (tx - cx) + (ty - cy) * (ty - cy);
+                if (d >= bd || d > 100) continue;
+                bool wet = World.IsWater(tx * TS + 8, ty * TS + 8);
+                if (World.Solid(tx, ty) != 0 || World.Solid(tx, ty - 1) != 0 || World.CharAt(tx, ty) == 'x') continue;
+                if (!wet && (World.Solid(tx, ty + 1) == 0 || World.CharAt(tx, ty + 1) == 'x')) continue;
+                bd = d; best = new Godot.Vector2(tx * TS + 8 - p.w / 2, (ty + 1) * TS - p.h);
+            }
+        return best;
     }
     public static void Respawn()
     {
@@ -781,6 +849,7 @@ public static class G
         if (p.oil < 30) p.oil = 30;
         EnterRoom(Data.Room[r.room]);
         p.x = r.x; p.y = r.y;
+        doorSpot = null;
         SnapCamera();
         breachT = 0;
         if (stats.deaths == 1) After(0.6f, () => Narr.Think("firstDeath"));
@@ -893,7 +962,7 @@ public static class G
         difficulty = d.S("difficulty") ?? "keeper"; encrustedType = d.S("encrustedType"); freeGraft = d.B("freeGraft");
         tips = new HashSet<string>(d.Strings("tips")); narr = NarrState.From(d.P("narr")); dialT = 1;
         undertow = new UndertowSystem { dead = d.B("undertowDead") }; mode = "play"; ended = null; swell = 0; valveT = 0;
-        titheFlood = null; breachT = 0;
+        titheFlood = null; breachT = 0; doorSpot = null;
         Narr.Reset();
         Hints.Reset();
         Gore.Reset(); Voices.Reset(); Hollow.Load(d.P("hollow")); Legend.Load(d.P("legend")); Guide.Reset();
@@ -1024,6 +1093,7 @@ public static class G
             else if (t < 110) st.flood = H.Lerp(9.5f, 18, (t - 80) / 30);
             else { st.flood = null; titheFlood = null; }
         }
+        CheckBreachCleared();
         if (breachT > 0)
         {
             breachT -= dt;
@@ -1057,6 +1127,8 @@ public static class G
             {
                 if (p.dragging != null) p.StopDrag();
                 EnterRoom(nr);
+                doorSpot = new Spot { room = nr.Id, x = p.x, y = p.y };
+                cameFrom = r.Id;
             }
             else { p.x = H.Clamp(p.x, r.Px, r.Px + r.Pw - p.w); p.y = H.Clamp(p.y, r.Py, r.Py + r.Ph - p.h); }
         }

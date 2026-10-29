@@ -25,7 +25,7 @@ public static class UI
     public static void FontMenu() => Inst?.FontMenu();
     public static void Inscription(string title, string text, Action done = null) => Inst?.Inscription(title, text, done);
     public static void Cinematic(List<string> lines, Action done, string first = null) => Inst?.Cinematic(lines, done, first);
-    public static void Death(string title, string line, string detail, Action onWake) => Inst?.Death(title, line, detail, onWake);
+    public static void Death(string title, string line, string detail, Action onWake, Action onRetry = null) => Inst?.Death(title, line, detail, onWake, onRetry);
     public static void Ending(string title, List<string> paras, string stats, List<string> fates, bool glimpse = false) => Inst?.Ending(title, paras, stats, fates, glimpse);
     public static void Close() => Inst?.Close();
     public static bool CinematicOpen => Inst != null && Inst.cine != null;
@@ -544,7 +544,7 @@ public partial class UiRoot : CanvasLayer
         Cinematic(lines, PanelView, "title");
     }
     // The sea has her: black water, her last breath going up past the sinking lantern, the words, and above, the bell.
-    public void Death(string title, string line, string detail, Action onWake)
+    public void Death(string title, string line, string detail, Action onWake, Action onRetry = null)
     {
         Show("death");
         dim.Dim = 0.88f; dim.Tint = new Color(0.005f, 0.02f, 0.03f);
@@ -564,7 +564,10 @@ public partial class UiRoot : CanvasLayer
         Lbl(col, line, 8, H.Col("#d8d0bc"), italic: true, center: true);
         Lbl(col, detail, 5, MUTED, center: true);
         col.AddChild(new Control { CustomMinimumSize = new Vector2(0, 8) });
-        Btn(Row(col, true), "Wake at the bell", () => { Close(); onWake(); Input.MouseMode = Input.MouseModeEnum.Hidden; }, primary: true);
+        var row = Row(col, true);
+        // killed by a boss in its hall: try it again from the door, or go back to the bell
+        if (onRetry != null) Btn(row, "Try again from the door", () => { Close(); onRetry(); Input.MouseMode = Input.MouseModeEnum.Hidden; }, primary: true);
+        Btn(row, "Wake at the bell", () => { Close(); onWake(); Input.MouseMode = Input.MouseModeEnum.Hidden; }, primary: onRetry == null);
         FocusFirst();
     }
     static void DeathDeep(Canvas c, Vector2 sz, float t)

@@ -60,11 +60,56 @@ public static class Hud
         }
     }
 
+    // the air vents in the room she is in, found once per room
+    static RoomDef ventRoom;
+    static readonly List<Vector2> vents = new();
+    static Vector2? NearestVent(Player p)
+    {
+        var r = G.room;
+        if (r != ventRoom)
+        {
+            ventRoom = r; vents.Clear();
+            for (int ty = 0; ty < r.Th; ty++) for (int tx = 0; tx < r.Tw; tx++)
+                    if (World.CharAt(r.Ox + tx, r.Oy + ty) == 'a') vents.Add(new Vector2(r.Px + tx * 16 + 8, r.Py + ty * 16 + 8));
+        }
+        if (vents.Count == 0) return null;
+        return vents.OrderBy(v => v.DistanceSquaredTo(new Vector2(p.Cx(), p.Cy()))).First();
+    }
+    // Running low under water, the nearest vent is marked: a ring of bubbles on it, or an arrow at the edge toward it.
+    static void AirPointer(Canvas c, Player p, float max)
+    {
+        if (!p.HeadUnder() || p.breath > max * 0.45f) return;
+        var v = NearestVent(p);
+        if (v == null) return;
+        var sp = G.WorldToScreen(v.Value.X, v.Value.Y);
+        float pulse = 0.5f + 0.5f * MathF.Sin(G.Now * 6);
+        var col = H.Rgba(190, 228, 255, 0.55f + 0.4f * pulse);
+        if (sp.X > 8 && sp.X < H.VIEW_W - 8 && sp.Y > 8 && sp.Y < H.VIEW_H - 8)
+        {
+            c.Stroke = col; c.LineWidth = 1;
+            c.BeginPath(); c.Arc(sp.X, sp.Y, 7 + pulse * 3, 0, H.PI * 2); c.StrokePath();
+            c.Glow(sp.X, sp.Y, 14, H.Rgba(150, 210, 255, 0.18f));
+            return;
+        }
+        var me = G.WorldToScreen(p.Cx(), p.Cy());
+        var d = (sp - me).Normalized();
+        float ex = Math.Clamp(me.X + d.X * 1000, 18, H.VIEW_W - 18), ey = Math.Clamp(me.Y + d.Y * 1000, 70, H.VIEW_H - 70);
+        // pull the point back along the line so it sits on the clamped edge
+        float k = MathF.Min(MathF.Abs(d.X) > 0.001f ? (ex - me.X) / d.X : 1e9f, MathF.Abs(d.Y) > 0.001f ? (ey - me.Y) / d.Y : 1e9f);
+        var at = me + d * k;
+        float ang = MathF.Atan2(d.Y, d.X);
+        c.Save(); c.Translate(at.X, at.Y); c.Rotate(ang);
+        c.Fill = col; c.Poly(new[] { new Vector2(6, 0), new Vector2(-4, -4), new Vector2(-2, 0), new Vector2(-4, 4) });
+        c.Restore();
+        c.Stroke = col; c.LineWidth = 0.8f; c.BeginPath(); c.Arc(at.X - d.X * 9, at.Y - d.Y * 9, 2.4f, 0, H.PI * 2); c.StrokePath();
+    }
+
     // Breath shows only underwater, as bubbles rising from the helmet.
     static void Breath(Canvas c, Player p)
     {
         float max = p.BreathMax();
         if (!float.IsFinite(max)) return;
+        AirPointer(c, p, max);
         if (!p.HeadUnder() && p.breath >= max - 0.1f) return;
         int n = (int)MathF.Ceiling(p.breath / 3), total = (int)MathF.Ceiling(max / 3);
         float by = Hollow.owned ? 62 : 50;

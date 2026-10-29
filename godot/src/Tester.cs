@@ -93,11 +93,12 @@ public partial class Tester : Node
             G.EnterRoom(Data.Room[id]);
             LightingManager.Inst?.OnRoom(G.room, true);   // a screenshot shows the room's own light, not a blend from the last
             PlaceInRoom(Data.Room[id]);
-            G.titleT = 0; H.Toasts.Clear();
+            G.titleT = 0; H.Toasts.Clear(); UI.Close();
             Inp.MouseOverride = new Vector2(560, 180);
             var aimEnv = OS.GetEnvironment("HM_AIM");
             if (!string.IsNullOrEmpty(aimEnv)) { var a = aimEnv.Split(','); Inp.MouseOverride = new Vector2(float.Parse(a[0]), float.Parse(a[1])); }
             await Frames(20);
+            UI.Close(); await Frames(2);   // a page picked up on the way in would otherwise cover every room after it
             Shot("room_" + id);
         }
         Check("room screenshots", Errors.Count == 0, ids.Count + " rooms");
@@ -107,7 +108,7 @@ public partial class Tester : Node
     {
         int ti = Array.IndexOf(args, "--test");
         var names = args.Skip(ti + 1).TakeWhile(a => !a.StartsWith("--")).ToList();
-        if (names.Count == 0) names = Scenarios.All.Keys.ToList();
+        if (names.Count == 0) names = Scenarios.All.Keys.Where(k => !Playtest.Slow.Contains(k)).ToList();
         foreach (var n in names)
         {
             GD.Print("--- " + n);

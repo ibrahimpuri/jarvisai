@@ -41,10 +41,11 @@ public static class Narr
     static NarrState St => G.narr ??= new NarrState();
 
     // ---- thoughts: one quiet italic line, each shown once ----------------------------------
-    class Timed { public string text; public float t, max, x, y; }
+    class Timed { public string text, room; public float t, max, x, y; }
     static Timed thought, epigraph;
     static readonly Queue<string> queued = new();
-    public static void Think(string id)
+    // room: a thought about the room she has just come into, which fades when she leaves it
+    public static void Think(string id, string room = null)
     {
         var s = St;
         string text = L.P("thoughts")?.S(id);
@@ -52,7 +53,14 @@ public static class Narr
         s.thoughts.Add(id);
         // two thoughts at the same moment: the second waits for the first to fade
         if (thought != null && thought.max - thought.t < 0.5f) { queued.Enqueue(text); return; }
-        thought = new Timed { text = text, t = 5, max = 5 };
+        thought = new Timed { text = text, t = 5, max = 5, room = room };
+    }
+    // a room's own thought does not follow her into the next room, nor a region's epigraph into the next region
+    public static void LeftRoom(string id)
+    {
+        if (thought?.room != null && thought.room != id && thought.t > 0.6f) thought.t = 0.6f;
+        var r = Data.Room.GetValueOrDefault(id);
+        if (epigraph?.room != null && r != null && epigraph.room != r.Region && epigraph.t > 0.8f) epigraph.t = 0.8f;
     }
 
     // ---- region epigraphs ----------------------------------------------------------------------
@@ -62,7 +70,7 @@ public static class Narr
         if (s.regions.Contains(region)) return false;
         s.regions.Add(region);
         string ep = L.P("epigraphs")?.S(region);
-        if (ep != null) epigraph = new Timed { text = ep, t = 6, max = 6 };
+        if (ep != null) epigraph = new Timed { text = ep, t = 6, max = 6, room = region };
         return true;
     }
 

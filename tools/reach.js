@@ -285,7 +285,7 @@ const stages = [
 function breakCrystals(id) { const r = H.ROOM[id]; for (let y = 0; y < r.th; y++) for (let x = 0; x < r.tw; x++) if (W.charAt(r.ox + x, r.oy + y) === 'C') W.setChar(r.ox + x, r.oy + y, ' '); }
 // The barrel's fire cracks the salt plug in the Breakers.
 function breakPlug() { const r = H.ROOM.breakers; for (let y = 0; y < r.th; y++) for (let x = 0; x < r.tw; x++) if (W.charAt(r.ox + x, r.oy + y) === 'S') W.setChar(r.ox + x, r.oy + y, ' '); }
-if (require.main !== module) { module.exports = { analyse, H, W, T, TG }; return; }
+if (require.main !== module) { module.exports = { analyse, H, W, T, TG, breakCrystals }; return; }
 let fails = 0;
 const dumpArg = process.argv.indexOf('--dump');
 const dump = dumpArg > 0 ? { stage: +process.argv[dumpArg + 1], room: process.argv[dumpArg + 2] } : null;

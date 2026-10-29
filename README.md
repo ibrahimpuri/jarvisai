@@ -347,6 +347,13 @@ The full island is now being built from it, one region at a time, with a playabl
 - **the Shoal** turns in the Brainpan now and throws itself at you; its death lifts the bone shutter onto the Lamp, which moved to the far end of the Skull
 - **the Keeper's Watch** and **Agathe's Room**, the Skull's Bell Rooms
 
+**Playtested end to end:** sweeps that walk every door, soak every room with the drowned, use every object and save
+at every Bell Room, and a check that the guide's way to every objective can be played (`godot/docs/PLAYTEST.md`).
+- fixes: underwater ledges and ladder tops, the Cloister Bell Room's breach that never lifted, the guide pointing
+  through shut doors and up one-way drops, banners and thoughts sitting on each other
+- try a boss again from its door; ride the bell-cables to any lit Bell Room; an air-vent pointer when breath runs low;
+  unopened boxes marked on the chart
+
 Still smaller than the document: art and audio are procedural (stick-skeleton puppets, tile shading and synthesised sound).
 
 ## Development tools
@@ -354,6 +361,8 @@ Still smaller than the document: art and audio are procedural (stick-skeleton pu
 ```sh
 node tools/validate.js      # room sizes, legend, and that every open edge meets an open neighbour
 node tools/reach.js         # movement-model reachability of the critical path, gate integrity, and soft-lock (trap) detection
+node tools/throughs.js      # how every room plays with each set of tools, for the guide -> godot/data/through.json
+node tools/guidecheck.js    # the guide's way to every objective can be played (--bells: from every Bell Room too)
 node tools/play.js          # 26 scripted scenarios with real keyboard, mouse and (simulated) controller input (Playwright)
 node tools/route.js         # the movement model plans routes; an in-page autopilot plays them with real physics
 node tools/soak.js 5        # random bot in every room and tide phase, reports runtime errors

@@ -14,6 +14,7 @@ public static class Scenarios
     static Body Find(string key) => G.ents.OfType<Body>().FirstOrDefault(e => e.key == key);
     static T First<T>(Func<T, bool> f = null) where T : Ent => G.ents.OfType<T>().FirstOrDefault(e => f == null || f(e));
     static JsonArray Arr(params string[] s) => new(s.Select(x => (JsonNode)x).ToArray());
+    static Scenarios() { Playtest.Register(All); }
 
     public static readonly Dictionary<string, Func<Tester, Task>> All = new()
     {

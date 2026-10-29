@@ -450,6 +450,7 @@ room({
   id: "picks",
   name: "Pick Gallery",
   region: "saltworks",
+  noEntryFrom: [["collapse", "salt:collapse"]],
   col: 40,
   row: 5,
   map: [
@@ -713,6 +714,7 @@ room({
   id: "collapse",
   name: "Collapsed Drift",
   region: "saltworks",
+  noEntryFrom: [["picks", "salt:collapse"]],
   col: 40,
   row: 4,
   map: [
@@ -832,6 +834,7 @@ room({
   id: "saltchapel",
   name: "Salt Chapel",
   region: "saltworks",
+  noThrough: [["saltcloister", "chute", "jet"]],
   col: 38,
   row: 3,
   map: [
@@ -872,6 +875,7 @@ room({
   id: "chute",
   name: "The Salt Chute",
   region: "saltworks",
+  noEntryFrom: ["upperkilns"],
   col: 37,
   row: 3,
   w: 1,

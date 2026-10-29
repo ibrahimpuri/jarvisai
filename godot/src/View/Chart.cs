@@ -31,6 +31,8 @@ public static class Chart
                 string t = sp.S("type");
                 if (t is "bell" or "bench" or "npc" or "wrackpool" or "socket" or "crank" or "lift" or "sluice" or "font" or "lampwork")
                     l.Add(new Mark(t, sp.S("id"), sp.F("x"), sp.F("y") - 8));
+                // a box she has not opened yet, so a room she has been through tells her what it still holds
+                else if (t == "chest" && !sp.B("needsDrained")) l.Add(new Mark(t, sp.S("key"), sp.F("x"), sp.F("y") - 4));
             }
         }
     }
@@ -217,6 +219,14 @@ public static class Chart
                     c.Font = "5px caps"; c.TextAlign = 1; c.Fill = new Color(INK.R, INK.G, INK.B, 0.85f); c.FillText(Story.NpcName(m.id).Split(' ')[^1], p.X, p.Y - 5); c.TextAlign = 0;
                     break;
                 }
+                case "chest":
+                {
+                    if (World.StateOrNull(r.Id)?.ents.TryGetValue(m.id, out var st) == true && st != null && st.B("done")) break;
+                    if (r == G.room && G.ents.OfType<Chest>().Any(e => e.key == m.id && (e.done || e.gone))) break;   // opened just now
+                    c.Fill = new Color(STAIN.R, STAIN.G, STAIN.B, 0.95f); c.FillRect(p.X - 2, p.Y - 1.4f, 4, 2.8f);
+                    c.Fill = new Color(INK.R, INK.G, INK.B, 0.9f); c.FillRect(p.X - 2, p.Y - 0.2f, 4, 0.5f); c.FillRect(p.X - 0.4f, p.Y - 0.6f, 0.8f, 1);
+                    break;
+                }
                 case "wrackpool":
                     c.Stroke = new Color(SEA.R, SEA.G, SEA.B, 0.9f); c.LineWidth = 0.6f;
                     c.BeginPath(); c.Arc(p.X, p.Y, 2.4f, 0, H.PI * 1.6f); c.StrokePath(); c.BeginPath(); c.Arc(p.X, p.Y, 1.1f, 1, H.PI * 2.2f); c.StrokePath();
@@ -370,6 +380,7 @@ public static class Chart
         Item(ix => { c.Fill = INK; c.FillRect(ix - 2.6f, y - 1, 5.2f, 1.4f); c.FillRect(ix - 0.8f, y + 0.4f, 1.6f, 1.8f); }, "bench");
         Item(ix => { c.Fill = RED; c.FillCircle(ix, y - 1.4f, 1.2f); c.FillRect(ix - 1, y - 0.4f, 2, 2.4f); }, "people");
         Item(ix => { c.Stroke = SEA; c.LineWidth = 0.6f; c.BeginPath(); c.Arc(ix, y, 2.2f, 0, H.PI * 1.6f); c.StrokePath(); }, "wrack pool");
+        Item(ix => { c.Fill = STAIN; c.FillRect(ix - 2, y - 1.4f, 4, 2.8f); c.Fill = INK; c.FillRect(ix - 2, y - 0.2f, 4, 0.5f); }, "unopened box");
         Item(ix => { c.Stroke = SEA; c.LineWidth = 0.6f; c.Line(ix - 3, y, ix + 3, y); }, "tide seen");
         Item(ix => { c.Fill = new Color(INK_FADED.R, INK_FADED.G, INK_FADED.B, 0.8f); c.FillRect(ix - 3, y - 2, 2, 0.6f); c.FillRect(ix + 1, y - 2, 2, 0.6f); c.FillRect(ix - 3, y + 1.6f, 2, 0.6f); c.FillRect(ix + 1, y + 1.6f, 2, 0.6f); }, "not yet entered");
         c.Fill = new Color(INK_FADED.R, INK_FADED.G, INK_FADED.B, 0.9f);

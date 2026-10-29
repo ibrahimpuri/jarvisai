@@ -156,22 +156,144 @@ public static class Guide
     }
     public static IReadOnlyDictionary<string, List<(int tx, int ty)>> Links(string room) { if (seams == null) BuildSeams(); return seams[room]; }
 
-    // The shortest way through the rooms from one to another (both ends included), or null.
+    // Can she get through this opening now? Doors the story holds shut (a boss's, the epiglottis, the Choir's gate) count
+    // only once they are open; the tide's own doors count, since she can wait for the tide.
+    static bool LiveOpen(int wx, int wy) => World.Solid(wx, wy) != 1 || World.CharAt(wx, wy) is 'L' or 'E' or 'V';
+    static bool SeamOpenNow(List<(int tx, int ty)> seam)
+    {
+        foreach (var (wx, wy) in seam)
+        {
+            if (!LiveOpen(wx, wy)) continue;
+            foreach (var (dx, dy) in new[] { (-1, 0), (1, 0), (0, -1), (0, 1) })
+                if (World.RoomAtTile(wx + dx, wy + dy) != World.RoomAtTile(wx, wy) && World.RoomAtTile(wx + dx, wy + dy) != null && LiveOpen(wx + dx, wy + dy)) return true;
+        }
+        return false;
+    }
+
+    // The shortest way through the rooms from one to another (both ends included), or null: through the doors open now
+    // if there is such a way, and only failing that through doors still shut (the step's own gate, say).
+    // asked for several times a frame (the arrow, the tracker, the chart): kept for a moment
+    static readonly Dictionary<(string, string), (ulong frame, int sig, List<string> route)> routeCache = new();
+    static readonly string[] GATE_FLAGS = { "seawallOpen", "priorWedged", "almonerDead", "precentorDead", "motherDead", "undertowDead", "skullOpen", "shoalDead", "choirDrained", "basinFilling", "basinCrossed", "liftDropped" };
+    // what the way depends on: the doors the story opens, and the tools she has
+    static int RouteSig()
+    {
+        int sig = P?.abilities.Count ?? 0;
+        for (int i = 0; i < GATE_FLAGS.Length; i++) if (F.B(GATE_FLAGS[i])) sig |= 1 << (i + 4);
+        return sig;
+    }
     public static List<string> Route(string from, string to)
     {
+        if (from == null || to == null) return null;
+        ulong frame = Engine.GetProcessFrames();
+        // from the room she is in, the way she came in matters: a drop she fell down is not a way back up
+        string came = from == G.room?.Id ? G.cameFrom : null;
+        int sig = RouteSig() ^ (came?.GetHashCode() ?? 0);
+        if (routeCache.TryGetValue((from, to), out var c) && c.sig == sig && frame - c.frame < 30) return c.route;
+        var r = Route(from, to, came, true, true) ?? Route(from, to, came, false, true) ?? Route(from, to, null, false, false);
+        if (routeCache.Count > 64) routeCache.Clear();
+        routeCache[(from, to)] = (frame, sig, r);
+        return r;
+    }
+    // The rooms that only play one way, from the room data: a drop nobody climbs back up (noEntryFrom: the rooms she
+    // cannot come in from), or a room she can cross one way but not the other without a tool (noThrough: [from, to, unless]).
+    // Either rule can be lifted ("unless"): by a tool she has, or ("salt:room") once that room's salt is broken.
+    static Dictionary<string, List<(string from, string unless)>> noEntry;
+    static Dictionary<string, List<(string from, string to, string unless)>> noThrough;
+    static void BuildRules()
+    {
+        noEntry = new(); noThrough = new();
+        foreach (var r in Data.Rooms)
+        {
+            if (r.Raw?.A("noEntryFrom") is System.Text.Json.Nodes.JsonArray ne)
+                noEntry[r.Id] = ne.Select(n => n is System.Text.Json.Nodes.JsonArray a ? ((string)a[0], a.Count > 1 ? (string)a[1] : null) : ((string)n, (string)null)).ToList();
+            if (r.Raw?.A("noThrough") is System.Text.Json.Nodes.JsonArray rules)
+                noThrough[r.Id] = rules.OfType<System.Text.Json.Nodes.JsonArray>().Where(a => a.Count >= 2)
+                    .Select(a => ((string)a[0], (string)a[1], a.Count > 2 ? (string)a[2] : null)).ToList();
+        }
+    }
+    static bool Lifted(string unless)
+    {
+        if (unless == null) return false;
+        if (unless.StartsWith("salt:"))
+        {
+            var r = Data.Room.GetValueOrDefault(unless[5..]);
+            if (r == null) return false;
+            for (int ty = 0; ty < r.Th; ty++) for (int tx = 0; tx < r.Tw; tx++) if (World.CharAt(r.Ox + tx, r.Oy + ty) == 'S') return false;
+            return true;
+        }
+        return P != null && P.Has(unless);
+    }
+    // How every room plays, worked out from Maren's movement by tools/throughs.js: for each set of tools she can have,
+    // each room, and each room she can come into it from, the rooms she can go on to. A way in the table does not list
+    // is no way at all (a drop she cannot climb back up, a pit she cannot cross from that side).
+    static Dictionary<string, Dictionary<string, Dictionary<string, HashSet<string>>>> through;
+    static void LoadThrough()
+    {
+        through = new();
+        const string PATH = "res://data/through.json";
+        if (!Godot.FileAccess.FileExists(PATH)) return;
+        var tiers = System.Text.Json.Nodes.JsonNode.Parse(Godot.FileAccess.GetFileAsString(PATH))?["tiers"]?.AsObject();
+        if (tiers == null) return;
+        foreach (var (tier, rooms) in tiers)
+        {
+            var t = through[tier] = new();
+            foreach (var (room, ways) in rooms.AsObject())
+            {
+                var w = t[room] = new();
+                foreach (var (came, exits) in ways.AsObject()) w[came] = new HashSet<string>(exits.AsArray().Select(x => (string)x));
+            }
+        }
+    }
+    static Dictionary<string, Dictionary<string, HashSet<string>>> Ways()
+    {
+        string tier = P == null ? "swing" : P.Has("seal") ? "seal" : P.Has("tidekey") ? "tidekey" : P.Has("jet") ? "jet" : P.Has("boots") ? "boots" : "swing";
+        return through.GetValueOrDefault(tier);
+    }
+    static bool CannotEnter(string room, string from)
+    {
+        if (noEntry.TryGetValue(room, out var l) && l.Any(e => e.from == from && !Lifted(e.unless))) return true;
+        var w = Ways();
+        return w != null && w.TryGetValue(room, out var ways) && !ways.ContainsKey(from);
+    }
+    static bool Plays(string came, string room, string to)
+    {
+        var w = Ways();
+        if (came == null || w == null || !w.TryGetValue(room, out var ways) || !ways.TryGetValue(came, out var exits)) return true;
+        return exits.Contains(to);
+    }
+    static bool CannotCross(string came, string room, string to)
+    {
+        if (came == null || !noThrough.TryGetValue(room, out var rules)) return false;
+        foreach (var (a, b, unless) in rules) if (a == came && b == to && !Lifted(unless)) return true;
+        return false;
+    }
+    // live: only through doors open now; strict: only the ways the rooms play (the table and the rooms' own rules)
+    static List<string> Route(string from, string to, string came0, bool live, bool strict)
+    {
         if (seams == null) BuildSeams();
+        if (noEntry == null) { BuildRules(); LoadThrough(); }
         if (from == null || to == null || !seams.ContainsKey(from) || !seams.ContainsKey(to)) return null;
-        var prev = new Dictionary<string, string> { [from] = null };
-        var q = new Queue<string>(); q.Enqueue(from);
+        // searched over (room, the room she came in from), so a room can forbid a way through it
+        var start = (room: from, came: came0);
+        var prev = new Dictionary<(string room, string came), (string room, string came)?> { [start] = null };
+        var q = new Queue<(string room, string came)>(); q.Enqueue(start);
+        (string room, string came)? end = null;
         while (q.Count > 0)
         {
             var a = q.Dequeue();
-            if (a == to) break;
-            foreach (var b in seams[a].Keys) if (!prev.ContainsKey(b)) { prev[b] = a; q.Enqueue(b); }
+            if (a.room == to) { end = a; break; }
+            foreach (var (b, seam) in seams[a.room])
+            {
+                var nx = (room: b, came: a.room);
+                if (prev.ContainsKey(nx) || (live && !SeamOpenNow(seam))) continue;
+                if (strict && (CannotEnter(b, a.room) || CannotCross(a.came, a.room, b) || !Plays(a.came, a.room, b))) continue;
+                prev[nx] = a; q.Enqueue(nx);
+            }
         }
-        if (!prev.ContainsKey(to)) return null;
+        if (end == null) return null;
         var path = new List<string>();
-        for (var c = to; c != null; c = prev[c]) path.Add(c);
+        for (var c = end; c != null; c = prev[c.Value]) path.Add(c.Value.room);
         path.Reverse();
         return path;
     }
@@ -208,7 +330,8 @@ public static class Guide
         var route = Route(r.Id, s.room);
         if (route == null || route.Count < 2) return null;
         var seam = Links(r.Id)[route[1]];
-        // the nearest tile of the opening
+        // the nearest tile of the opening (of the part of it open now, when part of it is)
+        if (seam.Any(t => LiveOpen(t.tx, t.ty))) seam = seam.Where(t => LiveOpen(t.tx, t.ty)).ToList();
         (int tx, int ty) best = seam[0]; float bd = 1e9f;
         foreach (var t in seam)
         {
@@ -259,18 +382,28 @@ public static class Guide
     static string shownId;
     public static float bannerT;
     public static string bannerTitle;
-    public static void Reset() { shownId = null; bannerT = 0; }
+    // the banner waits for a room's title card and a region's epigraph to fade, so the three never sit on each other
+    static bool bannerWaiting, bannerChimed;
+    public static void Reset() { shownId = null; bannerT = 0; bannerWaiting = false; }
     public static void Update(float dt)
     {
-        if (bannerT > 0) bannerT -= dt;
+        if (bannerT > 0)
+        {
+            bannerWaiting = G.titleT > 0.2f || Narr.EpigraphActive();
+            if (!bannerWaiting)
+            {
+                if (!bannerChimed && On) Snd.Bell(392, 0.12f);
+                bannerChimed = true;
+                bannerT -= dt;
+            }
+        }
         var s = Current;
         string id = s?.id;
         if (id == shownId) return;
         bool first = shownId == null;
         shownId = id;
         if (s == null || first) return;   // loading a game does not announce what was already known
-        bannerTitle = s.title; bannerT = 5;
-        if (On) Snd.Bell(392, 0.12f);
+        bannerTitle = s.title; bannerT = 5; bannerChimed = false; bannerWaiting = G.titleT > 0.2f || Narr.EpigraphActive();
     }
 
     // ---- drawing --------------------------------------------------------------------------------------------
@@ -299,7 +432,7 @@ public static class Guide
         c.FillText(line, x, y + 9);
         c.TextAlign = 0;
         // a new objective: a banner across the top of the view
-        if (bannerT > 0 && bannerTitle != null)
+        if (bannerT > 0 && bannerTitle != null && !bannerWaiting)
         {
             float a = MathF.Min(1, MathF.Min(bannerT, 5 - bannerT) * 2);
             float cx = H.VIEW_W / 2f, by = 118;

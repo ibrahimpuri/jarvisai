@@ -137,7 +137,8 @@ See [ENEMIES.md](ENEMIES.md).
 | The Gullet | the Drowned Bell; the Last Air |
 | Lantern Skull | the Keeper's Watch; Agathe's Room, beyond the Lamp |
 
-**Bell-cable lifts** (from Act II): each lit Bell Room can ride its cable to the other lit Bell Room in its region.
+**Bell-cable lifts** (from Act II): each lit Bell Room can ride its cable to the other lit Bell Room in its region, and on
+to any lit Bell Room on the island ("Ride the cables to another region...").
 
 ## Collectibles across the island
 
@@ -175,7 +176,8 @@ The counts stay as the document gives them, spread so that thorough exploration 
 - **Saves move with the island.** A save records where every room sat. When rooms move in a later phase, everything
   the save remembers (her respawn, her lost satchel, bodies and loose items) moves with its room. A save from the
   26-room prototype has no record and is moved by the known offset.
-- **Bell-cable lifts.** From Act II, each lit Bell Room's menu offers a ride to every other lit Bell Room of its region.
+- **Bell-cable lifts.** From Act II, each lit Bell Room's menu offers a ride to every other lit Bell Room of its region,
+  and a page of every lit Bell Room on the island.
 - **The Undertow's way** runs along every room marked `sea` that spans the sea row, room to room however wide each
   room is. It never surfaces in a Bell Room or where a boss still stands.
 - **A room's own thought.** A thought in the lore named for a room is Maren's the first time she comes in.

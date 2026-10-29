@@ -29,7 +29,7 @@ public partial class UiRoot
             cv.Glow(sz.X / 2, sz.Y * 0.6f, 70, 34, new Color(1, 0.75f, 0.4f, 0.1f));
             MenuArt.Bell(cv, sz.X / 2, 6, 19, t, 0.14f, 11);
         }, new Vector2(0, 54)) { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill });
-        var title = H1(c, (bell.spec.S("name") ?? G.room.Name) + " Bell Room");
+        var title = H1(c, BellRoomName(bell.spec.S("name") ?? G.room.Name));
         Lbl(c, "No Brine body will ever enter while the bell rings.", 6, MUTED, italic: true, center: true);
         Lbl(c, $"{Tide.PhaseName()} tide  ·  {H.FmtTime(Tide.PhaseRemaining())} until it turns", 5, MUTED, caps: true, center: true);
         Rule(c);
@@ -41,12 +41,47 @@ public partial class UiRoot
         foreach (var (room, _, name) in G.CableTargets(bell))
         {
             var to = room;
-            Btn(col, "Ride the bell-cable to " + name + (name.EndsWith("Room") ? "" : " Bell Room"), () => { Close(); G.RideCable(to); });
+            Btn(col, "Ride the bell-cable to " + BellRoomName(name), () => { Close(); G.RideCable(to); });
         }
+        if (G.AllCableTargets(bell).Any(x => x.room.Region != bell.room.Region)) Btn(col, "Ride the cables to another region...", () => CableMenu(bell));
         Btn(col, "Leave", Close);
         Rule(c);
         Small(c, "Resting skips time. Every body left lying in water re-knots on the way.").HorizontalAlignment = HorizontalAlignment.Center;
         Footer(c, ("confirm", "choose"), ("cancel", "leave"));
+        FocusFirst();
+    }
+
+    // "Ribvault" is the Ribvault Bell Room; the Sternum Bell and Agathe's Room are already their own names
+    static string BellRoomName(string name) => name.EndsWith("Room") || name.EndsWith("Bell") ? name : name + " Bell Room";
+
+    // Every lit Bell Room on the island, region by region, in two columns: the cables run on under all of it.
+    public void CableMenu(Bell bell)
+    {
+        Show("cable");
+        backAction = () => BellMenu(bell);
+        var c = Panel(440, look: MenuArt.Look.Slate);
+        H1(c, "The bell-cables");
+        Lbl(c, "Under the whole island the cables run bell to bell. Every lit Bell Room answers.", 6, MUTED, italic: true, center: true);
+        Rule(c);
+        var groups = G.AllCableTargets(bell).GroupBy(x => x.room.Region).ToList();
+        int total = groups.Sum(g => g.Count() + 1), half = 0, split = groups.Count;
+        for (int i = 0; i < groups.Count; i++) { if (half >= (total + 1) / 2) { split = i; break; } half += groups[i].Count() + 1; }
+        var cols = new HBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
+        cols.AddThemeConstantOverride("separation", 16);
+        c.AddChild(cols);
+        var left = Col(cols, 200); var right = Col(cols, 200);
+        for (int i = 0; i < groups.Count; i++)
+        {
+            var col = i < split ? left : right;
+            H3(col, Data.Regions.P(groups[i].Key).S("name"));
+            foreach (var (room, _, name) in groups[i])
+            {
+                var to = room;
+                Btn(col, BellRoomName(name), () => { Close(); G.RideCable(to); });
+            }
+        }
+        Btn(c, "Back", () => BellMenu(bell));
+        Footer(c, ("confirm", "ride"), ("cancel", "back"));
         FocusFirst();
     }
 
