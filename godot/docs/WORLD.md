@@ -94,9 +94,12 @@ Six fixed bosses, all built from the same knot rules at a bigger scale, plus the
    so its bell rings the same, and strike it, and the salt shatters: he hangs stunned and the plates over the pipes
    that root him in the organ fall away until it grows back, at a new note. Two broken limbs open the crown. He keeps
    the Tide Key, in the Tuning Chamber behind him.
-4. **The Hanging Mother** (Ribvault, the spine). A Gullet the size of a chapel hanging from the vertebrae on many
-   tendrils, in a room the wind blows through. Shoot the tendrils to drop her onto the rib struts, where her spine
-   knots can be reached. Every cut tendril lets a young Gullet fall.
+4. **The Hanging Mother** (Ribvault, the Spine). A Gullet the size of a chapel hanging from the vertebrae on six
+   tendrils, in a hall the wind blows through. While she hangs she is out of reach: she drips brine on whoever is
+   below and lashes at anyone who climbs close. Every cut tendril lets one of her young fall. Cut four and she comes
+   down onto the deck of ribs, where the knots along her spine can be broken; after a while she hauls herself back up
+   on three new tendrils. Two broken spine knots open the crown in her back. Her death opens the Ribvault's doors
+   (a new tile, `U`): the way on to the Sternum Bell and down to the Lamp Prisms and the Pressure Seal.
 5. **The Undertow** (the Gullet, its lair). The island's stalker, killable only here.
 6. **The Shoal** (Lantern Skull, Act III). Five bodies fused into one rolling mass with eight knots.
 
@@ -153,8 +156,8 @@ The counts stay as the document gives them, spread so that thorough exploration 
 | 1 | the Wrackline and the Saltworks | 61 in all (35 new) | **built** |
 | 2 | Lower Cloister | 86 in all (25 new) | **built** |
 | 3 | Sunken Choir | 104 in all (18 new) | **built** |
-| 4 | Ribvault | | next |
-| 5 | The Gullet | | |
+| 4 | Ribvault | 120 in all (16 new) | **built** |
+| 5 | The Gullet | | next |
 | 6 | Lantern Skull | | |
 
 ### What the engine does for a large island
@@ -173,7 +176,8 @@ The counts stay as the document gives them, spread so that thorough exploration 
   room is. It never surfaces in a Bell Room or where a boss still stands.
 - **A room's own thought.** A thought in the lore named for a room is Maren's the first time she comes in.
 - **Gates by flag.** Gate tiles open on a flag: `K` the seawall gate, `Z` the Skull's hatch, `Q` the Refectory's
-  chained doors (`almonerDead`), `J` the Organ Loft's doors (`precentorDead`).
+  chained doors (`almonerDead`), `J` the Organ Loft's doors (`precentorDead`),
+  `U` the Ribvault's bone-grown doors (`motherDead`).
 - **Tuned bells.** Each room's bells hang over its own basin (`basin_<room>`; the shrine's own is `basin`), filled by
   that room's valve. A valve with a wave-shaped lock (`needsKey`) needs the Tide Key, and with it fills the basin to
   the brim, the deepest note. A crystal wall in the room breaks at its own pitch (`crystals` in the room data).
@@ -215,6 +219,16 @@ The counts stay as the document gives them, spread so that thorough exploration 
   - his scream throws her down in the open and wakes the stalls; behind a pier it passes over her
   - the wrong note does nothing; his note shatters the salt and bares his pipes; the salt grows back at a new note
   - his death opens the doors; the Tide Key; the keyed valve; the drop to the Narthex; the Vestry's cable
+
+### Phase 4 tests
+
+- `node tools/reach.js`: the Ribvault's rooms and chests, and its gates:
+  - the Hanging Mother holds the Sternum Bell, the way down, the prisms and the Skull Gate
+  - the Heart-Root's deep brine needs the Pressure Seal
+- `--test ribvault4`: every new room can be entered, the guide's new steps, and the Hanging Mother:
+  - she drips brine; her spine is out of reach while she hangs; every cut tendril drops one of her young
+  - four tendrils cut, she falls onto the deck; there her spine breaks; she climbs back on new tendrils
+  - her death opens the doors; the Sternum Bell's cable; the way into the prisms; the Skull's hatch
 
 ## Phase 1: the Wrackline and the Saltworks
 
@@ -345,6 +359,38 @@ The Tide Key raises the shrine's water to the Ribvault, as before, and opens the
 | **The Bellows** | 8,7 | the pumpers who have not stopped |
 | **The Triforium** | 9–10,7 | the gallery over the stalls |
 | **The Night Gallery** | 11,7 | the drop to the Narthex |
+
+## Phase 4: the Ribvault (16 rooms)
+
+The climb up the inside of the Saint's ribcage, in the wind. The Skull moved up to sit on top of it (rows 0, cols
+20–21), its hatch now at the Skull Gate; the Ribvault Bell Room's ladder climbs on into the Breastbone, and its door
+to the Lamp Prisms is grown shut with bone until the Hanging Mother falls.
+
+The way through: up from the Ribvault Bell Room into the Breastbone; west through the West Ribs (a ring to swing the
+gap) to the Lung; up the Rib Ladder; east along the Collarbone (rings over its breaks) and up onto the Vertebrae; east
+to the Spine and the Hanging Mother. After her: the Sternum Bell (the second Bell Room), down its bell-rope well into
+the East Ribs, west through the Floating Ribs and down to the Lantern Lung, and west into the Lamp Prisms and the
+Pressure Seal. The Breastplate's bone door opens back to the Breastbone. With the Seal, the Heart-Root's deep brine.
+
+| Room | Cell | Role |
+| --- | --- | --- |
+| The Ribs, Ribvault Bell Room, Lamp Prisms | 13–15, 6–7 | as before; the Bell Room's door east is grown shut, and the prisms open east |
+| **The Breastbone** | 14,5 | over the Bell Room |
+| **The West Ribs** | 12–13,5 | arches of bone, a crusted gap and a ring |
+| **The Lung** | 10–11,5 | dry membranes; the Rib Ladder goes up from it |
+| **The Marrow** | 9,5 | a split rib, its ivory on a ledge (Jet Valve) |
+| **The Rib Ladder** | 10, 2–4 | a long climb in the wind |
+| **The Collarbone** | 11–13,2 | a bridge of bone, broken in three places |
+| **The Vertebrae** | 12–15,1 | the run along the spine, Gullet Pairs overhead |
+| **The Spine** | 16–17, 1–2 | the Hanging Mother |
+| **The Atlas** | 18,1 | the top vertebra |
+| **The Skull Gate** | 19–20,1 | the hatch into the Skull, barred until the spring tide |
+| **The Sternum Bell** | 18,2 | the Ribvault's second Bell Room |
+| **The East Ribs** | 18–19, 3–5 | the way down |
+| **The Floating Ribs** | 16–17, 4–5 | loose ribs on chains, a climb to a box (Jet Valve) |
+| **The Breastplate** | 15,5 | the bone door back to the Breastbone |
+| **The Lantern Lung** | 16–17,6 | the lamp oil, and Bellmouths; west to the prisms |
+| **The Heart-Root** | 16–17,7 | deep brine (Pressure Seal) |
 
 Later phases are planned in the same way when they are built: their region's rooms, the gap their clusters move
 across, their second Bell Room and their boss.
