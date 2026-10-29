@@ -1285,7 +1285,7 @@ public static class Scenarios
             if (al == null) return;
             t.Ok("and the doors west are chained to him", World.Solid(rr.Ox, rr.Oy + 38) == 1 && World.Solid(rr.Ox, rr.Oy + 15) == 1);
             t.Snap("cl_almoner_waits");
-            t.Place("refectory", 58, 39); await t.Run(0.4f);
+            t.Place("refectory", 56, 39); await t.Run(0.4f);
             t.Ok("he wakes as she comes down the hall", al.started && G.bossBar == al, al.mode);
             await t.Run(1.8f);
             t.Snap("cl_almoner_up");
@@ -1313,7 +1313,7 @@ public static class Scenarios
             // elbows: no grab and no throw, but he heaves the table, and the floor throws her
             Tide.AdvanceTo("low"); await t.Run(0.5f);
             al.DamageKnot(al.K("elbowL"), 99, "rivet"); al.DamageKnot(al.K("elbowR"), 99, "rivet");
-            t.Place("refectory", 30, 39); await t.Run(0.1f);
+            t.Place("refectory", 26, 39); await t.Run(0.1f);
             G.god = false; p.hp = p.maxHp; p.invulnT = 0;
             bool heaved = false; int hp0 = p.hp;
             for (int i = 0; i < 80 && p.hp == hp0; i++) { await t.Run(0.1f); heaved |= al.mode == "heave"; }

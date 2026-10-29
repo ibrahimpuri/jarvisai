@@ -496,7 +496,7 @@ public class Abbot : Body
 // chest is sealed until two limbs are broken.
 public class Almoner : Drowned
 {
-    const float SCALE = 2.4f;
+    const float SCALE = 2.8f;
     public bool started;
     readonly float anchorX, anchorY, chain, tableX0, tableX1;
     float noteT, slamT;
@@ -577,7 +577,7 @@ public class Almoner : Drowned
         }
         if (mode == "dormant")
         {
-            if (H.Dist(p.Cx(), p.Cy(), Cx(), Cy()) < 18 * H.TILE && p.Feet() > room.Py + 30 * H.TILE) Start();
+            if (H.Dist(p.Cx(), p.Cy(), Cx(), Cy()) < 20 * H.TILE && p.Feet() > room.Py + 30 * H.TILE) Start();
             return;
         }
         if (mode == "rise") { vx = 0; atkT -= dt; if (atkT <= 0) { SetPose(LegsOK() ? "stand" : "crawl"); mode = "hunt"; } return; }

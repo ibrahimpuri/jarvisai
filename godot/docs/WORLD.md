@@ -16,7 +16,9 @@ Rooms sit on one world grid of screens (40 × 23 tiles each). The full island is
   and sluice basins worked with the Tide Key.
 
 The existing 26 rooms keep their maps and their links to each other within each cluster. A cluster moves only when
-the region that fills the gap behind it is built:
+the region that fills the gap behind it is built. Phase 2 moved everything west of the Cloister (the Prior's Walk, the
+Choir, the Ribvault, the Gullet and the Skull) 18 screens west as one block; the Choir, the Ribvault, the Gullet and
+the Skull reach their full-island cells in later phases:
 
 | Cluster | Rooms | Prototype position | Full island |
 | --- | --- | --- | --- |
@@ -79,9 +81,12 @@ Six fixed bosses, all built from the same knot rules at a bigger scale, plus the
 
 1. **The Abbot of Salt** (Saltworks). A cathedral-sized Saltwright whose plates fall only when he strikes his own
    kilns. Moves from the prototype's kiln level to the top of the salt mine.
-2. **The Almoner** (Lower Cloister, the flooded refectory). The brother who chose which one in ten went to the Saint. A
-   bloated Shucker at scale, chained to the refectory's long table. Knees first, and he crawls into the water and
-   swims at High tide. Elbows first, and he cannot grab but heaves the table. The tide changes the fight.
+2. **The Almoner** (Lower Cloister, the Refectory). The brother who chose which one in ten went to the Saint, and made
+   sure it was never him. A bloated Shucker at boss scale, chained by the neck to the Refectory's long table; the
+   doors west are chained to him. Two broken limbs open the crown in his chest. Knees first, and he can only crawl,
+   but when the tide is in and the hall is flooded he swims at her. Elbows first, and he cannot grab or throw, but he
+   heaves the table, which throws anyone on it or on the floor beside it. Out of his chain's reach (the sideboards by
+   the walls, the galleries, the reader's pulpit) he throws pewter alms-bowls.
 3. **The Precentor** (Sunken Choir, the organ loft). A Bellmouth fused into the organ's pipes. It inhales to scream,
    and the scream wakes the choir. Break its jaw during the inhale, or tune the bells (the Tide Key's water) to the
    pitch that shatters the salt in its throat.
@@ -142,8 +147,8 @@ The counts stay as the document gives them, spread so that thorough exploration 
 | --- | --- | --- | --- |
 | 0 | the engine for a large island | | built: the sea row, the chart, save migration, bell-cable lifts, region files |
 | 1 | the Wrackline and the Saltworks | 61 in all (35 new) | **built** |
-| 2 | Lower Cloister | | next |
-| 3 | Sunken Choir | | |
+| 2 | Lower Cloister | 86 in all (25 new) | **built** |
+| 3 | Sunken Choir | | next |
 | 4 | Ribvault | | |
 | 5 | The Gullet | | |
 | 6 | Lantern Skull | | |
@@ -160,6 +165,11 @@ The counts stay as the document gives them, spread so that thorough exploration 
   the save remembers (her respawn, her lost satchel, bodies and loose items) moves with its room. A save from the
   26-room prototype has no record and is moved by the known offset.
 - **Bell-cable lifts.** From Act II, each lit Bell Room's menu offers a ride to every other lit Bell Room of its region.
+- **The Undertow's way** runs along every room marked `sea` that spans the sea row, room to room however wide each
+  room is. It never surfaces in a Bell Room or where a boss still stands.
+- **A room's own thought.** A thought in the lore named for a room is Maren's the first time she comes in.
+- **Gates by flag.** Gate tiles open on a flag: `K` the seawall gate, `Z` the Skull's hatch, `Q` the Refectory's
+  chained doors (`almonerDead`).
 
 ### Phase 1 tests
 
@@ -172,6 +182,20 @@ The counts stay as the document gives them, spread so that thorough exploration 
   - `--dump <stage> <room>` prints one room's reachable cells
 - `--test bigworld`: every new room can be entered. It also covers the bell-cable in Acts I and II, an old save landing
   on the new grid with its bodies, the Gullet Pair and the Hooded Bellmouth.
+
+### Phase 2 tests
+
+- `node tools/reach.js`: the Cloister's rooms and chests, and its gates:
+  - nothing west of the Refectory (the Almonry, the Jet Valve) until the Almoner is dead
+  - the Light-Well, the Bell-Cote and the Treasury's strongbox need the Jet Valve
+  - the candle-hoop box in the Chapter House is reached by swimming up at High tide
+- `--test cloister`: every new room can be entered, the guide's new steps, and the Almoner:
+  - he wakes as she comes down the hall, the chain holds him, and out of his reach he throws
+  - knees broken, he crawls, and at High water he swims at her
+  - elbows broken, he heaves the table
+  - his death opens the doors west, and he stays dead
+  - the Almonry's bell-cable, the Undertow's way along the lower floor
+  - saves from before the move land on the moved Prior's Walk
 
 ## Phase 1: the Wrackline and the Saltworks
 
@@ -226,6 +250,46 @@ The prototype went pans, kilns, Abbot. Now the kilns lead up into the salt mine,
 | **Abbot's Stair** | 40,3 | up to the cathedral |
 | **Cathedral of Salt** | 40,2 | the Abbot |
 | **The Salt Chute** | 36,3–5 | after the Abbot: a long drop back to the Pan Terraces |
+
+## Phase 2: the Lower Cloister (25 rooms)
+
+The flooded monastery between the Bell-Rope Nave and the Prior's Walk, 18 screens long. It has two floors. The upper
+floor (row 8) is dry. The lower floor is on the sea row: the tide fills it to the waist, and at High water the Undertow
+walks it. Both floors meet at the Refectory, where the Almoner keeps the way west.
+
+The way through, from the Nave: west into the Lavatorium; then along the lower floor or up the Night Stair to the upper
+floor; then the Almoner; then the Almonry (the second Bell Room) and on west to the Prior's Walk and its Jet Valve. With
+the Jet Valve, the Cloister opens again: a hatch in the Library to the Light-Well, the Chantry's bell-cote, and the
+Treasury's strongbox.
+
+| Room | Cell | Role |
+| --- | --- | --- |
+| Cloister Walk, Bell-Rope Nave, Cloister Bell Room | 33–34, 8–9 | as before |
+| **The Lavatorium** | 32,9 | the washing trough, always full; a Bloater |
+| **The Chapter House** | 30–31,9 | tiers of seated brothers and a Toller; a box in the candle-hoop, reached by swimming up at High tide |
+| **The Slype** | 29,9 | a low passage that floods at High tide; a Gullet Pair in its light-well |
+| **The Warming Room** | 28,9 | the one hearth, and a Kilnman by it |
+| **The Undercroft** | 26–27,9 | cellars, a drain channel, an Ossuary |
+| **The Refectory** | 24–25, 8–9 | the Almoner; its west doors are chained to him |
+| **The Kitchens** | 22–23,9 | ovens, a well, a Netter; a Drowned Diver in Act III |
+| **The Infirmary** | 21,9 | a Cantor singing to the beds |
+| **The Charnel House** | 19–20,9 | two Ossuaries and a bone pit |
+| **The Tithe Cells** | 17–18,9 | a gallery of cells; the end cells open only at Low tide |
+| **The Prior's Garth** | 15–16,9 | the Prior's garden and fishpond, east of the Prior's Walk |
+| **The Night Stair** | 32,8 | up from the Lavatorium; its east door is the Bell Room's, opened when the Choir is drained |
+| **The Dorter** | 30–31,8 | rows of cots, a Hooded Bellmouth |
+| **The Scriptorium** | 29,8 | desks, and a Bellmouth on the reader's desk |
+| **The Library** | 28,8 | the stacks; a hatch in the vault to the Light-Well (Jet Valve) |
+| **The Counting House** | 26–27,8 | the Wheel of Lots, a Cantor and a Hooded Bellmouth |
+| **The Almonry** | 23,8 | the Cloister's second Bell Room |
+| **The Dole Hall** | 22,8 | where the Hithe was given bread; a Netter |
+| **The Chantry** | 21,8 | a Toller at the altar; a Wick in Act III; the bell-cote above (Jet Valve) |
+| **The Sacristy** | 20,8 | vestment presses and a Saltwright |
+| **The Treasury** | 19,8 | its strongbox ledge needs the Jet Valve |
+| **The Pulpitum** | 17–18,8 | the stone screen before the Choir, with a box on its rood loft |
+| **The Prior's Lodging** | 15–16,8 | his study and the hymnal's hint for his door; on west to the Choir Steps |
+| **The Light-Well** | 28–29,7 | the Cloister's only sky: wind, Kites and Saltgulls (Jet Valve) |
+| **The Bell-Cote** | 21,7 | the chantry's bell (Jet Valve) |
 
 Later phases are planned in the same way when they are built: their region's rooms, the gap their clusters move
 across, their second Bell Room and their boss.

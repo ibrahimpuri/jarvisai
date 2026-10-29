@@ -49,6 +49,7 @@ only from that act, so revisiting a region brings new kinds into it:
   - a Deepwalker in the Brine Cisterns' tank
   - a Wick at the Mine Head, and one in the Hult Cottage
   - a Kite at the Wreckers' Lookout
+  - in the Lower Cloister: a Drowned Diver in the Kitchens, a Wick in the Chantry, a Bloater in the Undercroft
 
 And the end mixes every tier: the Skull Stair has Wicks, a Toller and a Kilnman, and the Gullet Mouth has a Bloater
 beside its Deepwalker and Diver.
