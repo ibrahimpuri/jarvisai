@@ -14,7 +14,7 @@ namespace Hollowmere;
 
 public static class Playtest
 {
-    public static readonly HashSet<string> Slow = new() { "pt_doors", "pt_soak", "pt_objects", "pt_bells", "pt_debug", "pt_menus", "pt_route" };
+    public static readonly HashSet<string> Slow = new() { "pt_doors", "pt_soak", "pt_objects", "pt_bells", "pt_debug", "pt_menus", "pt_route", "pt_long" };
 
     // late in the game, every gate open and every tool in hand
     static void LateGame()
@@ -594,8 +594,40 @@ public static class Playtest
         return false;
     }
 
+    // A long night in the busiest rooms, under attack: nothing should pile up, and the frame should not slow.
+    static async Task Long(Tester t)
+    {
+        var bad = new List<string>();
+        foreach (var id in new[] { "nave", "stomach", "spine", "jaw", "kilns" })
+        {
+            LateGame(); Reset(t);
+            Tide.SetPhase("rising", 5);
+            var r = Data.Room[id]; var sp = Spot(r);
+            G.EnterRoom(r); t.Place(id, sp.x, sp.y);
+            await t.Run(1f);
+            int e0 = G.ents.Count, f0 = FX.parts.Count;
+            ulong t0 = Time.GetTicksMsec();
+            // fight back now and then, so knots break, bodies fall and gore piles up as it would
+            for (int i = 0; i < 120; i++)
+            {
+                var near = G.ents.OfType<Body>().Where(b => b.Alive()).OrderBy(b => H.Dist(b.Cx(), b.Cy(), G.player.Cx(), G.player.Cy())).FirstOrDefault();
+                if (near != null) { t.AimAt(near.Cx(), near.Cy()); await t.Click(); }
+                await t.Run(1f);
+                if (G.room != r) { G.EnterRoom(r); t.Place(id, sp.x, sp.y); }
+            }
+            float ms = (Time.GetTicksMsec() - t0) / (120f * 60);
+            int e1 = G.ents.Count, f1 = FX.parts.Count;
+            GD.Print($"  LONG {id}: entities {e0} -> {e1}, particles {f0} -> {f1}, {ms:0.00} ms a frame");
+            if (e1 > e0 + 40) bad.Add($"{id}: entities grew {e0} -> {e1}");
+            if (f1 > 4000) bad.Add($"{id}: {f1} particles alive");
+        }
+        foreach (var b in bad) GD.Print("  LEAK " + b);
+        t.Ok("a long night under attack piles nothing up", bad.Count == 0, string.Join("; ", bad));
+    }
+
     public static void Register(Dictionary<string, Func<Tester, Task>> all)
     {
+        all["pt_long"] = Long;
         all["guideroutes"] = GuideRoutes;
         all["pt_route"] = Route;
         all["pt_menus"] = Menus;
