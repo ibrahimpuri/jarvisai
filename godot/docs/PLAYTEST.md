@@ -19,6 +19,7 @@ $GODOT --headless --path . -- --test pt_doors pt_soak pt_objects pt_bells
 | `pt_objects` | finds somewhere to stand within reach of every object (beside it, under it, or swimming at it) and uses it | nowhere to stand that shows its prompt |
 | `pt_bells` | lights, saves at and reloads in every Bell Room | the bell opens nothing, the save does not set the respawn, or she wakes elsewhere, in rock, or in the air |
 | `pt_route` | the autopilot: from each objective to the next, steering only by where the guide's arrow points | no headway for six seconds (mostly the bot's own limits on climbing; see below for the check that does not depend on it) |
+| `pt_long` | two minutes in each of five busy rooms under attack, fighting back | entities or particles piling up, or the frame slowing |
 | `pt_menus` | the chart in three regions, the satchel's tabs, pause, a Bell Room's menu and the cable page, and the air pointer, for looking at (run rendered with `--out`) | |
 
 ## The guide's routes (`tools/guidecheck.js`, `tools/throughs.js`)
