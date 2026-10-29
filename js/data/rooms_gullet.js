@@ -131,7 +131,7 @@ room({
     {"type": "driftnest", "tx": 60, "ty": 10, "n": 10, "always": true},
     {"type": "bloater", "tx": 40, "ty": 19, "pose": "lying"},
     {"type": "bloater", "tx": 80, "ty": 19, "pose": "lying"},
-    {"type": "deepwalker", "tx": 100, "ty": 20},
+    {"type": "deepwalker", "tx": 86, "ty": 20},
   ],
 });
 
