@@ -87,9 +87,13 @@ Six fixed bosses, all built from the same knot rules at a bigger scale, plus the
    but when the tide is in and the hall is flooded he swims at her. Elbows first, and he cannot grab or throw, but he
    heaves the table, which throws anyone on it or on the floor beside it. Out of his chain's reach (the sideboards by
    the walls, the galleries, the reader's pulpit) he throws pewter alms-bowls.
-3. **The Precentor** (Sunken Choir, the organ loft). A Bellmouth fused into the organ's pipes. It inhales to scream,
-   and the scream wakes the choir. Break its jaw during the inhale, or tune the bells (the Tide Key's water) to the
-   pitch that shatters the salt in its throat.
+3. **The Precentor** (Sunken Choir, the organ loft over the west door). A Bellmouth fused into the organ's pipes,
+   hanging out of reach. He spits brine, and he screams: the scream wakes two of the dead in the stalls and throws
+   down anyone in the open (the two low piers are the only shelter). His jaw is open only while he draws breath:
+   break it then, and the scream chokes. The salt in his throat rings a note as he breathes in; set the loft's valve
+   so its bell rings the same, and strike it, and the salt shatters: he hangs stunned and the plates over the pipes
+   that root him in the organ fall away until it grows back, at a new note. Two broken limbs open the crown. He keeps
+   the Tide Key, in the Tuning Chamber behind him.
 4. **The Hanging Mother** (Ribvault, the spine). A Gullet the size of a chapel hanging from the vertebrae on many
    tendrils, in a room the wind blows through. Shoot the tendrils to drop her onto the rib struts, where her spine
    knots can be reached. Every cut tendril lets a young Gullet fall.
@@ -148,8 +152,8 @@ The counts stay as the document gives them, spread so that thorough exploration 
 | 0 | the engine for a large island | | built: the sea row, the chart, save migration, bell-cable lifts, region files |
 | 1 | the Wrackline and the Saltworks | 61 in all (35 new) | **built** |
 | 2 | Lower Cloister | 86 in all (25 new) | **built** |
-| 3 | Sunken Choir | | next |
-| 4 | Ribvault | | |
+| 3 | Sunken Choir | 104 in all (18 new) | **built** |
+| 4 | Ribvault | | next |
 | 5 | The Gullet | | |
 | 6 | Lantern Skull | | |
 
@@ -169,7 +173,10 @@ The counts stay as the document gives them, spread so that thorough exploration 
   room is. It never surfaces in a Bell Room or where a boss still stands.
 - **A room's own thought.** A thought in the lore named for a room is Maren's the first time she comes in.
 - **Gates by flag.** Gate tiles open on a flag: `K` the seawall gate, `Z` the Skull's hatch, `Q` the Refectory's
-  chained doors (`almonerDead`).
+  chained doors (`almonerDead`), `J` the Organ Loft's doors (`precentorDead`).
+- **Tuned bells.** Each room's bells hang over its own basin (`basin_<room>`; the shrine's own is `basin`), filled by
+  that room's valve. A valve with a wave-shaped lock (`needsKey`) needs the Tide Key, and with it fills the basin to
+  the brim, the deepest note. A crystal wall in the room breaks at its own pitch (`crystals` in the room data).
 
 ### Phase 1 tests
 
@@ -196,6 +203,18 @@ The counts stay as the document gives them, spread so that thorough exploration 
   - his death opens the doors west, and he stays dead
   - the Almonry's bell-cable, the Undertow's way along the lower floor
   - saves from before the move land on the moved Prior's Walk
+
+### Phase 3 tests
+
+- `node tools/reach.js`: the Choir's rooms and chests, and its gates:
+  - the Baptistery's crystal holds the Choir's west until its bell is rung at its note
+  - the Precentor's doors hold the Tide Key and the galleries back
+  - the Bone Choir's vault needs the Tide Key's full basin
+- `--test choir3`: every new room can be entered, the guide's new steps, the Baptistery's bell, and the Precentor:
+  - he wakes as she comes into the loft; his jaw is shut but for the breath
+  - his scream throws her down in the open and wakes the stalls; behind a pier it passes over her
+  - the wrong note does nothing; his note shatters the salt and bares his pipes; the salt grows back at a new note
+  - his death opens the doors; the Tide Key; the keyed valve; the drop to the Narthex; the Vestry's cable
 
 ## Phase 1: the Wrackline and the Saltworks
 
@@ -290,6 +309,42 @@ Treasury's strongbox.
 | **The Prior's Lodging** | 15–16,8 | his study and the hymnal's hint for his door; on west to the Choir Steps |
 | **The Light-Well** | 28–29,7 | the Cloister's only sky: wind, Kites and Saltgulls (Jet Valve) |
 | **The Bell-Cote** | 21,7 | the chantry's bell (Jet Valve) |
+
+## Phase 3: the Sunken Choir (18 rooms)
+
+The Choir's shrine grows west from its Bell Room, through the cult's half-drowned church to the West Window and its
+bell tower; the organ loft is over the west door, and the galleries above the choir lead back. Its water is the
+Choir's own, held in basins and stall-pits, not the sea's. The Choir is still a faction hub: its living members do not
+harm Maren while she keeps the water, and Hesper sends her to the Precentor, who keeps the Tide Key.
+
+The way through: west from the Choir Bell Room into the Narthex; across the Drowned Stalls on the stall tops; the Song
+School; the Baptistery, where a crystal wall across the way west breaks at the note of the bell over its basin; the
+Cantors' Walk and the Bone Choir; the Cantor's Vestry (the second Bell Room); the West Window; up the bell tower to the
+organ loft and the Precentor; the Tide Key in the Tuning Chamber behind him; then east along the galleries (the
+Choir-Master's Rooms, the Pipe Gallery, the Bellows, the Triforium) to the Night Gallery, and a drop into the Narthex.
+The Tide Key raises the shrine's water to the Ribvault, as before, and opens the keyed valve in the Bone Choir.
+
+| Room | Cell | Role |
+| --- | --- | --- |
+| Choir Steps, Sunken Choir, Choir Bell Room | 12–14, 8 | as before; the Bell Room opens west, and the shrine's crystal pit holds a box now |
+| **The Narthex** | 11,8 | the cult's porch; the Night Gallery's drop comes down into it |
+| **The Drowned Stalls** | 9–10,8 | a choir up to its necks in the Choir's water; a Hooded Bellmouth on the cantor's desk |
+| **The Song School** | 8,8 | a Cantor and its pupils |
+| **The Baptistery** | 6–7,8 | the great font, Bloaters in it, and the first tuned bell |
+| **The Choir Crypt** | 6–7,9 | under the font, on the sea row; a Drowned Diver in Act III |
+| **The Cantors' Walk** | 5,8 | statues in niches, a Toller and a Bellmouth |
+| **The Bone Choir** | 3–4,8 | Ossuaries; an ivory vault behind a crystal at the Tide Key's note |
+| **The Cantor's Vestry** | 2,8 | the Choir's second Bell Room |
+| **The West Window** | 1,8 | the rose window, and the foot of the bell tower |
+| **The Bell Tower** | 1, 5–7 | the stair up to the organ loft, and the belfry above in the wind, with Kites |
+| **The Organ Loft** | 2–3, 6–7 | the Precentor |
+| **The Tuning Chamber** | 4,6 | the Tide Key |
+| **The Clerestory** | 5–7,6 | the high wall-walk, fallen through to the galleries (Jet Valve) |
+| **The Choir-Master's Rooms** | 4–5,7 | his letter to Hesper |
+| **The Pipe Gallery** | 6–7,7 | the great pipes, clung to and climbed |
+| **The Bellows** | 8,7 | the pumpers who have not stopped |
+| **The Triforium** | 9–10,7 | the gallery over the stalls |
+| **The Night Gallery** | 11,7 | the drop to the Narthex |
 
 Later phases are planned in the same way when they are built: their region's rooms, the gap their clusters move
 across, their second Bell Room and their boss.

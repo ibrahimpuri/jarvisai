@@ -934,6 +934,13 @@ public static class G
         if (p.lookT > 0.4f) ty += p.lookDir * 76;
         else if (!p.onGround && p.state == "normal" && p.vy > 260) ty += MathF.Min(56, (p.vy - 260) * 0.25f);
         if (!snap) { tx += StoryFocus.CamOffset.X; ty += StoryFocus.CamOffset.Y; }
+        // in a boss's hall the frame leans toward him, so a boss hung high over her stays in view
+        if (bossBar != null && !bossBar.gone && bossBar.room == r)
+        {
+            float bx = bossBar.Cx() - H.VIEW_W / 2, by = bossBar.Cy() - H.VIEW_H / 2;
+            tx = H.Lerp(tx, bx, 0.25f);
+            ty = H.Lerp(ty, by, MathF.Min(0.45f, MathF.Max(0, p.Cy() - bossBar.Cy()) / (H.VIEW_H * 1.2f)));
+        }
         if (r.Pw <= H.VIEW_W) tx = r.Px + (r.Pw - H.VIEW_W) / 2; else tx = H.Clamp(tx, r.Px, r.Px + r.Pw - H.VIEW_W);
         if (r.Ph <= H.VIEW_H) ty = r.Py + (r.Ph - H.VIEW_H) / 2; else ty = H.Clamp(ty, r.Py, r.Py + r.Ph - H.VIEW_H);
         if (snap) { cam = new Vector2(tx, ty); return; }

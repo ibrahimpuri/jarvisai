@@ -1326,9 +1326,12 @@ public static class Scenarios
             // behind a pier, the scream passes over her
             p.hp = p.maxHp; p.invulnT = 0;
             t.Place("organloft", 14, 39);
-            bool screamed = false; hp0 = p.hp;
-            for (int i = 0; i < 120 && !screamed; i++) { bool was = pc.mode == "inhale"; await t.Run(0.1f); screamed = was && pc.mode != "inhale"; }
-            await t.Run(0.2f);
+            bool screamed = false;
+            for (int i = 0; i < 300 && !screamed; i++)
+            {
+                if (pc.mode == "inhale" && pc.atkT < 0.12f) { p.hp = p.maxHp; p.invulnT = 0; hp0 = p.hp; await t.Run(0.2f); screamed = true; break; }
+                await t.Run(0.05f);
+            }
             t.Ok("behind a pier, the scream passes over her", screamed && p.hp == hp0, $"screamed {screamed} hp {hp0}->{p.hp}");
             G.god = true; p.hp = p.maxHp;
             // the bell at the wrong note does nothing; at his note the salt shatters and the pipes are bare

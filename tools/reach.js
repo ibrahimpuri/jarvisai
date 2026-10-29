@@ -244,10 +244,10 @@ const stages = [
     // what the Jet Valve opens, back in the Cloister
     mustNot: ['ch_lightwell@lightwell', 'ch_bellcote@bellcote', 'ch_treasury@treasury'] },
   { name: 'GATE: the Baptistery\'s crystal holds the Choir\'s west', abil: ['swing', 'boots', 'jet'], flags: { seawallOpen: true, basinFilling: true, basinCrossed: true, priorWedged: true, almonerDead: true }, pool: true,
-    need: ['valve@baptistery', 'tunedbell@baptistery', 'ch_narthex@narthex', 'ch_stalls@stalls', 'ch_songschool@songschool', 'ch_crypt@crypt'], mustNot: ['bell_vestry@vestry', 'precentor@organloft'] },
+    need: ['valve@baptistery', 'tunedbell@baptistery', 'ch_narthex@narthex', 'ch_stalls@stalls', 'ch_songschool@songschool', 'ch_crypt@crypt'], mustNot: ['bell_vestry@vestry', 'tunedbell@organloft'] },
   { name: 'Jet Valve', abil: ['swing', 'boots', 'jet'], flags: { seawallOpen: true, basinFilling: true, basinCrossed: true, priorWedged: true, almonerDead: true }, pool: true, crystals: ['baptistery'],
     need: ['sluice@choir', 'hesper@choir', 'bell_choir@choirbell', 'tunedbell@choir', 'valve@choir', 'table_4@choirsteps', 'ch_lightwell@lightwell', 'ch_bellcote@bellcote', 'ch_treasury@treasury',
-      'bell_vestry@vestry', 'ch_vestry@vestry', 'ch_belfry@belltower', 'precentor@organloft', 'valve@organloft', 'tunedbell@organloft', 'valve@bonechoir', 'tunedbell@bonechoir'],
+      'bell_vestry@vestry', 'ch_vestry@vestry', 'ch_belfry@belltower', 'valve@organloft', 'tunedbell@organloft', 'valve@bonechoir', 'tunedbell@bonechoir'],
     want: ['stitch_steps@choirsteps', 'ch_steps@choirsteps', 'page_cbell@choirbell'],
     // the Precentor holds the doors east of the loft: the Tide Key, and the galleries back
     mustNot: ['tidekey@tuning', 'ch_choirmaster@choirmaster', 'ch_nightgallery@nightgallery', 'ch_bonechoir@bonechoir'] },
