@@ -127,8 +127,8 @@ room({
   ents2: [
     {"type": "kite", "tx": 30, "ty": 5},
     {"type": "kite", "tx": 90, "ty": 6},
-    {"type": "saltgull", "tx": 100, "ty": 16},
-    {"type": "saltgull", "tx": 103, "ty": 16},
+    {"type": "saltgull", "tx": 104, "ty": 16},
+    {"type": "saltgull", "tx": 107, "ty": 16},
     {"type": "grafted", "tx": 110, "ty": 16},
   ],
 });
