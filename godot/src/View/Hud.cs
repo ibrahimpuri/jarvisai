@@ -269,7 +269,7 @@ public static class Hud
     {
         var b = G.bossBar;
         if (b == null || b.gone || b.dead) return;
-        string name = b.type switch { "abbot" => "The Abbot of Salt", "almoner" => "The Almoner", "undertow" => "The Undertow", "shoal" => "The Shoal", "grafted" => "Hesper Vane, the Cantor", "shucker" => "Teodor", _ => "" };
+        string name = b.type switch { "abbot" => "The Abbot of Salt", "almoner" => "The Almoner", "precentor" => "The Precentor", "undertow" => "The Undertow", "shoal" => "The Shoal", "grafted" => "Hesper Vane, the Cantor", "shucker" => "Teodor", _ => "" };
         int total = b.knots.Count, left = b.knots.Count(k => !k.broken);
         // across the top of the screen, clear of the weapon plate and the prompts
         float w = 300, x = (H.VIEW_W - 300) / 2f, y = 30;

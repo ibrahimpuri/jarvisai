@@ -691,7 +691,7 @@ public class Player : Mover
         return false;
     }
     // Stone, timber, bone, metal and salt can be climbed; crystals, gates and the island's edge cannot.
-    static bool Climbable(char ch) => ch is not ('x' or '_' or 'K' or 'Z' or 'h' or 'E' or 'L' or 'V' or 'Y' or 'C' or 'Q');
+    static bool Climbable(char ch) => ch is not ('x' or '_' or 'K' or 'Z' or 'h' or 'E' or 'L' or 'V' or 'Y' or 'C' or 'Q' or 'J');
     void UpdateMantle(float dt)
     {
         mantleT += dt / MANTLE_TIME;

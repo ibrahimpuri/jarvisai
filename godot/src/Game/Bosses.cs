@@ -682,6 +682,221 @@ public class Almoner : Drowned
     public override Props Serialize() => null;
 }
 
+// ---------------------------------------------------------------- The Precentor
+// The Choir's master of song, a Bellmouth grown into the organ he played. He hangs from its case over the loft, out
+// of reach, spits brine, and screams: the scream wakes the dead in the stalls and throws down anyone it finds in the
+// open (the two piers are the only shelter). Break his jaw while he draws breath and the scream chokes in him; strike
+// the loft's tuned bell at the pitch of the salt in his throat and the salt shatters, he hangs stunned, and the plates
+// over the pipes that root him in the organ fall away until it grows back. Two broken limbs open the crown in his chest.
+public class Precentor : Body
+{
+    public bool started, throatSalted = true;
+    public int pitch;
+    float saltT, screamCool = 4, spitCool = 2, stunT, hintT;
+    int hints;
+    static readonly string[] NOTE = { "high and thin", "a little lower", "low" };
+    public Precentor(Props spec, RoomDef room) : base(spec, room)
+    {
+        type = "precentor"; boss = true; voice = "bellmouth";
+        AddKnot("jaw", "jaw", "jaw", 5, 8);
+        var a = AddKnot("pipeL", "pipe", "shoulderL", 6, 7); a.plated = a.basePlated = true;
+        var b = AddKnot("pipeR", "pipe", "shoulderR", 6, 7); b.plated = b.basePlated = true;
+        AddKnot("crown", "crown", "sternum", 9, 9, 2);
+        // he hangs from the organ's case: spec y is his lowest point
+        w = 56; h = 80; x = spec.F("x") - w / 2; y = spec.F("y") - h;
+        pitch = (int)H.Rand(0, 3) % 3;
+        mode = "dormant"; awakeMode = "idle";
+        stepUp = false;
+    }
+    public override void SetPose(string p) { }
+    public override bool Perceives() { var p = G.player; return started && p != null && !p.dead && G.room == room; }
+    public override void Hear(float hx, float hy, float d, float r, string src) { if (mode == "dormant" && src != "scream" && d < r) Start(); }
+    public override void Wake(bool force = false) { if (mode == "dormant") Start(); }
+    public void Start()
+    {
+        if (started) return;
+        started = true; mode = "idle"; screamCool = 3;
+        G.bossBar = this;
+        Snd.Scream(Pan()); G.Shake(4);
+        H.ToastMsg("The Precentor lifts his head out of the organ, and the salt in his throat begins to ring.", 4);
+        Narr.Think("precentor");
+    }
+    static Vector2 V(float x, float y) => new(x, y);
+    public override Dictionary<string, Vector2> Skeleton()
+    {
+        float cx = Cx(), top = y;
+        float sway = MathF.Sin(anim * 0.9f) * 2;
+        float gape = mode == "inhale" ? H.Clamp(1.8f - atkT, 0, 1.8f) * 6 : mode == "stun" ? 8 : 0;
+        return new()
+        {
+            ["shoulderL"] = V(cx - 22, top + 12), ["shoulderR"] = V(cx + 22, top + 12),
+            ["sternum"] = V(cx + sway * 0.3f, top + 30),
+            ["head"] = V(cx + sway, top + 50), ["jaw"] = V(cx + sway, top + 66 + gape),
+            ["elbowL"] = V(cx - 32, top + 38 + sway), ["handL"] = V(cx - 27, top + 66),
+            ["elbowR"] = V(cx + 32, top + 38 - sway), ["handR"] = V(cx + 27, top + 66),
+            ["hip"] = V(cx, top + 40), ["neck"] = V(cx + sway * 0.6f, top + 40),
+        };
+    }
+    public override bool DamageKnot(Knot k, float dmg, string src)
+    {
+        Start();
+        // the jaw is only open while he draws breath, or hangs stunned
+        if (k.id == "jaw" && mode != "inhale" && mode != "stun") { Snd.Tink(Pan()); var kp = KnotPos(k).Value; FX.Sparks(kp.X, kp.Y, 3); return false; }
+        return base.DamageKnot(k, dmg, src);
+    }
+    public override void DamageFlesh(float d, float hx, float hy, string src) { Start(); base.DamageFlesh(d, hx, hy, src); }
+    public override void Flinch() { }
+    public override void OnKnotBroken(Knot k, string src)
+    {
+        if (k.type == "crown")
+        {
+            gone = true; dead = true; mode = "gone";
+            FX.Salt(Cx(), Cy(), 90); G.Shake(10); Snd.Toll(); Snd.Rumble();
+            G.OnPrecentorKilled(this);
+            return;
+        }
+        if (k.id == "jaw")
+        {
+            if (mode == "inhale") { mode = "stun"; stunT = 3; H.ToastMsg("His jaw breaks in the middle of the breath. The scream chokes in him.", 3); }
+            else H.ToastMsg("His jaw hangs broken. He cannot scream any more.", 3);
+        }
+        if (k.type == "pipe") H.ToastMsg("A pipe tears out of him with a shriek of air.", 2.5f);
+        var crown = K("crown");
+        if (!crown.broken && !IsSealed(crown)) Narr.Think("crown");
+    }
+    // the loft's tuned bell, rung anywhere in the room
+    public void HearBell(int lvl)
+    {
+        if (!started) { Start(); return; }
+        if (!throatSalted || gone) return;
+        if (lvl != pitch) { if (hints < 4) { hints++; H.ToastMsg("Wrong note. The salt in his throat rings " + NOTE[pitch] + ".", 3); } return; }
+        throatSalted = false; saltT = 16;
+        mode = "stun"; stunT = 4.5f;
+        foreach (var kn in knots) if (kn.type == "pipe" && !kn.broken) kn.plated = false;
+        var jp = KnotPos(K("jaw")).Value;
+        FX.Salt(jp.X, jp.Y - 8, 40); Snd.Crystal(Pan()); Snd.Crack(Pan()); G.Shake(5);
+        H.ToastMsg("The salt in his throat sings and shatters! He hangs stunned, and the plates over his pipes fall away.", 4);
+    }
+    public override void Think(float dt)
+    {
+        var p = G.player;
+        if (p == null) return;
+        if (mode == "dormant")
+        {
+            if (p.Feet() > room.Py + 30 * H.TILE && H.Dist(p.Cx(), p.Cy(), Cx(), Cy()) < 30 * H.TILE) Start();
+            return;
+        }
+        if (!throatSalted)
+        {
+            saltT -= dt;
+            if (saltT <= 0)
+            {
+                throatSalted = true;
+                pitch = (pitch + 1 + (H.Rand() < 0.5f ? 0 : 1)) % 3;
+                foreach (var kn in knots) if (kn.type == "pipe" && !kn.broken) kn.plated = true;
+                H.ToastMsg("Salt grows back in his throat. It rings a new note: " + NOTE[pitch] + ".", 4);
+            }
+        }
+        if (mode == "stun") { stunT -= dt; if (stunT <= 0) { mode = "idle"; screamCool = 3; } return; }
+        if (mode == "inhale")
+        {
+            atkT -= dt;
+            K("jaw").flare = 0.3f;
+            hintT -= dt;
+            if (hintT <= 0) { hintT = 0.6f; Snd.Bell(new[] { 392, 330, 262 }[pitch], 0.12f); }
+            if (atkT > 0) return;
+            mode = "idle"; screamCool = Cool(7f);
+            Scream(p);
+            return;
+        }
+        screamCool -= dt; spitCool -= dt;
+        if (!K("jaw").broken && screamCool <= 0)
+        {
+            mode = "inhale"; atkT = Wind(1.8f); hintT = 0;
+            Snd.Inhale(Pan());
+            if (hints < 3 && throatSalted) { hints++; H.ToastMsg("He draws breath. The salt in his throat rings " + NOTE[pitch] + ".", 2.5f); }
+            return;
+        }
+        if (spitCool <= 0)
+        {
+            // a gout of brine at her, arcing down from the organ
+            spitCool = Cool(K("jaw").broken ? 1.6f : 2.6f);
+            var jp = KnotPos(K("jaw")).Value;
+            float dx = p.Cx() - jp.X, t = H.Clamp(MathF.Abs(dx) / 240, 0.4f, 1.2f), g = 420;
+            G.enemyShots.Add(new Shot { x = jp.X, y = jp.Y, vx = dx / t, vy = (p.Cy() - jp.Y) / t - 0.5f * g * t, grav = g, life = 2.4f, dmg = 1, src = this, kind = "brine" });
+            Snd.Splash(0.2f, Pan());
+        }
+    }
+    void Scream(Player p)
+    {
+        var jp = KnotPos(K("jaw")).Value;
+        if (!throatSalted)
+        {
+            // with the salt gone from his throat, all that comes out is a croak
+            Snd.Groan(Pan(), 0.4f);
+            H.ToastMsg("He screams, and only a croak comes out.", 2);
+            return;
+        }
+        Snd.Scream(Pan()); G.Shake(6); G.AddSwell(2);
+        // the scream wakes two of the dead in the stalls, the nearest to her
+        foreach (var e in G.ents.OfType<Body>().Where(b => b != this && b.mode == "dormant" && !b.corpse && !b.gone).OrderBy(b => H.Dist(b.Cx(), b.Cy(), p.Cx(), p.Cy())).Take(2).ToArray())
+        { e.lastHeard = new Vector2(p.Cx(), p.Cy()); e.Wake(true); }
+        Noise.Emit(Cx(), Cy(), 20, "scream");
+        // and it throws down anyone it finds in the open
+        if (!p.inBellRoom && Phys.Los(jp.X, jp.Y, p.Cx(), p.Cy()))
+        {
+            p.Hurt(2, this);
+            p.vx += H.Sign(p.Cx() - jp.X) * 260; p.vy = -180;
+        }
+    }
+    public override void Physics(float dt, bool pinned = false) { vx = vy = 0; }
+    public override Palette Pal() => new() { robe = "#d8d4c8", skin = "#8e9e98", cowl = null, dark = "#6a6a62" };
+    public override void Draw(Canvas c)
+    {
+        if (gone) return;
+        var j = Skel();
+        float cx = Cx(), top = y;
+        // the organ's pipes, driven down into his shoulders
+        foreach (var side in new[] { "L", "R" })
+        {
+            var sh = j["shoulder" + side];
+            var kn = K("pipe" + side);
+            float px = sh.X + (side == "L" ? -10 : 10);
+            if (kn.broken) { c.StrokeStyle = "#4a463e"; c.LineWidth = 5; c.Line(px, top - 40, px + (side == "L" ? -3 : 3), top - 6); continue; }
+            c.StrokeStyle = "#7a7260"; c.LineWidth = 6; c.Line(px, top - 48, sh.X, sh.Y);
+            c.Stroke = H.Rgba(255, 240, 200, 0.25f); c.LineWidth = 1.2f; c.Line(px - 2, top - 48, sh.X - 2, sh.Y);
+            if (kn.plated) { c.Fill = H.Rgba(225, 222, 212, 0.75f); for (int i = 0; i < 6; i++) c.FillCircle(sh.X + TileArt.Hash(i, 7) * 8 - 4, sh.Y - 4 - i * 2.5f, 1.6f + TileArt.Hash(i, 9) * 1.2f); }
+        }
+        // a robe gone stiff and white, hanging from the organ's case
+        var st = j["sternum"];
+        c.FillStyle = "#b8b2a4";
+        c.Poly(new[] { V(cx - 26, top), V(cx + 26, top), V(cx + 20, top + 30), V(st.X + 13, top + 52), V(st.X - 13, top + 52), V(cx - 20, top + 30) });
+        c.Fill = H.Rgba(0, 0, 0, 0.22f); c.Poly(new[] { V(cx + 6, top), V(cx + 26, top), V(cx + 20, top + 30), V(st.X + 13, top + 52), V(st.X + 4, top + 52) });
+        c.Stroke = H.Rgba(60, 55, 48, 0.4f); c.LineWidth = 0.8f; for (int i = -2; i <= 2; i++) c.Line(cx + i * 7, top + 4, st.X + i * 4, top + 50);
+        // long arms, hanging
+        foreach (var side in new[] { "L", "R" }) { DrawLimb(c, j["shoulder" + side], j["elbow" + side], 3.4f, "#8a8478"); DrawLimb(c, j["elbow" + side], j["hand" + side], 2.6f, "#9a9488"); }
+        // the head: a bell of bone, and its jaw hanging open
+        var hd = j["head"]; var jw = j["jaw"];
+        c.FillStyle = "#a8aea6"; c.BeginPath(); c.Ellipse(hd.X, hd.Y, 15, 13, 0, 0, H.PI * 2); c.FillPath();
+        c.Fill = H.Rgba(255, 255, 255, 0.12f); c.BeginPath(); c.Ellipse(hd.X - 4, hd.Y - 4, 7, 5, 0, 0, H.PI * 2); c.FillPath();
+        c.FillStyle = "#1a1416"; c.BeginPath(); c.Ellipse(hd.X, (hd.Y + jw.Y) / 2 + 3, 9, (jw.Y - hd.Y) / 2 + 2, 0, 0, H.PI * 2); c.FillPath();
+        c.FillStyle = "#98a098"; c.BeginPath(); c.MoveTo(hd.X - 14, hd.Y + 4); c.LineTo(jw.X - 10, jw.Y); c.LineTo(jw.X + 10, jw.Y); c.LineTo(hd.X + 14, hd.Y + 4); c.LineTo(hd.X + 9, hd.Y + 8); c.LineTo(jw.X, jw.Y - 4); c.LineTo(hd.X - 9, hd.Y + 8); c.ClosePath(); c.FillPath();
+        bool hunting = mode is "inhale" or "idle";
+        c.Fill = hunting ? H.Rgba(255, 230, 190, 0.9f) : H.Rgba(180, 180, 170, 0.5f);
+        c.FillCircle(hd.X - 6, hd.Y - 3, 1.2f); c.FillCircle(hd.X + 6, hd.Y - 3, 1.2f);
+        // the salt in his throat, glowing the colour of its note
+        if (throatSalted)
+        {
+            var col = pitch switch { 0 => H.Rgba(190, 225, 255, 0.9f), 1 => H.Rgba(200, 250, 210, 0.9f), _ => H.Rgba(255, 215, 150, 0.9f) };
+            float glow = 0.35f + (mode == "inhale" ? 0.45f : 0.15f) * (0.5f + 0.5f * MathF.Sin(anim * 9));
+            c.Glow(jw.X, jw.Y - 6, 14, new Color(col.R, col.G, col.B, glow * 0.5f));
+            c.Fill = col;
+            for (int i = 0; i < 5; i++) { float sx = jw.X - 6 + i * 3, sy = jw.Y - 8 + TileArt.Hash(i, 11) * 3; c.Poly(new[] { V(sx - 1.6f, sy + 2), V(sx, sy - 3 - TileArt.Hash(i, 12) * 3), V(sx + 1.6f, sy + 2) }); }
+        }
+    }
+    public override Props Serialize() => null;
+}
+
 public class Kiln : Ent
 {
     public bool broken;

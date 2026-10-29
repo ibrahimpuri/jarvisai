@@ -148,6 +148,7 @@ public static class Story
                 {
                     "A Keeper's daughter in the Saint's own shrine. Be welcome. We will not harm you while you keep the water.",
                     "The Saint sings, diver. Under the salt and the bone, it is still singing. The Choir is learning the hymn.",
+                    "Our Precentor keeps the Tide Key, in the organ loft over the west door. He has not stopped screaming since the light went out. West through our Bell Room, if you are brave. Strike his note true.",
                     "The font will give you the Saint's gifts, if you want them. Each one grows a knot on you. Each one makes you more like us.",
                     "And if you find the Prior's tide tables, lay them in our bowl. The Saint will reward you.",
                 });
@@ -162,6 +163,7 @@ public static class Story
                 });
                 return;
             }
+            if (!World.flags.B("precentorDead")) { Say(new() { "He is still screaming. Listen to the salt in his throat when he breathes in, and make the bell in the loft ring the same note." }); return; }
             Say(new() { Narr.NpcLore("hesper"), G.act >= 3 ? "The spring tide is here. When you reach the lamp, I will be there, if you want the hymn finished." : "Three gifts, and the Choir at your side, and you could finish the Saint's hymn yourself." });
             return;
         }

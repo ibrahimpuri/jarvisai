@@ -210,6 +210,7 @@ public static class G
         }
         if (t == "abbot") return f.B("abbotDead") ? null : new Abbot(spec, r);
         if (t == "almoner") return f.B("almonerDead") ? null : new Almoner(spec, r);
+        if (t == "precentor") return f.B("precentorDead") ? null : new Precentor(spec, r);
         if (t == "shoal") return act >= 3 && !f.B("shoalDead") ? new Shoal(spec, r) : null;
         if (t == "grafted") return act >= 3 ? new Grafted(spec, r) : null;
         // the last night's weapons: Agathe's Glass is left for Maren at the spring tide; the Ear is always there
@@ -596,6 +597,16 @@ public static class G
         Snd.Rumble();
         H.ToastMsg("The Almoner goes down across his table. 2 Mere-ivory. The chain at his collar goes slack, and the chains on the doors west fall away.", 6);
         Narr.Think("almonerDead");
+    }
+    public static void OnPrecentorKilled(Body b)
+    {
+        World.flags.Set("precentorDead", true);
+        World.MarkDirty();
+        bossBar = null;
+        player.bag.Add("ivory", 2);
+        Snd.Rumble();
+        H.ToastMsg("The Precentor's last note runs out of him, and the organ falls silent. 2 Mere-ivory. The doors east grind open.", 6);
+        Narr.Think("precentorDead");
     }
     public static void OnUndertowKilled()
     {

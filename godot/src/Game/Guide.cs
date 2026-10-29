@@ -72,11 +72,20 @@ public static class Guide
         new() { id = "prior", act = "II", room = "priors", what = "ability:jet", title = "Open the Prior's door",
             how = "Go on west from the Refectory, past the Almonry (ring its bell), to the Prior's Walk at the far end of the Cloister. The hymnal says the door opens \"when the sea turns its back\": come at the Ebb. The Prior kept a Jet Valve behind it.",
             done = () => P.Has("jet") },
-        new() { id = "choir", act = "II", room = "choir", what = "ability:tidekey", title = "Climb to the Sunken Choir",
-            how = "Up from the Prior's Walk to the Choir Steps (or west along the upper floor, through the Prior's Lodging), then west into the Sunken Choir. The Choir will not harm you while you keep its water. Take the Tide Key.",
+        new() { id = "choir", act = "II", room = "choir", what = "npc:hesper", title = "Climb to the Sunken Choir",
+            how = "Up from the Prior's Walk to the Choir Steps (or west along the upper floor, through the Prior's Lodging), then west into the Sunken Choir. The Choir will not harm you while you keep its water. Hesper Vane leads them.",
+            done = () => G.quests.B("hesperMet") || Visited("narthex") || P.Has("tidekey") },
+        new() { id = "organ", act = "II", room = "organloft", title = "Find the Precentor",
+            how = "West from the Choir Bell Room, through the Narthex and the Drowned Stalls (keep to the stall tops), the Song School and the Baptistery, where the crystal across the door shatters at the note of the bell over its basin: turn the valve until they match. On west past the Bone Choir and the Cantor's Vestry to the West Window, and up the bell tower to the organ loft.",
+            done = () => Visited("organloft") || F.B("precentorDead") },
+        new() { id = "precentor", act = "II", room = "organloft", title = "Silence the Precentor",
+            how = "He hangs from the organ, out of reach. Shelter from his scream behind the two piers. Break his jaw while he draws breath, and the scream chokes. Or listen to the note the salt in his throat rings when he breathes in, set the loft's valve so its bell rings the same, and strike it: the salt shatters and the plates over his pipes fall away. Two broken limbs open the crown in his chest.",
+            done = () => F.B("precentorDead") },
+        new() { id = "tidekey", act = "II", room = "tuning", what = "ability:tidekey", title = "Take the Tide Key",
+            how = "In the Tuning Chamber, through the organ loft's upper door, east of the gallery.",
             done = () => P.Has("tidekey") },
         new() { id = "ribvault", act = "II", room = "ribbell", title = "Rise into the Ribvault",
-            how = "Turn the Tide Key in the Choir's sluice and raise the water to the vault, then swim up into the Saint's ribs and on to the Ribvault Bell Room.",
+            how = "Go back east along the galleries (the Choir-Master's Rooms, the Pipe Gallery, the Bellows, the Triforium) and drop from the Night Gallery into the Narthex. In the Sunken Choir, turn the Tide Key in the sluice and raise the water to the vault, then swim up into the Saint's ribs and on to the Ribvault Bell Room.",
             done = () => Visited("ribbell") || P.Has("seal") },
         new() { id = "seal", act = "II", room = "prisms", what = "ability:seal", title = "Take the Pressure Seal",
             how = "In the Lamp Prisms, east of the Ribvault Bell Room. Turn the salt prisms so a focused beam (hold focus) reaches the dead crystal in its niche, and the way to the Seal opens.",
@@ -110,7 +119,7 @@ public static class Guide
 
     // ---- the island's seams ------------------------------------------------------------------------------
     static Dictionary<string, Dictionary<string, List<(int tx, int ty)>>> seams;
-    static bool OpenTile(char ch) => World.Solidity(ch) != 1 || ch is 'L' or 'E' or 'K' or 'Z' or 'V' or 'Y' or 'h' or 'Q';
+    static bool OpenTile(char ch) => World.Solidity(ch) != 1 || ch is 'L' or 'E' or 'K' or 'Z' or 'V' or 'Y' or 'h' or 'Q' or 'J';
     static void BuildSeams()
     {
         seams = new();

@@ -143,6 +143,8 @@ public static class World
             case 'Z': return flags.B("skullOpen") ? 0 : 1;
             // the Refectory's doors, chained to the Almoner
             case 'Q': return flags.B("almonerDead") ? 0 : 1;
+            // the Organ Loft's doors, which the Precentor holds
+            case 'J': return flags.B("precentorDead") ? 0 : 1;
             case 'Y': return flags.B("choirDrained") ? 0 : 1;
             case 'y': return flags.B("choirDrained") ? 2 : 0;
             // the pan's hatch grinds shut behind whoever ran for the barge (G.HATCH_CLOSE seconds after the last lever)

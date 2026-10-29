@@ -595,7 +595,9 @@ public static class Scenarios
             t.Ok("tuned bell at the right pitch shatters the crystal", World.CharAt(ch.Ox + 4, ch.Oy + 19) != 'C');
             t.Place("choir", 2, 20);
             await t.Run(0.3f);
-            t.Ok("Tide Key collected", G.player.Has("tidekey"));
+            t.Ok("the crystal pit holds a box", First<Chest>(c => c.spec.S("id") == "ch_choirpit") != null);
+            // the Tide Key itself is the Precentor's (see choir3)
+            G.player.abilities.Add("tidekey");
             if (UI.IsOpen()) await t.Tap("interact");
             t.Place("choir", 36, 16);
             await t.Tap("interact");
@@ -604,7 +606,7 @@ public static class Scenarios
             t.Ok("sluice raises the shrine water", World.flags.F("choirTarget") == 3);
             t.Place("choir", 31, 16);
             await t.Tap("interact");
-            for (int i = 0; i < 4; i++) await t.Tap("interact");
+            for (int i = 0; i < 8 && UI.IsOpen(); i++) await t.Tap("interact");
             t.Place("choir", 28, 16);
             await t.Tap("interact");
             // first "Take" button belongs to the first graft listed (the Salt Ear)
@@ -1244,6 +1246,140 @@ public static class Scenarios
             p.x = G.room.Px + 18 * 16 - 3; p.y = G.room.Py + 2 * 16 + 1; p.vy = -320; p.onGround = false;
             await t.Run(0.12f);
             t.Ok("a jump clipping a ceiling corner slips past it", p.y < G.room.Py + 2 * 16 - 4, $"y {p.y - G.room.Py:0}");
+        },
+
+        // The full island, phase 3: the Sunken Choir. Every new room can be entered; the Baptistery's bell teaches the
+        // tuned bells; the Precentor screams from the organ and is broken by the jaw and the bell; the Tide Key, its
+        // keyed valves, the galleries' drop back to the Narthex and the Vestry's bell-cable.
+        ["choir3"] = async t =>
+        {
+            G.god = true;
+            var p = G.player; var f = World.flags;
+            f.Set("seawallOpen", true); f.Set("abbotDead", true); f.Set("almonerDead", true); f.Set("priorWedged", true);
+            foreach (var a in new[] { "boots", "jet" }) p.abilities.Add(a);
+            G.act = 2; G.quests.Set("anselMet", true); G.quests.Set("hesperMet", true);
+            foreach (var id in new[] { "pier", "saltgate", "kilns", "cloister", "refectory", "choir" }) World.State(id).visited = true;
+            t.Ok("the guide sends her west to the Precentor", Guide.Current?.id == "organ", Guide.Current?.id);
+
+            string[] fresh = { "narthex", "stalls", "songschool", "baptistery", "crypt", "cantorswalk", "bonechoir", "vestry", "westwindow", "belltower", "organloft", "tuning", "clerestory",
+                "choirmaster", "pipegallery", "bellows", "triforium", "nightgallery" };
+            int entered = 0;
+            foreach (var id in fresh)
+            {
+                var r = Data.Room[id];
+                (int x, int y) spot = (-1, -1);
+                for (int ty = Math.Min(r.Th - 2, 66); ty > 1 && spot.x < 0; ty--)
+                    for (int tx = 2; tx < r.Tw - 2 && spot.x < 0; tx++)
+                        if (World.Solid(r.Ox + tx, r.Oy + ty) == 0 && World.Solid(r.Ox + tx, r.Oy + ty - 1) == 0 && World.Solid(r.Ox + tx, r.Oy + ty + 1) == 1 && !World.IsWater(r.Px + tx * 16 + 8, r.Py + ty * 16 + 8)) spot = (tx, ty);
+                if (spot.x < 0) { t.Ok("somewhere to stand in " + id, false); continue; }
+                t.Place(id, spot.x, spot.y); await t.Run(0.35f);
+                if (G.room?.Id == id) entered++;
+                t.Snap("ch3_" + id);
+            }
+            t.Ok("every Choir room can be entered", entered == fresh.Length, $"{entered} of {fresh.Length}");
+            t.Ok("once she has seen the loft, the guide names the Precentor", Guide.Current?.id == "precentor", Guide.Current?.id);
+
+            // the Baptistery: the bell's note follows its basin, and the crystal across the door breaks at its own
+            var bp = Data.Room["baptistery"];
+            t.Place("baptistery", 9, 16); foreach (var b in G.ents.OfType<Body>()) b.gone = true;
+            await t.Tap("interact"); await t.Run(0.1f);
+            t.Ok("the Baptistery's valve fills its own basin", f.I("basin_baptistery") == 1 && f.I("basin") == 0, $"{f.I("basin_baptistery")} {f.I("basin")}");
+            t.Place("baptistery", 14, 16); await t.Tap("interact"); await t.Run(0.1f);
+            t.Ok("its bell at that note shatters the crystal across the door", World.CharAt(bp.Ox + 3, bp.Oy + 14) != 'C');
+            t.Snap("ch3_baptistery_open");
+            // a valve with a wave-shaped lock will not turn by hand
+            t.Place("bonechoir", 60, 10); foreach (var b in G.ents.OfType<Body>()) b.gone = true;
+            await t.Tap("interact"); await t.Run(0.1f);
+            t.Ok("the Bone Choir's valve wants the Tide Key", f.I("basin_bonechoir") == 0);
+            if (UI.IsOpen()) { UI.Close(); await t.Run(0.1f); }
+
+            // the Precentor
+            var ol = Data.Room["organloft"];
+            t.Place("organloft", 2, 39); await t.Run(0.3f);
+            var pc = First<Precentor>();
+            t.Ok("the Precentor hangs silent in the organ", pc != null && pc.mode == "dormant", pc?.mode);
+            if (pc == null) return;
+            t.Ok("and the doors east are his", World.Solid(ol.Ox + 79, ol.Oy + 38) == 1 && World.Solid(ol.Ox + 79, ol.Oy + 15) == 1);
+            t.Place("organloft", 26, 39); await t.Run(0.3f);
+            t.Ok("he wakes as she comes into the loft", pc.started && G.bossBar == pc, pc.mode);
+            t.Snap("ch3_precentor");
+            // his jaw is shut but for the breath
+            float jaw0 = pc.K("jaw").hp;
+            pc.DamageKnot(pc.K("jaw"), 2, "rivet");
+            t.Ok("the jaw cannot be broken while it is shut", pc.K("jaw").hp == jaw0 || pc.mode == "inhale", pc.mode);
+            // in the open, the scream throws her down and wakes the stalls
+            G.god = false; p.hp = p.maxHp; p.invulnT = 0;
+            int dormant0 = 0, dormant1 = 0, hp0 = 0;
+            bool heard = false;
+            for (int i = 0; i < 150 && !heard; i++)
+            {
+                // the breath held: then the scream
+                if (pc.mode == "inhale" && pc.atkT < 0.12f) { dormant0 = G.ents.OfType<Body>().Count(b => b != pc && b.mode == "dormant"); p.hp = p.maxHp; p.invulnT = 0; hp0 = p.hp; await t.Run(0.2f); heard = true; break; }
+                await t.Run(0.05f);
+                if (p.grabbedBy != null) p.grabbedBy.ReleaseGrab();
+            }
+            dormant1 = G.ents.OfType<Body>().Count(b => b != pc && b.mode == "dormant");
+            t.Ok("his scream throws her down in the open", heard && p.hp <= hp0 - 2, $"hp {hp0}->{p.hp}");
+            t.Ok("and wakes the dead in the stalls", dormant1 < dormant0, $"{dormant0}->{dormant1}");
+            t.Snap("ch3_scream");
+            foreach (var b in G.ents.OfType<Body>()) if (b != pc) b.gone = true;
+            // behind a pier, the scream passes over her
+            p.hp = p.maxHp; p.invulnT = 0;
+            t.Place("organloft", 14, 39);
+            bool screamed = false; hp0 = p.hp;
+            for (int i = 0; i < 120 && !screamed; i++) { bool was = pc.mode == "inhale"; await t.Run(0.1f); screamed = was && pc.mode != "inhale"; }
+            await t.Run(0.2f);
+            t.Ok("behind a pier, the scream passes over her", screamed && p.hp == hp0, $"screamed {screamed} hp {hp0}->{p.hp}");
+            G.god = true; p.hp = p.maxHp;
+            // the bell at the wrong note does nothing; at his note the salt shatters and the pipes are bare
+            var valve = First<Valve>(); var bell = First<TunedBell>();
+            f.Set("basin_organloft", (pc.pitch + 1) % 3); bell.Interact(); await t.Run(0.1f);
+            t.Ok("the bell at the wrong note does nothing", pc.throatSalted);
+            float pipe0 = pc.K("pipeR").hp; pc.DamageKnot(pc.K("pipeR"), 99, "rivet");
+            t.Ok("the pipes are plated while his throat is salted", !pc.K("pipeR").broken && pc.K("pipeR").hp == pipe0);
+            f.Set("basin_organloft", pc.pitch); bell.Interact(); await t.Run(0.1f);
+            t.Ok("at his note the salt in his throat shatters, and he hangs stunned", !pc.throatSalted && pc.mode == "stun", pc.mode);
+            t.Snap("ch3_shatter");
+            pc.DamageKnot(pc.K("pipeL"), 99, "rivet");
+            t.Ok("and the bare pipe breaks", pc.K("pipeL").broken);
+            pc.DamageKnot(pc.K("jaw"), 99, "rivet");
+            t.Ok("his jaw breaks while he hangs open", pc.K("jaw").broken);
+            t.Ok("two limbs broken open the crown", !pc.IsSealed(pc.K("crown")));
+            int note = pc.pitch;
+            await t.Run(17f);
+            t.Ok("the salt grows back at a new note", pc.throatSalted && pc.pitch != note && pc.K("pipeR").plated, $"{note}->{pc.pitch}");
+            int ivory0 = p.bag.Count("ivory");
+            pc.DamageKnot(pc.K("crown"), 99, "rivet"); await t.Run(0.5f);
+            t.Ok("the crown breaks, and the organ is silent", pc.gone && f.B("precentorDead") && G.bossBar == null);
+            t.Ok("he leaves 2 Mere-ivory", p.bag.Count("ivory") == ivory0 + 2);
+            t.Ok("and the doors east open", World.Solid(ol.Ox + 79, ol.Oy + 38) == 0 && World.Solid(ol.Ox + 79, ol.Oy + 15) == 0);
+            t.Ok("the guide sends her to the Tide Key", Guide.Current?.id == "tidekey", Guide.Current?.id);
+
+            // the Tide Key, and the valves that wait for it
+            t.Place("tuning", 20, 14); await t.Run(0.4f);
+            if (UI.IsOpen()) { UI.Close(); await t.Run(0.1f); }
+            t.Ok("the Tide Key is in the Tuning Chamber", p.Has("tidekey"));
+            t.Place("organloft", 30, 39); await t.Run(0.3f);
+            t.Ok("and the Precentor stays dead", First<Precentor>() == null);
+            var bn = Data.Room["bonechoir"];
+            t.Place("bonechoir", 60, 10); foreach (var b in G.ents.OfType<Body>()) b.gone = true;
+            for (int i = 0; i < 3; i++) { await t.Tap("interact"); await t.Run(0.1f); }
+            t.Ok("with the Key the valve fills the basin to the brim", f.I("basin_bonechoir") == 3, f.I("basin_bonechoir"));
+            t.Place("bonechoir", 63, 10); await t.Tap("interact"); await t.Run(0.1f);
+            t.Ok("and the deepest note opens the Bone Choir's vault", World.CharAt(bn.Ox + 66, bn.Oy + 8) != 'C');
+
+            // the galleries back: the Night Gallery drops her into the Narthex
+            t.Place("nightgallery", 17, 16); await t.Hold("right", 0.6f); await t.Run(1.2f);
+            t.Ok("the Night Gallery drops her into the Narthex", G.room?.Id == "narthex", G.room?.Id);
+
+            // the Cantor's Vestry and its cable to the Choir Bell Room
+            G.bellsLit.Add("bell_choir");
+            t.Place("vestry", 9, 16); p.bag.Add("oil", 2);
+            await t.Tap("interact"); await t.Run(0.2f);
+            t.Ok("the Vestry is a Bell Room, with a cable to the Choir's", G.room.BellRoom && UI.Inst.AllText().Contains("Ride the bell-cable to Sunken Choir"), UI.Kind);
+            t.Snap("ch3_vestry");
+            await t.ClickButton("Ride the bell-cable"); await t.Run(0.5f);
+            t.Ok("which carries her there", G.room?.Id == "choirbell", G.room?.Id);
         },
 
         // The full island, phase 2: the Lower Cloister. Every new room can be entered; the Almoner keeps the way west
@@ -2097,7 +2233,7 @@ public static class Scenarios
         {
             await t.Run(0.05f);
             var gaps = new List<string>(); var ladders = new List<string>(); var buried = new List<string>();
-            static bool Open(char ch) => World.Solidity(ch) != 1 || ch is 'L' or 'E' or 'K' or 'Z' or 'V' or 'Y' or 'h' or 'Q';
+            static bool Open(char ch) => World.Solidity(ch) != 1 || ch is 'L' or 'E' or 'K' or 'Z' or 'V' or 'Y' or 'h' or 'Q' or 'J';
             foreach (var r in Data.Rooms)
             {
                 for (int ty = 0; ty < r.Th; ty++)

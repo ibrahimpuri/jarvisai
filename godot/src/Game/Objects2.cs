@@ -338,13 +338,15 @@ public class TunedBell : Obj
 {
     public TunedBell(Props spec, RoomDef room) : base(spec, room) { w = 14; h = 18; }
     public override string Prompt() => "{interact} Strike the tuned bell";
-    int BasinLevel() => World.flags.S("choirLevelName") == "raised" ? 3 : World.flags.I("basin");
+    // each room's bells hang over its own basin; the shrine's own is the Choir's water, which the Tide Key can raise
+    int BasinLevel() => room.Id == "choir" && World.flags.S("choirLevelName") == "raised" ? 3 : World.flags.I(Valve.BasinKey(room));
     public override void Interact() => Ring();
     public void OnGaff() => Ring();
     void Ring()
     {
         int lvl = BasinLevel();
         Snd.Bell(new[] { 392, 330, 262, 196 }[lvl], 0.5f);
+        foreach (var pc in G.ents.OfType<Precentor>()) pc.HearBell(lvl);
         // Crystal walls in this room shatter at their own pitch.
         var pitches = room.Raw.P("crystals");
         bool broke = false;
@@ -372,9 +374,17 @@ public class TunedBell : Obj
 }
 public class Valve : Obj
 {
-    public Valve(Props spec, RoomDef room) : base(spec, room) { w = 10; h = 10; }
-    public override string Prompt() => "{interact} Turn the basin valve (level " + World.flags.I("basin") + ")";
-    public override void Interact() { World.flags.Set("basin", (World.flags.I("basin") + 1) % 3); Snd.Ui(); Snd.Splash(0.1f); }
+    // A valve with a wave-shaped lock takes the Tide Key, and with it the basin fills right to the brim.
+    readonly bool keyed;
+    public Valve(Props spec, RoomDef room) : base(spec, room) { w = 10; h = 10; keyed = spec.B("needsKey"); }
+    public static string BasinKey(RoomDef r) => r.Id == "choir" ? "basin" : "basin_" + r.Id;
+    public override string Prompt() => keyed && !G.player.Has("tidekey") ? "{interact} Examine the valve" : "{interact} Turn the basin valve (level " + World.flags.I(BasinKey(room)) + ")";
+    public override void Interact()
+    {
+        if (keyed && !G.player.Has("tidekey")) { UI.Say(null, "A basin valve with a lock shaped like a wave. It will not turn by hand."); return; }
+        string k = BasinKey(room);
+        World.flags.Set(k, (World.flags.I(k) + 1) % (keyed ? 4 : 3)); Snd.Ui(); Snd.Splash(0.1f);
+    }
     public override void Draw(Canvas c)
     {
         c.StrokeStyle = "#8a6a3a"; c.LineWidth = 1.5f; c.BeginPath(); c.Arc(Cx(), Cy(), 4, 0, H.PI * 2); c.StrokePath();
