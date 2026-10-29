@@ -1190,8 +1190,8 @@ public class Kiln : Ent
 // ---------------------------------------------------------------- The Shoal
 public class Shoal : Body
 {
-    float rot;
-    bool started;
+    float rot, leapT = 3;
+    public bool started;
     public Shoal(Props spec, RoomDef room) : base(spec, room)
     {
         type = "shoal"; boss = true;
@@ -1235,6 +1235,16 @@ public class Shoal : Body
         float dx = p.Cx() - Cx();
         int s = (int)H.Sign(dx); facing = s != 0 ? s : 1;
         float sp = 55 + knots.Count(k => k.broken) * 6;
+        // every few seconds it gathers itself and throws its whole weight at her, sooner as it comes apart
+        leapT -= dt;
+        if (leapT <= 0 && onGround && MathF.Abs(dx) < 9 * H.TILE)
+        {
+            leapT = 3.4f - knots.Count(k => k.broken) * 0.2f;
+            vy = -330; vx = facing * 210;
+            Snd.Scream(); FX.Salt(Cx(), Feet(), 10);
+            return;
+        }
+        if (!onGround) { rot += vx * dt / 17; if (H.RectsOverlap(x, y, w, h, p.x, p.y, p.w, p.h) && !p.Invuln()) { p.Hurt(2, this); p.vx = facing * 220; p.vy = -160; } return; }
         vx = H.Approach(vx, facing * sp, 120 * dt);
         rot += vx * dt / 17;
         if (hitWall != 0 && onGround) vy = -200;

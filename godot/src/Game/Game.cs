@@ -634,7 +634,7 @@ public static class G
         bossBar = null;
         player.bag.Add("ivory", 2);
         Snd.Rumble();
-        H.ToastMsg("The Shoal comes apart. 2 Mere-ivory. The way on to the lamp is open.", 6);
+        H.ToastMsg("The Shoal comes apart in the Brainpan. 2 Mere-ivory. The bone shutter onto the lamp lifts.", 6);
     }
     public static void Collect(Props spec)
     {

@@ -690,7 +690,7 @@ public static class Scenarios
         ["shoal"] = async t =>
         {
             G.god = true; G.act = 3; World.flags.Set("skullOpen", true);
-            t.Place("skullstair", 5, 16);
+            t.Place("brainpan", 5, 16);
             var s = First<Shoal>();
             t.Ok("the Shoal is here in Act III", s != null);
             if (s == null) return;
@@ -1328,6 +1328,95 @@ public static class Scenarios
             t.Place("lair", 6, 15); await t.Run(0.3f);
             t.Ok("the short way back is open, and it stays dead", G.room?.Id == "lair" && First<Undertow>(e => e.boss) == null);
             t.Snap("g5_lair_open");
+        },
+
+        // Phase 6: the Lantern Skull at full size. East through the Sinus and the Keeper's Watch, across the Crown to
+        // the Shoal in the Brainpan, whose death lifts the shutter onto the Lamp; the eyes, the Jaw and the Temple's prisms.
+        ["skull6"] = async t =>
+        {
+            G.god = true;
+            var p = G.player; var f = World.flags;
+            foreach (var fl in new[] { "seawallOpen", "abbotDead", "almonerDead", "priorWedged", "precentorDead", "motherDead", "liftDropped", "undertowDead", "skullOpen" }) f.Set(fl, true);
+            foreach (var a in new[] { "boots", "jet", "tidekey", "seal" }) p.abilities.Add(a);
+            G.act = 3; G.quests.Set("anselMet", true); G.quests.Set("hesperMet", true);
+            foreach (var id in new[] { "pier", "saltgate", "kilns", "cloister", "refectory", "choir", "organloft", "ribbell", "spine", "gulletmouth", "skullstair" }) World.State(id).visited = true;
+            var bp = Data.Room["brainpan"]; var lamp = Data.Room["lamp"];
+            t.Ok("the Lamp is beyond the Brainpan now", lamp.Col == bp.Col + 2 && lamp.Row == 0, $"{lamp.Col},{lamp.Row}");
+            t.Ok("and the bone shutter onto it is down", World.Solid(bp.Ox + 79, bp.Oy + 15) == 1);
+
+            string[] fresh = { "sinus", "keeperswatch", "crown", "brainpan", "agathesroom", "lefteye", "nasal", "righteye", "temple", "earbone", "jaw" };
+            int entered = 0;
+            foreach (var id in fresh)
+            {
+                var r = Data.Room[id];
+                (int x, int y) spot = (-1, -1);
+                for (int ty = r.Th - 2; ty > 1 && spot.x < 0; ty--)
+                    for (int tx = 2; tx < r.Tw - 2 && spot.x < 0; tx++)
+                        if (World.Solid(r.Ox + tx, r.Oy + ty) == 0 && World.Solid(r.Ox + tx, r.Oy + ty - 1) == 0 && World.Solid(r.Ox + tx, r.Oy + ty + 1) == 1 && World.CharAt(r.Ox + tx, r.Oy + ty) != 'x') spot = (tx, ty);
+                if (spot.x < 0) { t.Ok("somewhere to stand in " + id, false); continue; }
+                t.Place(id, spot.x, spot.y); await t.Run(0.35f);
+                if (G.room?.Id == id) entered++;
+                t.Snap("s6_" + id);
+            }
+            t.Ok("every Skull room can be entered", entered == fresh.Length, $"{entered} of {fresh.Length}");
+            t.Ok("the guide sends her across the Crown to the Shoal", Guide.Current?.id == "shoal", Guide.Current?.id);
+
+            // the Skull's Bell Rooms, and the cable between them
+            G.bellsLit.Add("bell_agathe");
+            t.Place("keeperswatch", 10, 16); p.bag.Add("oil", 2);
+            foreach (var b in G.ents.OfType<Body>()) b.gone = true;
+            await t.Tap("interact"); await t.Run(0.2f);
+            t.Ok("the Keeper's Watch is a Bell Room, with a cable to Agathe's", G.room.BellRoom && UI.Inst.AllText().Contains("Ride the bell-cable to"), UI.Kind);
+            t.Snap("s6_watch_bell");
+            UI.Close(); await t.Run(0.1f);
+
+            // the Temple's prisms
+            p.oil = 90;
+            t.Place("temple", 30, 16); await t.Run(0.2f);
+            foreach (var b in G.ents.OfType<Body>()) b.gone = true;
+            async Task<int> Turn(string id, int times)
+            {
+                var pr = First<Prism>(e => e.spec.S("id") == id);
+                t.Place("temple", pr.spec.I("tx"), pr.spec.I("ty"));
+                for (int i = 0; i < times; i++) await t.Tap("interact");
+                return First<Prism>(e => e.spec.S("id") == id).dir;
+            }
+            int a1 = await Turn("templeA", 3), b1 = await Turn("templeB", 1);
+            t.Ok("the Temple's prisms turn", a1 == 3 && b1 == 2, $"{a1},{b1}");
+            t.Place("temple", 10, 16);
+            var ta = First<Prism>(e => e.spec.S("id") == "templeA").Center();
+            t.AimAt(ta.X, ta.Y);
+            t.Down("focus"); await t.Run(3.5f); t.Release("focus");
+            var tr = Data.Room["temple"];
+            t.Ok("the beam, bent up and back, wakes the crystal", First<Crystal>()?.done == true);
+            t.Ok("and the salt on the keepers' strongbox cracks", World.CharAt(tr.Ox + 32, tr.Oy + 6) != 'S');
+            t.Snap("s6_temple");
+
+            // the Shoal
+            t.Place("brainpan", 6, 16); await t.Run(0.2f);
+            var s = First<Shoal>();
+            t.Ok("the Shoal turns in the Brainpan", s != null);
+            if (s == null) return;
+            foreach (var b in G.ents.OfType<Body>()) if (b != s) b.gone = true;
+            p.x = s.Cx() - 6 * 16; p.y = s.Feet() - p.h; p.vx = p.vy = 0;
+            bool leapt = false;
+            for (int i = 0; i < 60 && !leapt; i++) { await t.Run(0.1f); leapt = s.started && s.vy < -200; }
+            t.Ok("it wakes, and throws itself at her", leapt && G.bossBar == s);
+            t.Snap("s6_shoal");
+            int ivory0 = p.bag.Count("ivory");
+            foreach (var k in s.knots.ToList()) s.DamageKnot(k, 99, "rivet");
+            await t.Run(0.3f);
+            t.Ok("it comes apart: 2 Mere-ivory", f.B("shoalDead") && p.bag.Count("ivory") == ivory0 + 2 && G.bossBar == null);
+            t.Ok("and the shutter onto the Lamp lifts", World.Solid(bp.Ox + 79, bp.Oy + 15) == 0);
+            t.Ok("the guide sends her to the lamp", Guide.Current?.id == "agathe", Guide.Current?.id);
+            foreach (var b in G.ents.OfType<Body>()) b.gone = true;
+            t.Place("brainpan", 74, 16); await t.Run(0.2f);
+            p.vx = 0; t.Down("right"); await t.Run(1.2f); t.Release("right");
+            t.Ok("she walks through into the Lamp", G.room?.Id == "lamp", G.room?.Id);
+            t.Snap("s6_lamp");
+            t.Place("lamp", 36, 16); await t.Run(0.1f);
+            t.Down("right"); await t.Run(1.0f); t.Release("right");
+            t.Ok("and on into Agathe's Room", G.room?.Id == "agathesroom", G.room?.Id);
         },
 
         ["ribvault4"] = async t =>

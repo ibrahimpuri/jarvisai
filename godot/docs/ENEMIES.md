@@ -57,6 +57,9 @@ And the end mixes every tier: the Skull Stair has Wicks, a Toller and a Kilnman,
 beside its Deepwalker and Diver. In the Gullet at full size, Bloaters lie in the Long Throat and the Up-Current,
 Deepwalkers walk the Stomach, the Deep and the Whale Fall, Divers hunt the Throat Gate, the Pylorus and the wreck, Gullet
 Pairs hang in the Pylorus and the Brine Galleries, and a Toller keeps the Buoy Chapel.
+In the Lantern Skull every tier is out: Wicks, an Ossuary and a lying Shucker in the Sinus, Kites, Saltgulls and a
+Grafted on the Crown, a Cantor in the Left Eye, a Netter on the Nasal Bridge, a Toller in the Right Eye, a Bellmouth and
+a Kilnman in the Ear-Bone, and in the Jaw a Grafted, a Wick, a Netter and a Kilnman.
 
 ## The journal's bestiary
 

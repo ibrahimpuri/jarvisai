@@ -342,6 +342,11 @@ The full island is now being built from it, one region at a time, with a playabl
 - breath is the clock: air vents in the rock, and two domes of trapped air, **the Drowned Bell** and **the Last Air**, the Gullet's Bell Rooms
 - the lair's front onto the Gullet Mouth stays shut until **the Undertow** dies
 
+**Phase 6 is built:** the Lantern Skull at full size, and the island is whole: 145 rooms.
+- 11 new rooms in the Saint's skull: the Sinus, the Crown in the wind, the eyes, the Nasal Bridge, the Jaw, the Temple's prisms and the Ear-Bone
+- **the Shoal** turns in the Brainpan now and throws itself at you; its death lifts the bone shutter onto the Lamp, which moved to the far end of the Skull
+- **the Keeper's Watch** and **Agathe's Room**, the Skull's Bell Rooms
+
 Still smaller than the document: art and audio are procedural (stick-skeleton puppets, tile shading and synthesised sound).
 
 ## Development tools

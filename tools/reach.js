@@ -274,7 +274,11 @@ const stages = [
   { name: 'GATE: no Tide Key means no Ribvault', abil: ['swing', 'boots', 'jet'], flags: { seawallOpen: true, basinFilling: true, basinCrossed: true, priorWedged: true, almonerDead: true, precentorDead: true }, pool: true, crystals: ['baptistery', 'bonechoir'], breakC: true, mustNot: ['bell_rib@ribbell', 'seal@prisms'] },
   { name: 'GATE: no Seal means no Gullet', abil: ['swing', 'boots', 'jet', 'tidekey'], flags: { seawallOpen: true, basinFilling: true, basinCrossed: true, priorWedged: true, almonerDead: true, precentorDead: true, motherDead: true, liftDropped: true }, pool: true, crystals: ['baptistery', 'bonechoir'], choir: 3, breakC: true, lift: true, mustNot: ['page_lair@lair'] },
   { name: 'GATE: Skull closed', abil: ['swing', 'boots', 'jet', 'tidekey', 'seal'], flags: { seawallOpen: true, basinFilling: true, basinCrossed: true, priorWedged: true, almonerDead: true, precentorDead: true, motherDead: true, liftDropped: true }, pool: true, crystals: ['baptistery', 'bonechoir'], choir: 3, breakC: true, breakS: true, lift: true, mustNot: ['agathe@lamp'] },
-  { name: 'Skull open', abil: ['swing', 'boots', 'jet', 'tidekey', 'seal'], flags: { seawallOpen: true, basinFilling: true, basinCrossed: true, priorWedged: true, almonerDead: true, precentorDead: true, motherDead: true, liftDropped: true, skullOpen: true, undertowDead: true }, pool: true, crystals: ['baptistery', 'bonechoir'], choir: 3, breakC: true, breakS: true, lift: true, need: ['shoal@skullstair', 'agathe@lamp', 'lampwork@lamp', 'beacon@lamp', 'hymnbell@lamp'] },
+  { name: 'Skull open: the Skull up to the Shoal', abil: ['swing', 'boots', 'jet', 'tidekey', 'seal'], flags: { seawallOpen: true, basinFilling: true, basinCrossed: true, priorWedged: true, almonerDead: true, precentorDead: true, motherDead: true, liftDropped: true, skullOpen: true, undertowDead: true }, pool: true, crystals: ['baptistery', 'bonechoir'], choir: 3, breakC: true, breakS: true, lift: true,
+    need: ['shoal@brainpan', 'ch_sinus@sinus', 'bell_watch@keeperswatch', 'ch_watch@keeperswatch', 'ch_crown@crown', 'ch_lefteye@lefteye', 'ch_nasal@nasal', 'ch_righteye@righteye', 'templeA@temple', 'templeB@temple', 'ch_temple@temple', 'ch_earbone@earbone', 'ch_jaw@jaw', 'ch_tongue@jaw'],
+    mustNot: ['agathe@lamp', 'bell_agathe@agathesroom'] },
+  { name: 'The Shoal dead: the Lamp', abil: ['swing', 'boots', 'jet', 'tidekey', 'seal'], flags: { seawallOpen: true, basinFilling: true, basinCrossed: true, priorWedged: true, almonerDead: true, precentorDead: true, motherDead: true, liftDropped: true, skullOpen: true, undertowDead: true, shoalDead: true }, pool: true, crystals: ['baptistery', 'bonechoir'], choir: 3, breakC: true, breakS: true, lift: true,
+    need: ['agathe@lamp', 'lampwork@lamp', 'beacon@lamp', 'hymnbell@lamp', 'bell_agathe@agathesroom', 'ch_agathe@agathesroom'] },
 ];
 
 // A tuned bell rung at its crystal's pitch shatters it.
@@ -348,7 +352,7 @@ if (!dump) {
   for (const r of H.ROOMS) for (let y = 0; y < r.th; y++) for (let x = 0; x < r.tw; x++) if (W.charAt(r.ox + x, r.oy + y) === 'S') W.setChar(r.ox + x, r.oy + y, ' ');
   breakPlug();
   for (const r of H.ROOMS) if (r.crystals) breakCrystals(r.id);
-  const allSeen = analyse(['swing', 'boots', 'jet', 'tidekey', 'seal', 'lens'], { seawallOpen: true, basinFilling: true, basinCrossed: true, priorWedged: true, liftDropped: true, skullOpen: true, almonerDead: true, precentorDead: true, motherDead: true, undertowDead: true });
+  const allSeen = analyse(['swing', 'boots', 'jet', 'tidekey', 'seal', 'lens'], { seawallOpen: true, basinFilling: true, basinCrossed: true, priorWedged: true, liftDropped: true, skullOpen: true, almonerDead: true, precentorDead: true, motherDead: true, undertowDead: true, shoalDead: true });
   const unreached = [];
   for (const r of H.ROOMS) for (const c of H.Narr.carvingSpecs(r, new Set())) if (!near(allSeen, { x: r.ox + c.tx, y: r.oy + c.ty }, 1)) unreached.push(r.id + ' ' + c.tx + ',' + c.ty);
   console.log((unreached.length ? 'FAIL' : 'ok  ') + ' carvings reachable: ' + (unreached.length ? unreached.join('; ') : 'all ' + Object.keys(H.LORE.carvings).length));
@@ -372,7 +376,12 @@ if (!dump) {
     W.state('saltgate').pool = { basin: 7 }; breakCrystals('baptistery'); breakCrystals('bonechoir'); W.state('choir').choirLevel = 21;
     const c = H.ROOM.choir; for (let y = 0; y < 23; y++) if (W.charAt(c.ox + 4, c.oy + y) === 'C') W.setChar(c.ox + 4, c.oy + y, ' ');
   }) ? 1 : 0;
-  fails += trapCheck('traps, all tools', ['swing', 'boots', 'jet', 'tidekey', 'seal', 'lens'], { seawallOpen: true, basinFilling: true, basinCrossed: true, priorWedged: true, liftDropped: true, skullOpen: true, almonerDead: true, precentorDead: true, motherDead: true, undertowDead: true }, () => {
+  fails += trapCheck('traps, the Skull before the Shoal', ['swing', 'boots', 'jet', 'tidekey', 'seal'], { seawallOpen: true, basinFilling: true, basinCrossed: true, priorWedged: true, liftDropped: true, skullOpen: true, almonerDead: true, precentorDead: true, motherDead: true, undertowDead: true }, () => {
+    W.state('saltgate').pool = { basin: 7 }; breakCrystals('baptistery'); breakCrystals('bonechoir'); W.state('choir').choirLevel = 3;
+    const r = H.ROOM.priors; for (let y = 17; y < 23; y++) W.setChar(r.ox + 21, r.oy + y, 'H');
+    const c = H.ROOM.choir; for (let y = 0; y < 23; y++) for (const x of [4, 32]) if (W.charAt(c.ox + x, c.oy + y) === 'C') W.setChar(c.ox + x, c.oy + y, ' ');
+  }) ? 1 : 0;
+  fails += trapCheck('traps, all tools', ['swing', 'boots', 'jet', 'tidekey', 'seal', 'lens'], { seawallOpen: true, basinFilling: true, basinCrossed: true, priorWedged: true, liftDropped: true, skullOpen: true, almonerDead: true, precentorDead: true, motherDead: true, undertowDead: true, shoalDead: true }, () => {
     W.state('saltgate').pool = { basin: 7 }; breakCrystals('baptistery'); breakCrystals('bonechoir'); W.state('choir').choirLevel = 3;
     const r = H.ROOM.priors; for (let y = 17; y < 23; y++) W.setChar(r.ox + 21, r.oy + y, 'H');
     const c = H.ROOM.choir; for (let y = 0; y < 23; y++) for (const x of [4, 32]) if (W.charAt(c.ox + x, c.oy + y) === 'C') W.setChar(c.ox + x, c.oy + y, ' ');

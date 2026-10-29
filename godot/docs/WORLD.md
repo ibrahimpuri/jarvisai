@@ -30,7 +30,7 @@ the Skull reach their full-island cells in later phases:
 | Sunken Choir | choir, choirbell | row 3, cols 0–1 | row 6, cols 3–4 |
 | Ribvault | ribshaft, ribbell, prisms | rows 1–2, cols 1–3 | rows 3–5, cols 6–8 |
 | Gullet | lair | row 5, cols 3–4 | stayed at row 10, cols 15–16, east of the Gullet Mouth |
-| Lantern Skull | skullstair, lamp | row 0, cols 2–3 | row 0, cols 22–23 |
+| Lantern Skull | skullstair, lamp | row 0, cols 2–3 | row 0: the stair at col 20, the Lamp at col 29 |
 
 ```
       0         1         2         3         4
@@ -103,7 +103,9 @@ Six fixed bosses, all built from the same knot rules at a bigger scale, plus the
 5. **The Undertow** (the Gullet, its lair). The island's stalker, killable only here. The lair's front, onto the
    Gullet Mouth, is the Saint's epiglottis (a new tile, `N`), shut until it dies: Maren comes round the long way and
    into the lair from behind, out of the Buoy Chapel, and the Undertow waits at the far end, facing her.
-6. **The Shoal** (Lantern Skull, Act III). Five bodies fused into one rolling mass with eight knots.
+6. **The Shoal** (Lantern Skull, the Brainpan, Act III). Five bodies fused into one rolling mass with eight knots; every
+   few seconds it gathers itself and throws its whole weight at her, more often as it comes apart, and each broken knot
+   sheds a crawling body. Its death lifts the bone shutter onto the Lamp (a new tile, `O`).
 
 Conditional fights stay as they are: **Teodor** (Act III, if he was captured) and **Hesper** (if the Choir was drained).
 
@@ -133,7 +135,7 @@ See [ENEMIES.md](ENEMIES.md).
 | Sunken Choir | Choir Bell Room; the Cantor's Vestry |
 | Ribvault | Ribvault Bell Room; the Sternum Bell |
 | The Gullet | the Drowned Bell; the Last Air |
-| Lantern Skull | the Keeper's Watch; the Lamp Room (Agathe's) |
+| Lantern Skull | the Keeper's Watch; Agathe's Room, beyond the Lamp |
 
 **Bell-cable lifts** (from Act II): each lit Bell Room can ride its cable to the other lit Bell Room in its region.
 
@@ -160,7 +162,7 @@ The counts stay as the document gives them, spread so that thorough exploration 
 | 3 | Sunken Choir | 104 in all (18 new) | **built** |
 | 4 | Ribvault | 120 in all (16 new) | **built** |
 | 5 | The Gullet | 134 in all (14 new) | **built** |
-| 6 | Lantern Skull | | next |
+| 6 | Lantern Skull | 145 in all (11 new) | **built**: the island is whole |
 
 ### What the engine does for a large island
 
@@ -241,6 +243,13 @@ The counts stay as the document gives them, spread so that thorough exploration 
   - the Drowned Bell and the Last Air are domes of air over the water, each with a bell
   - the guide sends her round to the lair; the Undertow waits at the far end; its death opens the Skull and the
     lair's front, and it stays dead
+
+### Phase 6 tests
+
+- `node tools/reach.js`: the Skull's rooms, chests and prisms before the Shoal, and the Lamp and Agathe's Room only after
+- `--test skull6`: every new room can be entered; the Keeper's Watch is a Bell Room with a cable to Agathe's Room; the
+  Temple's prisms bend the beam up and back to its crystal, which cracks the salt on the keepers' strongbox; the Shoal
+  wakes and throws itself at her, and its death lifts the shutter: she walks into the Lamp and on into Agathe's Room
 
 ## Phase 1: the Wrackline and the Saltworks
 
@@ -435,6 +444,33 @@ Gullet Mouth, and the Skull's hatch.
 | **The Swallowed Wreck** | 14–15,11 | an older *Constance* (up from the Pylorus) |
 | **The Teeth** | 16,11 | crystal teeth, always open |
 | **The Whale Fall** | 17–18,11 | a whale's bones, inside a dead god; back onto the Up-Current |
+
+## Phase 6: the Lantern Skull (11 rooms)
+
+The Saint's skull, on top of everything, made into a lighthouse. The Lamp moved east from beside the Skull Stair to
+the far end of the Skull (row 0, col 29), behind the Brainpan, where the Shoal turns; Agathe's Room, the Skull's second
+Bell Room, is beyond it.
+
+The way through: up the hatch from the Skull Gate into the Skull Stair; east through the Sinus and the Keeper's Watch
+(the first Bell Room) and out onto the Crown, the top of the Skull in the wind, its breaks swung from iron rings; east
+into the Brainpan and the Shoal. Its death lifts the bone shutter onto the Lamp. Under the Crown, a loop: down a ladder
+from the Sinus into the Left Eye, east over the Nasal Bridge (the Jaw below it) to the Right Eye, which climbs back
+up onto the Crown, and east from it the Temple's prisms and the Ear-Bone.
+
+| Room | Cell | Role |
+| --- | --- | --- |
+| The Skull Stair, the Lamp | 20,0 and 29,0 | the stair as before, without the Shoal; the Lamp moved to the far end, open east |
+| **The Sinus** | 21–22,0 | the inside of its head; a ladder down to the Left Eye |
+| **The Keeper's Watch** | 23,0 | the Skull's first Bell Room |
+| **The Crown** | 24–26,0 | outdoors, in the wind; breaks in the bone, iron rings |
+| **The Brainpan** | 27–28,0 | the Shoal; its east door is the bone shutter (`O`) |
+| **Agathe's Room** | 30,0 | the second Bell Room, beyond the Lamp |
+| **The Left Eye** | 21–22,1 | a lens of salt glass onto the sea |
+| **The Nasal Bridge** | 23,1 | a ladder down into the Jaw |
+| **The Right Eye** | 24–25,1 | a ladder back up onto the Crown |
+| **The Temple** | 26,1 | two prisms and a crystal; the keepers' strongbox behind salt |
+| **The Ear-Bone** | 27–28,1 | a coil of bone, a box at its end |
+| **The Jaw** | 21–24,2 | the teeth, top and bottom |
 
 Later phases are planned in the same way when they are built: their region's rooms, the gap their clusters move
 across, their second Bell Room and their boss.
