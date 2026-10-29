@@ -211,6 +211,7 @@ public static class G
         if (t == "abbot") return f.B("abbotDead") ? null : new Abbot(spec, r);
         if (t == "almoner") return f.B("almonerDead") ? null : new Almoner(spec, r);
         if (t == "precentor") return f.B("precentorDead") ? null : new Precentor(spec, r);
+        if (t == "mother") return f.B("motherDead") ? null : new HangingMother(spec, r);
         if (t == "shoal") return act >= 3 && !f.B("shoalDead") ? new Shoal(spec, r) : null;
         if (t == "grafted") return act >= 3 ? new Grafted(spec, r) : null;
         // the last night's weapons: Agathe's Glass is left for Maren at the spring tide; the Ear is always there
@@ -608,12 +609,22 @@ public static class G
         H.ToastMsg("The Precentor's last note runs out of him, and the organ falls silent. 2 Mere-ivory. The doors east grind open.", 6);
         Narr.Think("precentorDead");
     }
+    public static void OnMotherKilled(Body b)
+    {
+        World.flags.Set("motherDead", true);
+        World.MarkDirty();
+        bossBar = null;
+        player.bag.Add("ivory", 2);
+        Snd.Rumble();
+        H.ToastMsg("The Hanging Mother goes still across the ribs. 2 Mere-ivory. Below and behind you, bone that had grown across the doors cracks and falls away.", 6);
+        Narr.Think("motherDead");
+    }
     public static void OnUndertowKilled()
     {
         World.flags.Set("undertowDead", true); World.flags.Set("skullOpen", true);
         undertow.dead = true; bossBar = null;
         player.bag.Add("ivory", 2);
-        H.ToastMsg("The Undertow dies in its lair. Far above, the skull door of the Ribvault Bell Room grinds open.", 6);
+        H.ToastMsg("The Undertow dies in its lair. Far above, at the top of the Ribvault, the hatch into the Skull grinds open.", 6);
     }
     public static void OnShoalKilled() { World.flags.Set("shoalDead", true); bossBar = null; H.ToastMsg("The Shoal comes apart. The lamp room is ahead.", 4); }
     public static void Collect(Props spec)

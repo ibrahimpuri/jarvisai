@@ -73,6 +73,7 @@ H.World = (() => {
       case 'Z': return flags.skullOpen ? 0 : 1;
       case 'Q': return flags.almonerDead ? 0 : 1;
       case 'J': return flags.precentorDead ? 0 : 1;
+      case 'U': return flags.motherDead ? 0 : 1;
       case 'Y': return flags.choirDrained ? 0 : 1;
       case 'y': return flags.choirDrained ? 2 : 0;
       case 'h': return (flags.basinFilling && !flags.basinCrossed) ? 1 : 0;

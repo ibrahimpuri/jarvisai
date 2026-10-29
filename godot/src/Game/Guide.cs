@@ -87,8 +87,14 @@ public static class Guide
         new() { id = "ribvault", act = "II", room = "ribbell", title = "Rise into the Ribvault",
             how = "Go back east along the galleries (the Choir-Master's Rooms, the Pipe Gallery, the Bellows, the Triforium) and drop from the Night Gallery into the Narthex. In the Sunken Choir, turn the Tide Key in the sluice and raise the water to the vault, then swim up into the Saint's ribs and on to the Ribvault Bell Room.",
             done = () => Visited("ribbell") || P.Has("seal") },
+        new() { id = "spine", act = "II", room = "spine", title = "Climb to the Spine",
+            how = "Up the ladder from the Ribvault Bell Room into the Breastbone, west through the West Ribs (swing across the gap on the ring) to the Lung, up the Rib Ladder, east along the Collarbone and up onto the Vertebrae, then east to the Spine. Mind the wind.",
+            done = () => Visited("spine") || F.B("motherDead") },
+        new() { id = "mother", act = "II", room = "spine", title = "Bring down the Hanging Mother",
+            how = "She hangs out of reach on six tendrils. Cut four and she falls onto the deck of ribs: break the knots along her spine while she is down, before she hauls herself back up on new tendrils. Two broken spine knots open the crown in her back. Every cut tendril drops one of her young.",
+            done = () => F.B("motherDead") },
         new() { id = "seal", act = "II", room = "prisms", what = "ability:seal", title = "Take the Pressure Seal",
-            how = "In the Lamp Prisms, east of the Ribvault Bell Room. Turn the salt prisms so a focused beam (hold focus) reaches the dead crystal in its niche, and the way to the Seal opens.",
+            how = "Down from the Spine: through the Sternum Bell (ring it), down its bell-rope well into the East Ribs, west through the Floating Ribs and down to the Lantern Lung, then west into the Lamp Prisms. Turn the salt prisms so a focused beam (hold focus) reaches the dead crystal in its niche, and the way to the Seal opens.",
             done = () => P.Has("seal") },
         // ---- Act III: the spring tide ----
         new() { id = "gullet", act = "III", room = "gulletmouth", title = "Dive the Gullet",
@@ -98,7 +104,7 @@ public static class Guide
             how = "Its lair is east of the Gullet Mouth, in the deep. Break the knots that hold it together.",
             done = () => F.B("undertowDead") },
         new() { id = "skull", act = "III", room = "skullstair", title = "Climb into the Lantern Skull",
-            how = "The hatch in the Ribvault Bell Room has opened. Climb its ladder into the Skull.",
+            how = "The hatch into the Skull has opened, at the Skull Gate on top of the Ribvault: ride the bell-cable to the Sternum Bell, go back into the Spine and out by its upper door, through the Atlas, and climb the ladder under the hatch.",
             done = () => Visited("skullstair") },
         new() { id = "shoal", act = "III", room = "skullstair", title = "Get past the Shoal",
             how = "Something made of many drowned guards the Skull Stair. Break it apart and go east to the lamp.",
@@ -119,7 +125,7 @@ public static class Guide
 
     // ---- the island's seams ------------------------------------------------------------------------------
     static Dictionary<string, Dictionary<string, List<(int tx, int ty)>>> seams;
-    static bool OpenTile(char ch) => World.Solidity(ch) != 1 || ch is 'L' or 'E' or 'K' or 'Z' or 'V' or 'Y' or 'h' or 'Q' or 'J';
+    static bool OpenTile(char ch) => World.Solidity(ch) != 1 || ch is 'L' or 'E' or 'K' or 'Z' or 'V' or 'Y' or 'h' or 'Q' or 'J' or 'U';
     static void BuildSeams()
     {
         seams = new();

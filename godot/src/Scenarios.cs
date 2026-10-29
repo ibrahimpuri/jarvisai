@@ -1248,6 +1248,101 @@ public static class Scenarios
             t.Ok("a jump clipping a ceiling corner slips past it", p.y < G.room.Py + 2 * 16 - 4, $"y {p.y - G.room.Py:0}");
         },
 
+        // The full island, phase 4: the Ribvault. Every new room can be entered; the Hanging Mother keeps the Ribvault's
+        // doors, comes down when four tendrils are cut, and dies by her spine; the Sternum Bell; the Skull on top.
+        ["ribvault4"] = async t =>
+        {
+            G.god = true;
+            var p = G.player; var f = World.flags;
+            foreach (var fl in new[] { "seawallOpen", "abbotDead", "almonerDead", "priorWedged", "precentorDead" }) f.Set(fl, true);
+            foreach (var a in new[] { "boots", "jet", "tidekey" }) p.abilities.Add(a);
+            G.act = 2; G.quests.Set("anselMet", true); G.quests.Set("hesperMet", true);
+            foreach (var id in new[] { "pier", "saltgate", "kilns", "cloister", "refectory", "choir", "narthex", "organloft", "ribbell" }) World.State(id).visited = true;
+            t.Ok("the guide sends her up to the Spine", Guide.Current?.id == "spine", Guide.Current?.id);
+            var rb = Data.Room["ribbell"];
+            t.Ok("the Bell Room's door to the prisms is grown shut", World.Solid(rb.Ox + 39, rb.Oy + 15) == 1);
+
+            string[] fresh = { "breastbone", "westribs", "lung", "marrow", "ribladder", "collarbone", "vertebrae", "spine", "atlas", "skullgate", "sternumbell", "eastribs", "floating",
+                "breastplate", "lanternlung", "heartroot" };
+            int entered = 0;
+            foreach (var id in fresh)
+            {
+                var r = Data.Room[id];
+                (int x, int y) spot = (-1, -1);
+                for (int ty = Math.Min(r.Th - 2, 66); ty > 1 && spot.x < 0; ty--)
+                    for (int tx = 2; tx < r.Tw - 2 && spot.x < 0; tx++)
+                        if (World.Solid(r.Ox + tx, r.Oy + ty) == 0 && World.Solid(r.Ox + tx, r.Oy + ty - 1) == 0 && World.Solid(r.Ox + tx, r.Oy + ty + 1) == 1 && !World.IsWater(r.Px + tx * 16 + 8, r.Py + ty * 16 + 8)) spot = (tx, ty);
+                if (spot.x < 0) { t.Ok("somewhere to stand in " + id, false); continue; }
+                t.Place(id, spot.x, spot.y); await t.Run(0.35f);
+                if (G.room?.Id == id) entered++;
+                t.Snap("rv4_" + id);
+            }
+            t.Ok("every Ribvault room can be entered", entered == fresh.Length, $"{entered} of {fresh.Length}");
+            t.Ok("once she has seen the Spine, the guide names the Hanging Mother", Guide.Current?.id == "mother", Guide.Current?.id);
+
+            // the Hanging Mother
+            var spn = Data.Room["spine"];
+            t.Place("spine", 8, 16); await t.Run(0.3f);
+            foreach (var b in G.ents.OfType<Body>()) if (b is not HangingMother) b.gone = true;
+            var hm = First<HangingMother>();
+            t.Ok("the Hanging Mother hangs in the vertebrae", hm != null && hm.mode == "dormant", hm?.mode);
+            if (hm == null) return;
+            t.Ok("and the Spine's ways on are grown shut", World.Solid(spn.Ox + 79, spn.Oy + 15) == 1 && World.Solid(spn.Ox + 79, spn.Oy + 38) == 1);
+            t.Place("spine", 30, 39); await t.Run(0.4f);
+            t.Ok("she stirs as she comes down onto the deck", hm.started && G.bossBar == hm, hm.mode);
+            t.Snap("rv4_mother");
+            bool dripped = false;
+            for (int i = 0; i < 40 && !dripped; i++) { await t.Run(0.1f); dripped = G.enemyShots.Any(s => s.kind == "brine"); }
+            t.Ok("she drips brine on whoever is below", dripped);
+            hm.DamageKnot(hm.K("spine1"), 99, "rivet");
+            t.Ok("her spine is out of reach while she hangs", !hm.K("spine1").broken);
+            int young0 = G.ents.OfType<Gullet>().Count(g => !g.gone);
+            hm.DamageKnot(hm.K("t0"), 99, "rivet"); await t.Run(0.2f);
+            t.Ok("every cut tendril drops one of her young", G.ents.OfType<Gullet>().Count(g => !g.gone) == young0 + 1);
+            foreach (var g in G.ents.OfType<Gullet>()) g.gone = true;
+            foreach (var id in new[] { "t1", "t2", "t3" }) hm.DamageKnot(hm.K(id), 99, "rivet");
+            foreach (var g in G.ents.OfType<Gullet>()) g.gone = true;
+            t.Ok("with two tendrils left she falls", hm.mode == "fall" && hm.TendrilsLeft == 2, hm.mode);
+            for (int i = 0; i < 30 && hm.mode == "fall"; i++) await t.Run(0.1f);
+            t.Ok("onto the deck of ribs", hm.mode is "ground" or "snap" or "recover" && hm.Feet() <= spn.Py + 40 * 16 + 1, $"{hm.mode} {(hm.Feet() - spn.Py) / 16:0.0}");
+            t.Snap("rv4_down");
+            hm.DamageKnot(hm.K("spine1"), 99, "rivet"); hm.DamageKnot(hm.K("spine2"), 99, "rivet");
+            t.Ok("down on the ribs her spine breaks", hm.K("spine1").broken && hm.K("spine2").broken);
+            t.Ok("and two spine knots open her crown", !hm.IsSealed(hm.K("crown")));
+            for (int i = 0; i < 140 && hm.mode != "hang"; i++) await t.Run(0.1f);
+            t.Ok("she hauls herself back up on new tendrils", hm.mode == "hang" && hm.TendrilsLeft == 5, $"{hm.mode} {hm.TendrilsLeft}");
+            int ivory0 = p.bag.Count("ivory");
+            hm.DamageKnot(hm.K("crown"), 99, "rivet"); await t.Run(0.5f);
+            t.Ok("the crown breaks, and she goes still", hm.gone && f.B("motherDead") && G.bossBar == null);
+            t.Ok("she leaves 2 Mere-ivory", p.bag.Count("ivory") == ivory0 + 2);
+            t.Ok("and the bone across the doors falls away", World.Solid(spn.Ox + 79, spn.Oy + 15) == 0 && World.Solid(spn.Ox + 79, spn.Oy + 38) == 0 && World.Solid(rb.Ox + 39, rb.Oy + 15) == 0);
+            t.Ok("the guide sends her down to the Pressure Seal", Guide.Current?.id == "seal", Guide.Current?.id);
+            t.Place("atlas", 20, 16); await t.Run(0.2f);
+            t.Place("spine", 30, 39); await t.Run(0.3f);
+            t.Ok("and she stays dead", First<HangingMother>() == null);
+
+            // the Sternum Bell, and its cable down to the Ribvault Bell Room
+            G.bellsLit.Add("bell_rib");
+            t.Place("sternumbell", 10, 16); p.bag.Add("oil", 2);
+            await t.Tap("interact"); await t.Run(0.2f);
+            t.Ok("the Sternum Bell is a Bell Room, with a cable to the Ribvault's", G.room.BellRoom && UI.Inst.AllText().Contains("Ride the bell-cable to Ribvault"), UI.Kind);
+            t.Snap("rv4_sternumbell");
+            await t.ClickButton("Ride the bell-cable"); await t.Run(0.5f);
+            t.Ok("which carries her there", G.room?.Id == "ribbell", G.room?.Id);
+            if (UI.IsOpen()) UI.Close();
+
+            // the Lantern Lung opens onto the prisms
+            t.Place("lanternlung", 3, 16); await t.Hold("left", 0.8f);
+            t.Ok("the Lantern Lung opens west onto the Lamp Prisms", G.room?.Id == "prisms", G.room?.Id);
+
+            // the Skull sits on the Ribvault now, over the Skull Gate's hatch
+            var sk = Data.Room["skullstair"]; var sg = Data.Room["skullgate"];
+            t.Ok("the Skull sits on top of the Ribvault", sk.Row == 0 && sk.Col == sg.Col + 1);
+            t.Ok("its hatch is barred until the spring tide", World.Solid(sg.Ox + 59, sg.Oy + 1) == 1);
+            f.Set("skullOpen", true); World.MarkDirty();
+            t.Ok("and opens when the Skull does", World.Solid(sg.Ox + 59, sg.Oy + 1) == 0 && World.IsLadder(sg.Ox + 59, sg.Oy + 1));
+        },
+
         // The full island, phase 3: the Sunken Choir. Every new room can be entered; the Baptistery's bell teaches the
         // tuned bells; the Precentor screams from the organ and is broken by the jaw and the bell; the Tide Key, its
         // keyed valves, the galleries' drop back to the Narthex and the Vestry's bell-cable.
@@ -2236,7 +2331,7 @@ public static class Scenarios
         {
             await t.Run(0.05f);
             var gaps = new List<string>(); var ladders = new List<string>(); var buried = new List<string>();
-            static bool Open(char ch) => World.Solidity(ch) != 1 || ch is 'L' or 'E' or 'K' or 'Z' or 'V' or 'Y' or 'h' or 'Q' or 'J';
+            static bool Open(char ch) => World.Solidity(ch) != 1 || ch is 'L' or 'E' or 'K' or 'Z' or 'V' or 'Y' or 'h' or 'Q' or 'J' or 'U';
             foreach (var r in Data.Rooms)
             {
                 for (int ty = 0; ty < r.Th; ty++)

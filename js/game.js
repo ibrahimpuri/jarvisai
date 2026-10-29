@@ -255,6 +255,10 @@ H.Game = (() => {
       H.toast('The buoy bell tolls in the dark water. The Undertow is home.', 4);
     }
     // The Almoner is fought only in the Godot build; here the Refectory's chains fall away when she comes in.
+    if (room.id === 'spine' && !f.motherDead) {
+      f.motherDead = true;
+      H.toast('Cut tendrils hang from the vertebrae. Whatever hung here is gone.', 4);
+    }
     if (room.id === 'organloft' && !f.precentorDead) {
       f.precentorDead = true;
       H.toast('The organ is silent. Whatever screamed in it has stopped.', 4);

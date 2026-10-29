@@ -897,6 +897,247 @@ public class Precentor : Body
     public override Props Serialize() => null;
 }
 
+// ---------------------------------------------------------------- The Hanging Mother
+// A Gullet the size of a chapel, hanging from the vertebrae of the Spine on six tendrils, in a hall the wind blows
+// through. While she hangs she is out of reach: she drips brine on whoever is below, and lashes at anyone who climbs
+// close. Every cut tendril lets one of her young fall. Cut four and the last two cannot hold her: she comes down onto
+// the deck of ribs, and there, for a while, the knots along her spine can be broken, until she hauls herself back up
+// on new tendrils. The crown in the middle of her back opens when two of her spine knots are broken.
+public class HangingMother : Body
+{
+    public bool started;
+    readonly float ax, ay;
+    public const int TENDRILS = 6;
+    const float LEN = 96;
+    float groundT, dripCool = 2, lashCool = 3, lashT, climbT, fromY;
+    int young;
+    public HangingMother(Props spec, RoomDef room) : base(spec, room)
+    {
+        type = "mother"; boss = true; voice = "gullet";
+        ax = spec.F("x"); ay = room.Py + 6 * H.TILE;
+        for (int i = 0; i < TENDRILS; i++) AddKnot("t" + i, "tendril", "t" + i, 3, 6);
+        AddKnot("spine1", "spine", "s1", 6, 8);
+        AddKnot("spine2", "spine", "s3", 6, 8);
+        AddKnot("spine3", "spine", "s4", 6, 8);
+        AddKnot("crown", "crown", "s2", 10, 9);
+        mode = "dormant"; stepUp = false;
+        Hang();
+    }
+    void Hang() { w = 30; h = LEN; x = ax - w / 2; y = HangTop(); vx = vy = 0; }
+    float HangTop() => ay + 10 * H.TILE;
+    public int TendrilsLeft => knots.Count(k => k.type == "tendril" && !k.broken);
+    bool Down => mode is "fall" or "ground" or "snap" or "recover";
+    public override void SetPose(string p) { }
+    public override bool Perceives() { var p = G.player; return started && p != null && !p.dead && G.room == room; }
+    public override void Hear(float hx, float hy, float d, float r, string src) { if (mode == "dormant" && d < r) Start(); }
+    public override void Wake(bool force = false) { if (mode == "dormant") Start(); }
+    public void Start()
+    {
+        if (started) return;
+        started = true; mode = "hang";
+        G.bossBar = this;
+        Snd.Groan(0, 0.6f); Snd.Rumble(); G.Shake(3);
+        H.ToastMsg("Something the size of a chapel stirs in the vertebrae, on tendrils as thick as ship's cables. The Hanging Mother.", 4);
+        Narr.Think("mother");
+    }
+    // her spine is only in reach when she is down on the ribs; her crown opens when two of its knots are broken
+    public override bool IsSealed(Knot k)
+    {
+        if (k.type == "spine") return !Down;
+        if (k.type == "crown") return knots.Count(q => q.type == "spine" && q.broken) < 2;
+        return false;
+    }
+    public override bool DamageKnot(Knot k, float dmg, string src) { Start(); return base.DamageKnot(k, dmg, src); }
+    public override void DamageFlesh(float d, float hx, float hy, string src) { Start(); base.DamageFlesh(d, hx, hy, src); }
+    public override void Flinch() { }
+    public override (float x, float y, float w, float h) HitBox() => (x, y, w, h);
+    public override void OnKnotBroken(Knot k, string src)
+    {
+        if (k.type == "crown")
+        {
+            ReleaseGrab();
+            gone = true; dead = true; mode = "gone";
+            FX.Salt(Cx(), Cy(), 90); G.Shake(10); Snd.Toll(); Snd.Rumble();
+            G.OnMotherKilled(this);
+            return;
+        }
+        if (k.type == "tendril")
+        {
+            // one of her young falls from the cut
+            var kp = KnotPos(k) ?? new Vector2(Cx(), y);
+            var spec = Props.Empty();
+            spec.Set("x", kp.X); spec.Set("anchorY", kp.Y - 6); spec.Set("len", 1); spec.Set("key", "mother_young_" + young++);
+            var g = new Gullet(spec, room); G.ents.Add(g); g.Drop();
+            if (young == 1) H.ToastMsg("One of her young drops from the cut tendril.", 2.5f);
+            Snd.Thud(Pan());
+            if (mode == "hang" && TendrilsLeft <= 2) Fall();
+            return;
+        }
+        if (k.type == "spine") { H.ToastMsg(knots.Count(q => q.type == "spine" && q.broken) >= 2 ? "Her back splits open over the crown." : "A knot in her spine cracks.", 2.5f); Narr.Think("crown"); }
+    }
+    void Fall()
+    {
+        mode = "fall";
+        float cx = Cx(), bottom = y + h;
+        w = LEN; h = 24; x = cx - w / 2; y = bottom - h; vy = 40;
+        Snd.Groan(Pan(), 0.6f);
+        H.ToastMsg("The last tendrils cannot hold her. She falls!", 2.5f);
+    }
+    public override void Think(float dt)
+    {
+        var p = G.player;
+        if (p == null) return;
+        if (mode == "dormant")
+        {
+            if (p.Cx() > room.Px + 14 * H.TILE || p.Feet() > room.Py + 19 * H.TILE) Start();
+            return;
+        }
+        if (mode == "hang")
+        {
+            dripCool -= dt; lashCool -= dt;
+            float d = H.Dist(p.Cx(), p.Cy(), Cx(), y + h);
+            // brine drips from her maw, aimed down at her
+            if (dripCool <= 0)
+            {
+                dripCool = Cool(2.2f);
+                float mx = Cx(), my = y + h, dx = p.Cx() - mx, t = H.Clamp(MathF.Abs(dx) / 200 + 0.3f, 0.4f, 1.1f), g = 420;
+                G.enemyShots.Add(new Shot { x = mx, y = my, vx = dx / t, vy = (p.Cy() - my) / t - 0.5f * g * t, grav = g, life = 2.4f, dmg = 1, src = this, kind = "brine" });
+                Snd.Splash(0.15f, Pan());
+            }
+            // and she lashes at anyone who climbs close
+            if (lashT > 0)
+            {
+                lashT -= dt;
+                if (lashT <= 0)
+                {
+                    Snd.Gaff(Pan()); G.Shake(2);
+                    if (H.Dist(p.Cx(), p.Cy(), Cx(), y + h * 0.7f) < 7 * H.TILE) { p.Hurt(2, this); p.vx += H.Sign(p.Cx() - Cx()) * 240; }
+                }
+            }
+            else if (lashCool <= 0 && d < 7 * H.TILE) { lashT = Wind(0.8f); lashCool = Cool(3f); foreach (var k in knots) if (!k.broken && k.type == "tendril") k.flare = 0.8f; Voices.Windup(this); }
+            return;
+        }
+        if (mode == "fall")
+        {
+            if (onGround)
+            {
+                mode = "ground"; groundT = 10;
+                G.Shake(8); Snd.Thud(Pan()); Snd.Rumble(); FX.Salt(Cx(), Feet(), 40);
+                if (H.RectsOverlap(x, y, w, h, p.x, p.y, p.w, p.h)) p.Hurt(2, this);
+                H.ToastMsg("She crashes down onto the ribs. The knots along her spine are in reach!", 3);
+            }
+            return;
+        }
+        if (mode == "climb")
+        {
+            climbT -= dt;
+            y = H.Lerp(HangTop(), fromY, H.Clamp(climbT / 1.5f, 0, 1));
+            if (climbT <= 0) { Hang(); mode = "hang"; dripCool = 1.5f; lashCool = 2; }
+            return;
+        }
+        // her time down on the ribs runs out whatever she is doing, short of a snap already coming
+        groundT -= dt;
+        if (groundT <= 0 && mode != "snap")
+        {
+            // new tendrils, and back up into the vertebrae
+            int grown = 0;
+            foreach (var k in knots.Where(k => k.type == "tendril" && k.broken).ToList()) { if (grown >= 3) break; k.broken = false; k.hp = k.max; grown++; }
+            fromY = Feet() - LEN;
+            w = 30; h = LEN; x = ax - w / 2; y = fromY;
+            mode = "climb"; climbT = 1.5f;
+            H.ToastMsg("She hauls herself back up into the vertebrae on new tendrils.", 3);
+            return;
+        }
+        if (mode == "snap")
+        {
+            vx *= 0.8f; atkT -= dt;
+            if (atkT <= 0)
+            {
+                mode = "recover"; atkT = 0.8f;
+                Snd.Gaff(Pan());
+                var hb = HitBox();
+                if (H.RectsOverlap(hb.x - 10, hb.y - 6, hb.w + 20, hb.h + 6, p.x, p.y, p.w, p.h)) p.Hurt(2, this);
+            }
+            return;
+        }
+        if (mode == "recover") { vx *= 0.85f; atkT -= dt; if (atkT <= 0) mode = "ground"; return; }
+        // down on the ribs: she drags herself at her, and snaps
+        cool -= dt;
+        int s = (int)H.Sign(p.Cx() - Cx()); if (s != 0) facing = s;
+        vx = H.Approach(vx, MathF.Abs(p.Cx() - Cx()) > 20 ? facing * 32 * Menace : 0, 300 * dt);
+        if (cool <= 0 && H.Dist(p.Cx(), p.Cy(), Cx(), Cy()) < 4.5f * H.TILE)
+        {
+            mode = "snap"; atkT = Wind(0.7f); cool = Cool(1.8f);
+            foreach (var k in knots) if (!k.broken) k.flare = 0.7f;
+            Voices.Windup(this);
+        }
+    }
+    public override void Physics(float dt, bool pinned = false)
+    {
+        if (mode is "dormant" or "hang" or "climb") { vx = vy = 0; return; }
+        base.Physics(dt, pinned);
+        // she never goes off the deck's ends
+        x = H.Clamp(x, room.Px + 6 * H.TILE, room.Px + room.Pw - 6 * H.TILE - w);
+    }
+    static Vector2 V(float x, float y) => new(x, y);
+    float AnchorX(int i) => ax + (i - (TENDRILS - 1) / 2f) * 34;
+    public override Dictionary<string, Vector2> Skeleton()
+    {
+        var j = new Dictionary<string, Vector2>();
+        float sway = MathF.Sin(anim * 0.7f) * 6;
+        if (!Down)
+        {
+            float cx = Cx() + sway, top = y;
+            for (int i = 0; i < TENDRILS; i++) j["t" + i] = V(H.Lerp(AnchorX(i), cx, 0.55f), H.Lerp(ay, top, 0.55f));
+            j["s1"] = V(cx, top + 12); j["s2"] = V(cx + sway * 0.2f, top + 38); j["s3"] = V(cx + sway * 0.35f, top + 62); j["s4"] = V(cx + sway * 0.5f, top + 82);
+            j["head"] = V(cx + sway * 0.6f, top + h);
+        }
+        else
+        {
+            float f = facing, cx = Cx(), gy = Feet() - 10;
+            float wv = MathF.Sin(anim * 6) * 2;
+            j["s1"] = V(cx - f * 36, gy + wv); j["s2"] = V(cx - f * 10, gy - wv); j["s3"] = V(cx + f * 14, gy + wv); j["s4"] = V(cx + f * 34, gy - wv);
+            j["head"] = V(cx + f * 48, gy + 2);
+            for (int i = 0; i < TENDRILS; i++) j["t" + i] = V(cx - f * (40 + i * 4), gy + 4 + (i % 2) * 3);
+        }
+        return j;
+    }
+    public override Palette Pal() => new() { robe = "#9fb7c0", skin = "#c8d4d4", cowl = null, dark = "#3a4a50" };
+    public override void Draw(Canvas c)
+    {
+        if (gone) return;
+        var j = Skel();
+        // her tendrils, from the vertebrae; the cut ones hang as stumps
+        for (int i = 0; i < TENDRILS; i++)
+        {
+            var k = K("t" + i); float axi = AnchorX(i);
+            if (k.broken) { c.StrokeStyle = "#6a7e86"; c.LineWidth = 3; c.Line(axi, ay - 4, axi + MathF.Sin(anim + i) * 3, ay + 30); continue; }
+            if (Down) continue;
+            var top = V(Cx() + MathF.Sin(anim * 0.7f) * 6, y);
+            c.StrokeStyle = "#8aa2aa"; c.LineWidth = 4;
+            c.BeginPath(); c.MoveTo(axi, ay - 4); c.QuadraticCurveTo(H.Lerp(axi, top.X, 0.5f) + MathF.Sin(anim * 1.1f + i) * 8, H.Lerp(ay, top.Y, 0.5f), top.X, top.Y); c.StrokePath();
+            c.Stroke = H.Rgba(255, 255, 255, 0.15f); c.LineWidth = 1; c.Line(axi - 1, ay, top.X - 1, top.Y);
+        }
+        // the body: plates of pale shell along a spine as long as a boat
+        string[] seg = { "s1", "s2", "s3", "s4" };
+        for (int i = 0; i < seg.Length; i++)
+        {
+            var a = j[seg[i]]; var b = i + 1 < seg.Length ? j[seg[i + 1]] : j["head"];
+            float r = 15 - i * 1.5f;
+            c.FillStyle = i % 2 == 0 ? "#8ea6ae" : "#7e969e";
+            c.BeginPath(); c.Ellipse((a.X + b.X) / 2, (a.Y + b.Y) / 2, Down ? 16 : r, Down ? r : 16, 0, 0, H.PI * 2); c.FillPath();
+            c.Fill = H.Rgba(230, 240, 240, 0.25f); c.BeginPath(); c.Ellipse((a.X + b.X) / 2 - 3, (a.Y + b.Y) / 2 - 4, 6, 4, 0, 0, H.PI * 2); c.FillPath();
+        }
+        // the maw, ringed with crystal teeth
+        var hd = j["head"];
+        c.FillStyle = "#2a1a1e"; c.BeginPath(); c.Ellipse(hd.X, hd.Y, 11, 9, 0, 0, H.PI * 2); c.FillPath();
+        c.Fill = H.Rgba(220, 240, 250, 0.9f);
+        for (int i = 0; i < 9; i++) { float a = i / 9f * H.PI * 2 + anim * 0.3f; c.FillCircle(hd.X + MathF.Cos(a) * 9, hd.Y + MathF.Sin(a) * 7, 1.6f); }
+        if (mode is "snap" || lashT > 0) c.Glow(hd.X, hd.Y, 16, H.Rgba(200, 240, 255, 0.35f));
+    }
+    public override Props Serialize() => null;
+}
+
 public class Kiln : Ent
 {
     public bool broken;

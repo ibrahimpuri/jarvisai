@@ -14,7 +14,7 @@ for (const f of require('./data-files')) {
 }
 const H = ctx.H;
 const SOLID = new Set('#_TRMPSbxCG='.split('').filter((c) => c !== '=' && c !== 'b'));
-const TILECHARS = new Set('#_TRMP=bSxoHELVCKZYyhGf|waQJ '.split(''));
+const TILECHARS = new Set('#_TRMP=bSxoHELVCKZYyhGf|waQJU '.split(''));
 let errors = 0;
 const err = (m) => { errors++; console.log('ERROR ' + m); };
 const warn = (m) => console.log('warn  ' + m);
