@@ -2086,7 +2086,7 @@ public static class Scenarios
             UI.Close();
             // steps done out of order are skipped
             f.Set("abbotDead", true); p.abilities.Add("boots"); t.Place("nave", 20, 16); await t.Run(0.2f);
-            t.Ok("steps already done are skipped", Guide.Current?.id == "prior", Guide.Current?.id);
+            t.Ok("steps already done are skipped", Guide.Current?.id == "west", Guide.Current?.id);
             // the guide can be put away
             Settings.Guide = false; await t.Run(0.05f);
             t.Ok("the guide can be turned off", !Guide.On);
