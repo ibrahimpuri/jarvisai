@@ -8,6 +8,7 @@ namespace Hollowmere;
 
 public static class Hud
 {
+    public static bool CleanShots;   // showcase screenshots: no debug tag
     static readonly Dictionary<string, string> PH_COL = new() { ["low"] = "#3d4b52", ["rising"] = "#3f7a86", ["high"] = "#244a73", ["ebbing"] = "#587a64" };
     static readonly Color GOLD = H.Col("#c9a14a"), GOLD_DIM = H.Col("#7a6230"), IRON = H.Rgba(14, 13, 12, 0.72f), TEXT = H.Col("#eadfc4"), MUTED = H.Col("#a89c80");
 
@@ -373,7 +374,7 @@ public static class Hud
         Guide.DrawHud(c);
         Hints.Draw(c);
         if (Inp.sneakLatch && Pad.Using) { c.Font = "7px caps"; c.FillStyle = "#a89c80"; c.FillText("creeping", 12, 62); }
-        if (G.god) { c.FillStyle = "#f66"; c.Font = "7px sans"; c.FillText("DEBUG", 6, H.VIEW_H - 4); }
+        if (G.god && !CleanShots) { c.FillStyle = "#f66"; c.Font = "7px sans"; c.FillText("DEBUG", 6, H.VIEW_H - 4); }
         Crosshair(c);
     }
 

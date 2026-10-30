@@ -14,7 +14,7 @@ namespace Hollowmere;
 
 public static class Playtest
 {
-    public static readonly HashSet<string> Slow = new() { "pt_doors", "pt_soak", "pt_objects", "pt_bells", "pt_debug", "pt_menus", "pt_route", "pt_long" };
+    public static readonly HashSet<string> Slow = new() { "pt_doors", "pt_soak", "pt_objects", "pt_bells", "pt_debug", "pt_menus", "pt_route", "pt_long", "pt_showcase" };
 
     // late in the game, every gate open and every tool in hand
     static void LateGame()
@@ -625,8 +625,150 @@ public static class Playtest
         t.Ok("a long night under attack piles nothing up", bad.Count == 0, string.Join("; ", bad));
     }
 
+    // ---- showcase: the island at its best, for sharing (run rendered: --test pt_showcase --out DIR) ----
+    static void Tidy()
+    {
+        G.titleT = 0; Guide.bannerT = 0; H.Toasts.Clear(); Narr.Reset(); UI.Close();
+        G.player.hp = G.player.maxHp; G.player.invulnT = 0;
+    }
+    static async Task Settle(Tester t, float secs = 1.2f)
+    {
+        LightingManager.Inst?.OnRoom(G.room, true);
+        await t.Run(secs);
+        G.titleT = 0; Guide.bannerT = 0; H.Toasts.Clear();
+    }
+    static void Story(int act, params string[] flags)
+    {
+        G.act = act;
+        foreach (var fl in flags) World.flags.Set(fl, true);
+        World.MarkDirty();
+    }
+    static async Task Showcase(Tester t)
+    {
+        Hud.CleanShots = true; Settings.Hints = false; Settings.Gore = "full";
+        var p = G.player; G.god = true;
+        foreach (var a in new[] { "boots", "jet", "tidekey", "seal" }) p.abilities.Add(a);
+        p.bag.Add("rivets", 40); p.oil = 90;
+        World.flags.Set("hollowGift", true);
+
+        // the title, then back to the game
+        UI.Title(); await t.Run(2.5f); t.Snap("01_title");
+        G.NewGame("keeper", 1); UI.Close(); Narr.Reset(); await t.Run(0.3f);
+        p = G.player; G.god = true;
+        foreach (var a in new[] { "boots", "jet", "tidekey", "seal" }) p.abilities.Add(a);
+        p.bag.Add("rivets", 40); p.oil = 90;
+        World.flags.Set("hollowGift", true);
+
+        // ashore in the storm: the Constance's deck, the island ahead
+        Story(1);
+        t.Place("reef", 25, 12); Tidy(); await Settle(t, 1.5f);
+        t.AimAt(p.Cx() - 160, p.Cy() - 30); await t.Run(0.6f); Tidy(); t.Snap("02_arrival");
+
+        // the first of the drowned, coming apart in the lantern's beam
+        t.Place("pier", 26, 16); Tide.AdvanceTo("rising"); Tidy();
+        Body sh = null;
+        for (int i = 0; i < 200; i++) { await t.Run(0.1f); sh = G.ents.OfType<Body>().FirstOrDefault(e => e.key == "first_shucker"); if (sh != null && sh.mode != "dormant") break; }
+        if (sh != null)
+        {
+            foreach (var id in new[] { "elbowL", "kneeL" })
+                for (int i = 0; i < 12 && !sh.K(id).broken; i++)
+                {
+                    var kp = sh.KnotPos(sh.K(id)).Value; t.AimAt(kp.X, kp.Y); t.Down("focus");
+                    await t.Click(); await t.Run(0.3f);
+                    if (p.weapons["driver"].mag == 0) { await t.Tap("reload"); await t.Run(1.4f); }
+                }
+            var crown = sh.KnotPos(sh.K("crown")); if (crown != null) t.AimAt(crown.Value.X, crown.Value.Y);
+            await t.Click(); await t.Run(0.06f); Tidy(); t.Snap("03_gore"); t.Release("focus");
+        }
+
+        // the Abbot of Salt in his cathedral of kilns
+        Story(1, "seawallOpen", "basinFilling", "basinCrossed");
+        t.Place("abbot", 5, 17); Tidy(); await Settle(t, 2.2f);
+        var ab = G.ents.OfType<Abbot>().FirstOrDefault(); if (ab != null) t.AimAt(ab.Cx(), ab.Cy());
+        await t.Run(0.3f); Tidy(); t.Snap("04_abbot");
+
+        // the Almoner, risen from his table
+        Story(2, "abbotDead");
+        t.Place("refectory", 74, 39); await t.Run(0.3f);
+        foreach (var b in G.ents.OfType<Body>()) if (b is not Almoner) b.gone = true;
+        t.Place("refectory", 56, 39); Tidy(); await Settle(t, 2.4f);
+        var al = G.ents.OfType<Almoner>().FirstOrDefault(); if (al != null) t.AimAt(al.Cx(), al.Cy());
+        await t.Run(0.3f); Tidy(); t.Snap("05_almoner");
+
+        // the Precentor, fused into the organ
+        Story(2, "almonerDead", "priorWedged");
+        t.Place("organloft", 2, 39); await t.Run(0.3f);
+        t.Place("organloft", 26, 39); Tidy(); await Settle(t, 2.4f);
+        var pc = G.ents.OfType<Precentor>().FirstOrDefault(); if (pc != null) t.AimAt(pc.Cx(), pc.Cy());
+        await t.Run(0.3f); Tidy(); t.Snap("06_precentor");
+
+        // the Hanging Mother, over the deck of ribs
+        Story(2, "precentorDead");
+        t.Place("spine", 30, 39); Tidy(); await Settle(t, 2.4f);
+        var hm = G.ents.OfType<HangingMother>().FirstOrDefault(); if (hm != null) t.AimAt(hm.Cx(), hm.Cy());
+        await t.Run(0.3f); Tidy(); t.Snap("07_hanging_mother");
+
+        // the Crown of the Skull, in the wind and the rain, the island under her
+        Story(3, "motherDead", "liftDropped", "undertowDead", "skullOpen");
+        t.Place("crown", 60, 9); Clear(); Tidy(); await Settle(t, 1.5f);
+        t.AimAt(p.Cx() + 200, p.Cy() + 40); await t.Run(0.4f); Tidy(); t.Snap("08_crown");
+
+        // the Drowned Bell: a dome of air at the bottom of the sea
+        G.bellsLit.Add("bell_drowned");
+        t.Place("drownedbell", 16, 16); Tidy(); await Settle(t, 1.5f);
+        t.AimAt(p.Cx() - 120, p.Cy() - 20); await t.Run(0.3f); Tidy(); t.Snap("09_drowned_bell");
+
+        // the Deep, and the thing that walks it
+        t.Place("deep", 96, 17); Tidy(); await Settle(t, 1.5f);
+        var dw = G.ents.OfType<Body>().Where(b => b.type == "deepwalker").OrderBy(b => MathF.Abs(b.Cx() - p.Cx())).FirstOrDefault();
+        if (dw != null) { t.AimAt(dw.Cx(), dw.Cy()); t.Down("focus"); }
+        await t.Run(0.8f); Tidy(); t.Snap("10_deep"); t.Release("focus");
+
+        // the Undertow, home in its lair
+        World.flags.Set("undertowDead", false); World.MarkDirty();
+        t.Place("buoychapel", 6, 13); await t.Run(0.2f);
+        t.Place("lair", 60, 12); Tidy(); await Settle(t, 1.6f);
+        var u = G.ents.OfType<Undertow>().FirstOrDefault(e => e.boss); if (u != null) t.AimAt(u.Cx(), u.Cy());
+        await t.Run(0.3f); Tidy(); t.Snap("11_undertow");
+        World.flags.Set("undertowDead", true); World.MarkDirty();
+
+        // the Shoal, throwing itself across the Brainpan
+        t.Place("brainpan", 20, 16); Tidy(); await Settle(t, 0.5f);
+        var so = G.ents.OfType<Shoal>().FirstOrDefault();
+        if (so != null)
+        {
+            p.x = so.Cx() - 7 * 16; p.y = so.Feet() - p.h;
+            for (int i = 0; i < 80; i++) { await t.Run(0.05f); if (so.started && so.vy < -150) break; }
+            t.AimAt(so.Cx(), so.Cy()); await t.Run(0.12f);
+        }
+        Tidy(); t.Snap("12_shoal");
+
+        // the Lamp, and Agathe
+        Story(3, "shoalDead");
+        t.Place("lamp", 10, 16); Tidy(); await Settle(t, 1.5f);
+        t.AimAt(p.Cx() + 140, p.Cy() - 60); await t.Run(0.3f); Tidy(); t.Snap("13_lamp");
+
+        // the Sunken Choir
+        t.Place("choir", 20, 16); Clear(); Tidy(); await Settle(t, 1.5f);
+        t.AimAt(p.Cx() + 120, p.Cy() - 40); await t.Run(0.3f); Tidy(); t.Snap("14_choir");
+
+        // the chart of the whole island
+        foreach (var r in Data.Rooms) World.State(r.Id).visited = true;
+        t.Place("crown", 60, 9); Clear(); Tidy(); await t.Run(0.2f);
+        UI.Map(); await t.Run(0.6f); t.Snap("15_map"); UI.Close(); await t.Run(0.2f);
+
+        // and the sea, when it has her
+        t.Place("nave", 20, 16); Tidy(); await Settle(t, 0.6f);
+        G.god = false; p.invulnT = 0; p.hp = 1; p.Hurt(5);
+        for (int i = 0; i < 30 && UI.Kind != "death"; i++) await t.Run(0.1f);
+        await t.Run(1.5f); t.Snap("16_death"); UI.Close();
+        G.god = true; Hud.CleanShots = false; Settings.Hints = true;
+        t.Ok("showcase taken", true);
+    }
+
     public static void Register(Dictionary<string, Func<Tester, Task>> all)
     {
+        all["pt_showcase"] = Showcase;
         all["pt_long"] = Long;
         all["guideroutes"] = GuideRoutes;
         all["pt_route"] = Route;
